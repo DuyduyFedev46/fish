@@ -168,10 +168,12 @@ export type MissingField =
   | "description";
 
 export interface ContentWarning {
-  type: "phone_like" | "cost_keyword" | "item_unavailable";
+  type: "phone_like" | "cost_keyword" | "item_unavailable" | "claim";
   field?: string;
   snippet?: string;
   item_code?: string;
+  /** Cụm khẳng định cấm đã gặp (chỉ có ở loại "claim"). */
+  claim?: string;
 }
 
 export interface EntryPublishPayload {

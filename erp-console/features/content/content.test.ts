@@ -216,7 +216,7 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
         kind: "post",
         title: "Kinh nghiệm chọn cá thu ngon",
         category: 1,
-        excerpt: "Bí quyết chọn cá tươi ngon mắt trong mang đỏ.",
+        excerpt: "Bí quyết chọn cá thu ngon mắt trong mang đỏ.",
       });
 
       // Tạo ảnh và gán cover

@@ -44,7 +44,7 @@ Route chi tiết dùng query string thay route động vì xuất tĩnh không d
 ```
 frontend/
   app/                 route: page.tsx, layout.tsx (CartProvider + ToastProvider ở root), globals.css (token),
-                       legacy.css (class cũ, xoá ở lô 5), about/, blog/, pages/, shop/, ui-preview/
+                       about/, blog/, pages/, shop/, ui-preview/
   components/
     ShopFrame.tsx      khung trang: header + main + footer + BottomNav, mỗi màn tự bọc
     ShopHeader, ShopFooter, BottomNav, LogoSlot, CartContext, shopLinks.ts
@@ -54,14 +54,14 @@ frontend/
     cart/              (✚ lô 2)
   features/            home/, catalog/, checkout/, content/ (mkt-brand), site/ (mkt-brand), ui-preview/
   lib/                 api.ts (MỌI gọi Shop API đi qua đây), mock.ts, types.ts, format.ts, quantity.ts, phone.ts
-  scripts/             check-no-mock.mjs, test-format.mjs, test-quantity.mjs, test-phone.mjs, test-safe-href.mjs
+  scripts/             check-no-mock.mjs, test-*.mjs (format, quantity, phone, safe-href, home-content…)
   e2e/                 kịch bản Playwright (Python)
 ```
 
 Component trong `components/ui|catalog|cart|search` chỉ **trình bày**: props vào, callback ra, không gọi API, không
 đọc storage. Chỉ `*Screen.tsx`, `ShopHeader` và `ShopFooter` được gọi API. Token màu và chữ lấy từ `DESIGN.md` ở gốc repo.
 
-Còn tồn tại nhưng sẽ xoá ở lô 5 (02b §1.11): `legacy.css`, `features/home/content.ts`. Code lô 3+4 cũ (`CountdownTimer`, `OrderLookup`, `storage.ts`, `PaymentPanel`, `OrderPaymentPanel`, khối thông báo xác nhận) đã xoá.
+Đã xoá ở lô 5c (02b §1.11): file class cũ của Shop và file chữ tạm của trang chủ (banner, cam kết nay lấy từ CMS). Code lô 3+4 cũ (`CountdownTimer`, `OrderLookup`, `storage.ts`, `PaymentPanel`, `OrderPaymentPanel`, khối thông báo xác nhận) đã xoá.
 
 ## API chính
 

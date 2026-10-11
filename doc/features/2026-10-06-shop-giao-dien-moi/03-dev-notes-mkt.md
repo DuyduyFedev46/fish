@@ -392,3 +392,80 @@ $ python3 scripts/check_naming.py -> exit 1, chỉ backend/apps/sales/orders/tes
 $ e2e content_public_pages.py, content_item_card.py: chỉ kiểm cú pháp (ast.parse OK); chưa chạy (cần BE :8104 + Shop :3104 + nạp nội dung).
 ```
 Không build frontend, không chạy test backend (lô 5b không đụng `backend/`).
+
+## Lô 5c (5c-MKT): SHOP-5-03, SHOP-5-06, SHOP-5-07 + nợ §12 (claim scan, L3, L7)
+
+```mermaid
+flowchart LR
+  L["Lộc sửa trang home-banner / home-commitments ở ERP"] --> W{"Có cụm chưa có nguồn?"}
+  W -- "có" --> C["Cảnh báo, Lộc sửa hoặc xác nhận vẫn đăng"]
+  W -- "không" --> P["Đăng"]
+  C --> P
+  P --> H["Trang chủ: banner, dải cam kết"]
+  P --> S["Dải chữ đầu trang mọi màn (máy tính)"]
+  H -. "chưa có trang" .-> X["Ẩn khối"]
+  S -. "chưa có trang" .-> F["Câu dự phòng, số kg từ site-info"]
+```
+
+> `mkt-brand` · 11/10/2026 · nhánh `shop/lo-5c-content-batch-pnl` · Trạng thái: **CHỜ REVIEW** (techlead + QA). Không commit.
+
+### File đổi
+| File | Việc |
+|---|---|
+| `backend/apps/content/body/scan.py` | 02b §3.7.5: `DEFAULT_BLOCKED_CLAIMS` (tươi sống, đánh bắt sáng nay, về cảng mỗi ngày, luôn có hàng, miễn phí giao, phí giao, giao trong ngày, Cân đúng, hút chân không, cấp đông ngay tại cảng), `get_blocked_claims()` (setting `CONTENT_BLOCKED_CLAIMS`, tuple hoặc chuỗi phẩy), `find_blocked_claims()`. Cảnh báo loại `claim` `{field, claim, snippet}` (snippet che SĐT); so chữ thường NFC **giữ dấu** ("cần dùng" ≠ "Cân đúng"); cụm chồng nhau chỉ báo một lần. Đi qua luồng `CONTENT_WARNINGS` sẵn có: cảnh báo, không chặn |
+| `backend/apps/content/management/commands/load_shop_content.py` | dùng chung danh sách cụm cấm của `scan.py` (bỏ hằng riêng); AC5 5-06: production (không `--publish`) trang có vai trò bắt buộc ghi `AuditLog content_load` note "…; chờ legal-vn duyệt trước khi đăng" |
+| `backend/apps/content/management/shop_content/pages.json` | thêm `home-banner` (1 slide: "Mua theo lô tại cảng" · "Hải sản cấp đông, giá theo kg, mua từ {min_qty_kg} kg." · nút "Xem hàng đang có" → `/shop/`; tóm tắt "Hải sản cấp đông theo lô · mua từ {min_qty_kg} kg · giao tận nhà") và `home-commitments` (3 mục); `khieu-nai` mục 2: "trong vòng 2 giờ kể từ khi nhận phản ánh trong giờ làm việc ([giờ mở] – [giờ đóng])" |
+| Test BE | mới `body/tests/test_scan_claims.py` (10), `tests/test_scan_warnings.py` lớp `ClaimWarningApiTests` (3: 409 có claim, xác nhận thì đăng 200 + AuditLog `claim`, NV kho 403), `test_load_shop_content.py` lớp `LoadShopContentHomeBlockTests` (5) + `LoadShopContentPolicyTextTests` (4); số trang 10→12, 15→17 |
+| `frontend/features/home/homeBlocks.ts` (mới) | hàm thuần `parseBanner`, `parseCommitments`, `stripTextOf`, `fallbackStripText`, `commitmentIcon`; khối sai dạng bỏ qua; nút chỉ nhận link nội bộ một lần `/`; ảnh chỉ `http(s)` |
+| `frontend/features/home/homeContent.ts` (mới) | `loadHomeBanner/loadHomeCommitments`: cache khi có trang hoặc 404/410, bỏ cache khi lỗi mạng |
+| `frontend/features/home/components/HomeScreen.tsx` + css | banner từ CMS (đang tải: giữ khung; không có: ẩn + h1 ẩn "Cá Về: hải sản cấp đông theo lô"; nhiều slide: chấm 44 px, không tự chạy); cam kết từ CMS (điện thoại 3 ô, máy tính 2 ô, rỗng ẩn); khẩu hiệu K1 và ô thanh toán H6 giữ ở code |
+| `frontend/components/ShopFrame.tsx` (chỉ chỗ dải chữ) | L7: dải chữ = tóm tắt `home-banner`; không có trang/lỗi → câu dự phòng với `policies.min_qty_kg` của site-info; bỏ `INTRO_TEXT` |
+| `frontend/features/content/policySummary.ts` | L3: lỗi mạng/5xx không giữ cache (404/410 vẫn giữ) |
+| `frontend/features/content/{slugs.ts, mock.ts}` | slug `home-banner`, `home-commitments`; mock hai trang + câu khiếu nại mới |
+| xoá | `frontend/features/home/content.ts`, `frontend/app/legacy.css` (+ import ở `layout.tsx`; grep class/biến cũ: không còn ai dùng) |
+| `frontend/scripts/test-home-content.mjs` (mới) | 37 ca: banner, cam kết, dải chữ, cache home + L3 (ca L3 ĐỎ trên bản `policySummary.ts` cũ: 36/37) |
+| `erp-console/features/content/{messages.ts, types.ts, contentModel.ts, *.test.ts}` | 5-07: "Viết bài đầu tiên để giới thiệu hàng và công thức cho khách."; cảnh báo `claim`: "Có câu “…”: Cá Về chưa cam kết điều này, nên sửa lại" (kèm snippet như loại khác) |
+| `doc/ops/cms-cho-mkt.md` §7, `frontend/README.md`, `features/home/README.md` | cách soạn hai trang trang chủ, danh sách cụm cảnh báo |
+
+### Chữ (nguồn đối chiếu)
+| Vị trí | Câu | Nguồn · trạng thái |
+|---|---|---|
+| Banner slide 1 | "Mua theo lô tại cảng" · "Hải sản cấp đông, giá theo kg, mua từ 1 kg." · "Xem hàng đang có" | 06-mkt H2 (bản không "biết rõ nguồn"); decisions 10/10 giá theo kg, tối thiểu 1 kg · ĐÃ ĐỐI CHIẾU. Bỏ "Cân đúng" (S-18) |
+| Dải chữ đầu trang | "Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà" | 06-mkt K2 · ĐÃ ĐỐI CHIẾU |
+| Cam kết 1–3 | "Cấp đông theo lô · Mua tại cảng, mỗi lô có hạn dùng riêng." / "Giao tận nhà · Đã gồm giao hàng ở Phan Thiết, không trả thêm khi nhận hàng." / "Quét mã QR · Chuyển khoản bằng app ngân hàng, tiền về đủ là đơn tự xác nhận." | 06-mkt H7, H8 (đổi sang câu "Đã gồm giao hàng" theo BR-BH-30, decisions 10–11/10), H6 (BR-TT-04) · ĐÃ ĐỐI CHIẾU; cam kết 2 CHỜ PHÁP LÝ |
+| Khiếu nại mục 2 | "…trong vòng 2 giờ kể từ khi nhận phản ánh trong giờ làm việc ([giờ mở] – [giờ đóng])." | Duy chốt 11/10 "dưới 2 giờ" · CHỜ PHÁP LÝ; CHỜ DUY: 2 giờ có tính ngoài giờ làm việc không (em giữ "trong giờ làm việc" để không hứa 24/7) |
+| Đổi trả mục 4 | gọi trong 1 ngày làm việc (`SHOP_CANCEL_CALLBACK_WITHIN`), chuyển tiền trong 3 ngày làm việc | Duy chốt 11/10 · CHỜ PHÁP LÝ (đã có từ lô 1, kiểm lại bằng test) |
+| Giao hàng | "khu vực Phan Thiết" | Duy chốt 11/10 · CHỜ PHÁP LÝ |
+
+Các ô `[…]` chờ số thật giữ nguyên (5-06 AC3, có test). Slide 2–3 chưa soạn (CHỜ DUY; khuyến mãi phải qua `legal-vn`).
+
+### Lệch / việc cho người khác
+1. **5-07 AC1 chưa đạt trọn:** `grep -rn "cá tươi" erp-console/` còn `erp-console/app/print/label/page.tsx:164` "Vựa cá tươi sống B2C" (tem phiếu giao, file fe-dev, ngoài danh sách lô). Câu này sai nghiệp vụ (hàng cấp đông). Đề xuất fe-dev đổi thành "Hải sản cấp đông theo lô".
+2. **5-06 AC5 "cờ trong ghi chú bản nháp":** CMS không có trường ghi chú bản nháp; cờ nằm ở ghi chú dòng `content_load` (Nhật ký) + cột "Trang bắt buộc trước khi mở bán" sẵn có. Muốn hiện ngay trên màn soạn cần trường mới (techlead).
+3. Dải chữ đầu trang gọi thêm `GET /api/public/content/entries/home-banner/` một lần mỗi lần mở web (cache trong phiên, dùng chung với HomeScreen).
+4. Trang `home-banner`, `home-commitments` vẫn mở được ở `/pages/?slug=` (không link nào trỏ tới); review L5: `PageScreen.tsx` đặt `noindex` cho 2 slug này (tsc=0, không build).
+5. **Staging:** sau khi gộp chạy `load_shop_content --author <Chủ> --publish` để tạo hai trang trang chủ; trang `khieu-nai` đã nạp trước sẽ "bỏ qua: đã sửa" nếu Lộc đã sửa tay, không thì cập nhật câu 2 giờ (cần `--overwrite` nếu đã sửa).
+6. Chưa chụp 360/1280 (QA chụp ở lô 7: `/` có banner, không banner, 2 slide; dải chữ máy tính).
+
+### Kiểm chứng (11/10, chạy trong lượt này)
+```
+$ cd backend && .venv/bin/python manage.py test apps.content.body.tests.test_scan_claims   (trước khi code: ImportError -> ĐỎ)
+Ran 10 tests ... OK
+$ .venv/bin/python manage.py test apps.content.tests.test_load_shop_content   (trước khi nạp 2 trang mới: FAILED failures=6, errors=5 -> ĐỎ)
+Ran 33 tests in 18.774s · OK
+$ .venv/bin/python manage.py test apps.content apps.common
+Ran 496 tests in 33.360s · OK
+$ .venv/bin/python manage.py makemigrations --check --dry-run  -> No changes detected
+
+$ cd frontend && rm -rf .next && npm ci && npx tsc --noEmit            -> tsc=0
+$ NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build -> build=0 (12 trang tĩnh, / 5.52 kB)
+$ node scripts/check-no-mock.mjs  -> XANH — không thấy seed mock nào trong bản build.
+$ for f in scripts/test-*.mjs: cart-reconcile 20/20 · catalog-view 21/21 · format 33/33 · home-content 37/37 · order-state 78/78
+  · phone 17/17 · quantity 45/45 · safe-href 40/40 · voucher 31/31
+$ grep -rnE "#[0-9A-Fa-f]{6}\b|#[0-9A-Fa-f]{3}\b" app components features | grep -v app/globals.css | wc -l  -> 0
+$ grep -rn "legacy.css\|features/home/content" frontend --exclude-dir=node_modules --exclude-dir=.next --exclude-dir=out -> 0 dòng
+
+$ cd erp-console && ./node_modules/.bin/tsc --noEmit -> 0 · npx vitest run features/content -> Test Files 6 passed · Tests 97 passed
+$ grep -rn "cá tươi" erp-console/ (bỏ node_modules) -> chỉ còn app/print/label/page.tsx:164 (xem Lệch 1)
+$ python3 scripts/check_naming.py -> OK, không phát sinh mới
+```

@@ -161,7 +161,7 @@ function LabelPrintContent() {
           <div className={s.labelHeadRow}>
             <div>
               <div className={s.labelBrand}>CÁ VỀ</div>
-              <div className={s.labelSub}>Vựa cá tươi sống B2C</div>
+              <div className={s.labelSub}>Hải sản cấp đông theo lô</div>
             </div>
             {labelData.is_reprint && <div className={s.labelReprint}>{reprintTitle}</div>}
           </div>

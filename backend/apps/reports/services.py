@@ -15,13 +15,43 @@ Hai góc nhìn (12.1):
 
 Không có bảng dữ liệu riêng — mọi thứ tính lại từ sales/inventory/purchasing.
 """
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from apps.common.exceptions import BusinessError
 from apps.inventory.models import Batch, ReturnToStock, StockLedgerEntry
-from apps.sales.models import Refund, SalesCreditNote, SalesCreditNoteLine, SalesInvoice
+from apps.sales.models import (
+    Refund, SalesCreditNote, SalesCreditNoteLine, SalesInvoice, VoucherRedemption,
+)
 
 ZERO = Decimal("0")
+ONE_DONG = Decimal("1")
+
+
+def _net_shares(line, *, voucher_order_ids, cache):
+    """
+    {pk phân bổ: doanh thu của phân bổ} cho một dòng hoá đơn (BR-BC-04, Duy 11/10), ghi nhớ theo `line.pk` trong `cache`.
+
+    CHỈ đơn có lượt mã giảm giá `USED` (`voucher_order_ids`) mới tính theo tiền thực thu: `SalesInvoiceLine.amount`
+    (sau giảm mã đã phân bổ vào dòng) chia theo kg phân bổ, làm tròn đồng bằng cộng dồn, phân bổ cuối nhận phần dư
+    nên tổng các lô đúng bằng `amount`. Mọi đơn khác, kể cả đơn có ưu đãi tự động (PricingRule), giữ `qty × rate`
+    như cũ để không đổi số lô/kỳ đã chốt.
+    """
+    if line.pk in cache:
+        return cache[line.pk]
+    allocs = list(line.batch_allocations.order_by("pk"))
+    total_qty = sum((a.qty for a in allocs), ZERO)   # chia theo kg phân bổ (combo: kg thành phần)
+    if line.invoice.sales_order_id not in voucher_order_ids or total_qty == ZERO:
+        shares = {a.pk: a.qty * line.rate for a in allocs}
+    else:
+        shares, cum_qty, prev = {}, ZERO, ZERO
+        for i, a in enumerate(allocs):
+            cum_qty += a.qty
+            cum = line.amount if i == len(allocs) - 1 else (line.amount * cum_qty / total_qty).quantize(
+                ONE_DONG, rounding=ROUND_HALF_UP)
+            shares[a.pk] = cum - prev
+            prev = cum
+    cache[line.pk] = shares
+    return shares
 
 
 def batch_pnl(*, batch):
@@ -29,7 +59,8 @@ def batch_pnl(*, batch):
     Lãi/lỗ theo lô (nguồn sự thật, BR-BC-04):
         Lãi/lỗ = doanh thu bán từ lô − (giá mua + chi phí phân bổ − tiền NCC hoàn)
 
-    - doanh thu bán từ lô = Σ(SalesInvoiceLineBatch.qty × rate dòng hoá đơn tương ứng),
+    - doanh thu bán từ lô = Σ phần thực thu của phân bổ (= qty × rate khi dòng không giảm; có mã giảm thì
+      `SalesInvoiceLine.amount` chia theo kg, tròn đồng — Duy 11/10, xem `_net_shares`),
       loại trừ hoá đơn đã huỷ (status=CANCELLED), TRỪ Σ dòng chứng từ đảo của lô
       (BR-HT-10: đơn huỷ sau thanh toán vẫn giữ hoá đơn ISSUED nhưng doanh thu đã đảo).
       Lô đã CLOSED chỉ trừ dòng chứng từ có issued_at <= closed_at (E2, Duy quyết 30/09: lô đã chốt
@@ -50,10 +81,17 @@ def batch_pnl(*, batch):
 
     revenue = ZERO
     qty_sold = ZERO
-    for alloc in batch.sold_allocations.select_related("invoice_line__invoice").exclude(
+    sold = list(batch.sold_allocations.select_related("invoice_line__invoice").exclude(
         invoice_line__invoice__status=SalesInvoice.Status.CANCELLED   # BR-BC-04 (L-11, Duy duyệt 28/09)
-    ):
-        revenue += alloc.qty * alloc.invoice_line.rate
+    ))
+    # Một truy vấn cho cả lô: các đơn có lượt mã đã dùng (không thêm field, không đụng đơn không mã).
+    voucher_order_ids = set(VoucherRedemption.objects.filter(
+        state=VoucherRedemption.State.USED,
+        order_id__in={a.invoice_line.invoice.sales_order_id for a in sold},
+    ).values_list("order_id", flat=True))
+    cache = {}
+    for alloc in sold:
+        revenue += _net_shares(alloc.invoice_line, voucher_order_ids=voucher_order_ids, cache=cache)[alloc.pk]
         qty_sold += alloc.qty
 
     reversed_qty = ZERO
@@ -65,9 +103,14 @@ def batch_pnl(*, batch):
         # E2 (Duy quyết 30/09, BR-BC-04): lô đã chốt không đổi số — chứng từ lập SAU lúc chốt
         # (kể cả lập bù) không làm đổi lãi lỗ lô, chỉ vào period_pnl kỳ hiện tại.
         credit_lines = credit_lines.filter(credit_note__issued_at__lte=batch.closed_at)
-    for cl in credit_lines:
+    for cl in credit_lines.select_related("invoice_line_batch__invoice_line__invoice"):
         reversed_qty += cl.qty
-        reversed_revenue += cl.amount
+        # Đảo đúng phần doanh thu đã ghi của phân bổ (thực thu nếu đơn dùng mã), theo tỉ lệ kg khi đảo một phần.
+        silb = cl.invoice_line_batch
+        # Chứng từ chỉ gắn hoá đơn ISSUED, đã nằm trong `sold` nên `voucher_order_ids` đã đủ.
+        share = _net_shares(silb.invoice_line, voucher_order_ids=voucher_order_ids, cache=cache)[silb.pk]
+        reversed_revenue += share if cl.qty == silb.qty else (share * cl.qty / silb.qty).quantize(
+            ONE_DONG, rounding=ROUND_HALF_UP)
     revenue -= reversed_revenue
     qty_sold -= reversed_qty
 

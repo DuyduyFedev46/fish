@@ -808,7 +808,7 @@ OrderTimeline 5 bước: Đặt hàng (`placed_at`) → Thanh toán (`paid_at`) 
 
 ## 8. Đề xuất cho Duy (không chặn, không làm ở đợt này)
 1. **Lãi lỗ theo lô dùng đơn giá gộp** (`reports/services.py::batch_pnl`: `alloc.qty × invoice_line.rate`) nên bỏ qua mọi giảm giá (PricingRule có từ trước, nay thêm mã), và với combo nhân kg thành phần với giá **mỗi combo**.
-   Sửa sẽ đổi số các lô đã chốt (trái "không sửa số kỳ cũ") → cần Duy quyết riêng, hồ sơ riêng. Đợt này: lãi lỗ theo kỳ đúng (hoá đơn đã trừ giảm); theo lô giữ như cũ.
+   **Đã làm 2026-10-11** (Duy chốt chiều 11/10, phần mã giảm giá): `batch_pnl` dùng doanh thu thực thu của dòng (sau giảm) chia theo kg phân bổ; đơn không mã không đổi số. Phần PricingRule/combo ngoài mã: chưa đổi (dòng không giảm vẫn `qty × rate`).
 2. PricingRule hiện cho giảm tới 100%, không trần tiền (V-10): đề xuất áp cùng trần 50% khi tạo/sửa rule mới — chưa làm.
 
 ---

@@ -133,3 +133,17 @@ $ python3 scripts/check_naming.py   # backend sạch; còn lỗi ở frontend/ (
 - **L3:** `apps/ai/registry/tests/test_forbidden_prefixes.py::VoucherForbiddenForAiTests` (4 đường dẫn bị cấm, registry không có lệnh voucher).
 - **L5:** PATCH `is_active` → `FIELD_LOCKED` với câu "Dùng nút Tắt mã hoặc Bật lại mã…" ở mọi giai đoạn; test `IsActiveLockedTests`.
 - Kiểm chứng: `manage.py test apps.catalog apps.sales apps.ai` (không có app `apps.payments`) → Ran 1534 tests, OK (skipped=9).
+
+## Lãi lỗ theo lô trừ mã (BR-BC-04, Duy chốt 11/10)
+- Sửa `backend/apps/reports/services.py`: hàm mới `_net_shares(line)`; `batch_pnl` dùng nó cho doanh thu và cho phần chứng từ đảo (đảo trọn một phân bổ thì đảo đúng phần thực thu). Giá vốn, API, migration: không đổi.
+- Quy tắc (đã sửa sau review H1, xem mục dưới): chỉ đơn có mã đã dùng mới tính theo thực thu. Dòng của đơn đó: `SalesInvoiceLine.amount` chia theo kg phân bổ, làm tròn đồng bằng cộng dồn, phân bổ cuối nhận phần dư, nên tổng các lô = `amount`. Combo có giảm chia theo kg thành phần.
+- "Từ nay / kỳ đã chốt": không có snapshot hay khoá kỳ; `batch_pnl` và `period_pnl` tính lại từ dữ liệu gốc. Chỉ đơn có `VoucherRedemption` USED (từ lô 3b, mới lên staging) đổi cách tính, nên mọi lô/kỳ có sẵn, kể cả đơn có PricingRule, không đổi số. Lô staging đã chốt mà có đơn dùng mã sẽ đổi số: dữ liệu demo, chấp nhận. Không đổi trạng thái đơn.
+- Test: `apps/reports/tests/test_voucher_period_pnl.py` (lô trừ giảm, đơn không mã, dòng ăn 2 lô tổng khớp và tròn đồng, kỳ khớp lô, huỷ sau thanh toán đảo đúng phần thực thu). Quyền xem lãi lỗ lô không đổi (test_api/cost_leak có sẵn).
+- Nợ: PricingRule không phải mã và combo không giảm vẫn dùng `qty × rate` như cũ (02b §8.1).
+
+### Sửa sau review lãi lỗ theo lô (review lô 5c: H1, M1, L1, L2)
+- H1: lập luận trước ("dòng amount != qty×rate là giảm mã") sai, vì PricingRule cũng ghi giảm vào `amount`. Nay `batch_pnl` lấy một lần tập đơn có `VoucherRedemption.state=USED` và chỉ các đơn đó chia theo thực thu; đơn khác (kể cả PricingRule, lô đã chốt) giữ `qty × rate`. Không thêm field, không migration.
+- M1: `_net_shares` ghi nhớ theo `line.pk` trong một lần `batch_pnl`; test đếm truy vấn không tăng theo số phân bổ.
+- L1: chứng từ đảo một phần chia theo tỉ lệ `cl.qty / silb.qty` của phần doanh thu đã ghi. L2: docstring test đã sửa. L4 (mkt-brand): không đụng.
+- Test mới: PricingRule không mã = 600.000; lô đã chốt có đơn PricingRule không đổi; mã + PricingRule = tiền thực thu của hoá đơn.
+- Câu hỏi mở cho Duy: có trừ cả ưu đãi tự động cho đơn từ nay không (cần mốc ngày bằng setting). Chưa có thì giữ như trên.

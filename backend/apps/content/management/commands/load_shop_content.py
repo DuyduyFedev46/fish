@@ -30,10 +30,22 @@ from django.db import transaction
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 from apps.content.body.sanitize import normalize_body
-from apps.content.body.scan import PHONE_RE, get_phone_allowlist, normalize_phone_digits, scan_entry_warnings
+from apps.content.body.scan import (
+    PHONE_RE,
+    get_blocked_claims,
+    get_phone_allowlist,
+    normalize_phone_digits,
+    scan_entry_warnings,
+)
 from apps.content.body.slug import normalize_name_key
 from apps.content.categories.services import create_category
-from apps.content.entries.services import calculate_content_hash, missing_fields, publish_entry, save_draft
+from apps.content.entries.services import (
+    GOLIVE_PAGE_ROLES,
+    calculate_content_hash,
+    missing_fields,
+    publish_entry,
+    save_draft,
+)
 from apps.content.images.services import upload_content_image
 from apps.content.management.content_markup import lines_to_blocks
 from apps.content.models.categories import Category
@@ -41,8 +53,12 @@ from apps.content.models.entries import Entry
 
 DEFAULT_SOURCE = Path(__file__).resolve().parents[1] / "shop_content"
 LOAD_ACTION = "content_load"
-# "Phí giao": Shop không có dòng phí giao (BR-BH-30, UI-RULES §2.3, QA lô 1 B1).
-DEFAULT_BLOCKED_CLAIMS = ("miễn phí giao", "Phí giao", "hút chân không", "cấp đông ngay tại cảng", "Cân đúng", "tươi sống")
+LOAD_NOTE = "Lệnh nạp nội dung Shop"
+# SHOP-5-06 AC5, BR-ND-21: trang chính sách nạp Nháp ở production phải chờ legal-vn duyệt rồi mới bấm Đăng.
+# CMS chưa có trường ghi chú bản nháp, nên cờ nằm ở ghi chú dòng nạp (Nhật ký) + cột "Trang bắt buộc" của màn Nội dung.
+LEGAL_PENDING_NOTE = "chờ legal-vn duyệt trước khi đăng"
+# Cụm khẳng định cấm dùng chung với máy quét CMS: `apps.content.body.scan.DEFAULT_BLOCKED_CLAIMS` (02b §3.7.5;
+# gồm "Phí giao" vì Shop không có dòng phí giao, BR-BH-30, QA lô 1 B1).
 PLACEHOLDER_ALT_PREFIX = "Ảnh minh hoạ"
 # Màu ảnh tạm theo token DESIGN.md: accent-soft (nền) và surface-3 (dải dưới).
 PLACEHOLDER_BACKGROUND = (0xEB, 0xF2, 0xFE)
@@ -105,9 +121,7 @@ class Command(BaseCommand):
 
         self.variables = self._variables()
         self.allowed_phones = self._allowed_phones()
-        self.blocked_claims = [
-            _nfc_lower(c) for c in getattr(settings, "CONTENT_BLOCKED_CLAIMS", DEFAULT_BLOCKED_CLAIMS) if str(c).strip()
-        ]
+        self.blocked_claims = get_blocked_claims()
         self.counts = {"created": 0, "updated": 0, "unchanged": 0, "skipped": 0, "published": 0}
         self.errors: list[str] = []
 
@@ -346,7 +360,7 @@ class Command(BaseCommand):
                 actor=self.author,
                 obj=entry,
                 changes={"entry_id": entry.pk, "draft_hash": entry.draft_hash},
-                note="Lệnh nạp nội dung Shop",
+                note=self._load_note(entry),
             )
 
         if self.publish:
@@ -364,6 +378,11 @@ class Command(BaseCommand):
         if result == "không đổi" and self.publish:
             self.counts["unchanged"] += 1
         return result
+
+    def _load_note(self, entry: Entry) -> str:
+        if not self.publish and entry.kind == "page" and entry.page_role in GOLIVE_PAGE_ROLES:
+            return f"{LOAD_NOTE}; {LEGAL_PENDING_NOTE}"
+        return LOAD_NOTE
 
     @staticmethod
     def _assert_publishable(entry: Entry, *, ignore_cover: bool = False) -> list:

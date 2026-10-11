@@ -15,7 +15,7 @@ import PolicyNav from "@/features/site/components/PolicyNav";
 import { fetchPublicEntry } from "../api";
 import { headingAnchors } from "../headings";
 import { GONE_TITLE, LOAD_ERROR_TITLE, NOT_FOUND_TITLE, setPageDescription, setPageMeta, withBrand } from "../pageMeta";
-import { CONTACT_SLUG, HOW_TO_BUY_SLUG, policyHref } from "../slugs";
+import { CONTACT_SLUG, HOME_BANNER_SLUG, HOME_COMMITMENTS_SLUG, HOW_TO_BUY_SLUG, policyHref } from "../slugs";
 import type { PublicEntryDetail } from "../types";
 import ArticleBody from "./ArticleBody";
 import ContactView from "./ContactView";
@@ -55,7 +55,9 @@ export default function PageScreen() {
       const entry = await fetchPublicEntry(slug);
       setState({ kind: "ready", entry });
       // seo_title trong CMS đã có "Cá Về" thì không thêm hậu tố lần nữa (QA lô 1 L2).
-      setPageMeta({ title: withBrand(entry.seo_title || entry.title || ""), noindex: false });
+      // Trang khối trang chủ (SHOP-5-03) không phải trang đọc: vẫn mở được nhưng không cho máy tìm kiếm lập chỉ mục (review lô 5c L5).
+      const homeBlock = entry.slug === HOME_BANNER_SLUG || entry.slug === HOME_COMMITMENTS_SLUG;
+      setPageMeta({ title: withBrand(entry.seo_title || entry.title || ""), noindex: homeBlock });
       setPageDescription(entry.description || entry.excerpt);
     } catch (err) {
       const failure = failureOf(err instanceof ApiError ? err.status : undefined);

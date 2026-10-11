@@ -203,11 +203,22 @@ Nội dung đăng xong có thể mất tới **60 giây** mới hiện trên Sho
 
 | Nội dung | Vì sao chưa | Chỗ tạm thời |
 |---|---|---|
-| **Banner trang chủ** (chữ, nút, ảnh, nhiều slide) | Không có model banner. Trang chủ `/` không phải một Entry | Cần techlead thiết kế (02b) |
-| **Khối "Cam kết"** ở trang chủ (3 ô icon + câu) | Như trên | Techlead, hoặc tạm để trong code |
+| ~~Banner trang chủ, khối "Cam kết"~~ | **Đã chứa từ lô 5c (SHOP-5-03)** bằng hai trang cố định, xem dưới bảng | |
 | **Landing `/gioi-thieu/` nhiều phần** (hero, thẻ 3 bước, khối giá có thẻ hàng, 2 thẻ bảo quản, 2 cột giao hàng, CTA) | Thân bài chỉ có khối tuyến tính, không có khối "section", thẻ hay nút. Thiếu cả ảnh nền và màu khối | Techlead. Tạm thời có thể dựng thành trang CMS dạng bài đọc (xem 06-marketing §B2) |
 | **Câu hỏi thường gặp dạng thu gọn** (accordion), **các bước dạng thẻ có số** | Không có khối tương ứng | Viết H3 + đoạn văn, hoặc danh sách số. FE có thể trình bày riêng theo đường dẫn trang |
 | **Nhóm link chân trang** (Mua hàng / Chính sách / Về Cá Về), link ngoài CMS | Footer API chỉ là danh sách phẳng các trang CMS | Nhóm "Chính sách" lấy từ footer API, hai nhóm kia để trong code |
+
+**Banner và cam kết trang chủ (lô 5c, 02b §3.7.2).** Sửa ở màn Nội dung ERP như trang thường, bấm Đăng là Shop đổi (không build lại).
+Không bật "Hiện ở chân trang", không gắn vai trò trang. Gỡ trang thì Shop ẩn khối đó.
+
+| Trang (đường dẫn) | Cách soạn | Shop hiện |
+|---|---|---|
+| `home-banner` | Mỗi slide: một **tiêu đề lớn (H2)**, một đoạn câu phụ, tuỳ chọn một đoạn **chỉ có một link nội bộ** (vd chữ "Xem hàng đang có" trỏ `/shop/`) làm nút, tuỳ chọn một ảnh. Tối đa 3 slide. **Tóm tắt** của trang = dải chữ nhỏ trên cùng (máy tính); để trống thì ẩn | Slide đầu; nhiều slide thì có chấm để khách chọn, không tự chạy. Khuyến mãi trên slide phải qua `legal-vn` |
+| `home-commitments` | Một **danh sách gạch đầu dòng**; mỗi dòng: phần **in đậm** là tiêu đề, phần sau là mô tả. Tối đa 4 dòng | Điện thoại: tiêu đề 3 dòng đầu. Máy tính: 2 dòng đầu kèm mô tả. Icon tự chọn theo chữ (đông, giao, QR/chuyển khoản) |
+
+Khi đăng hoặc gửi duyệt, màn Nội dung cảnh báo (không chặn) các cụm chưa có nguồn: "tươi sống", "đánh bắt sáng nay", "về cảng mỗi ngày",
+"luôn có hàng", "miễn phí giao", "phí giao", "giao trong ngày", "Cân đúng", "hút chân không", "cấp đông ngay tại cảng". Đổi danh sách bằng
+biến `CONTENT_BLOCKED_CLAIMS`. Lệnh nạp nội dung chặn hẳn các cụm này.
 | **Vai trò cho trang Giao hàng, Thanh toán, Khiếu nại** | Chỉ có 4 `page_role` | Đăng thành trang thường. Muốn khoá như trang bắt buộc thì techlead thêm vai trò |
 | **Thông tin người bán, hotline, Zalo, email, địa chỉ, giờ làm việc** | Nằm ở biến môi trường (`SELLER_*`, `SHOP_HOTLINE`). Chưa có `zalo` | Sửa qua deploy. Đề xuất BE-7 (`DOI-CHIEU-CODE.md:259`) |
 | **Câu ngắn dùng lại nhiều chỗ** (khẩu hiệu "Từ cảng về bếp nhà bạn", dải chữ đầu trang, câu giới thiệu ở chân trang, dòng "Giao hàng:" và "Đổi trả:" ở trang sản phẩm) | Không có model "đoạn chữ dùng chung" | Khẩu hiệu để trong code. Dòng "Giao hàng/Đổi trả" có thể lấy **tóm tắt** của trang chính sách tương ứng (06-marketing §B5) |
