@@ -124,3 +124,23 @@ Mong đợi: bảng có đơn tối thiểu (AC1 liệt kê rõ). Người sửa
 - `cd frontend && npm ci && npx tsc --noEmit` → exit 0; `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build` → exit 0; `node scripts/check-no-mock.mjs` → XANH.
 - `cd erp-console && npm ci && ./node_modules/.bin/tsc --noEmit` → exit 0; cùng lệnh build → exit 0; `check-no-mock` XANH; `npx vitest run` → 1359 passed.
 - Playwright Chromium (script tạm trong scratchpad `lo3b/`): ERP (`e1…e7`, `p1`), API (`a1…a4`), Shop (`s1…s4`, `o1…o4`, `l2`, `d3`, `m3`), 84 ảnh `shots/lo3b-qa/`.
+
+---
+
+# Lần 2 · 2026-10-11
+
+## Kết luận: APPROVED — B1 và B2 đã sửa, các Low chính đã sửa, hồi quy nhanh đạt
+
+Build lại từ nhánh `shop/lo-3b-voucher` (commit 6cd6fa5): Shop và ERP `npm ci` sạch, tsc 0 lỗi, build exit 0 (`USE_MOCK=0`, API `localhost:8000`), `check-no-mock` XANH cả hai, ERP vitest 1359 passed. BE thật với DB tạm mới (seed demo, nội dung Shop, mã tạo lại). 360 và 1280.
+
+| Hạng mục | KQ | Bằng chứng |
+|---|---|---|
+| B1 | ✅ | áp `CAVE10` → đặt hàng → `localStorage` chỉ còn `cangcaloc_cart_v1:"[]"` (không còn `cart_voucher_code_v1`); thêm món khác, mở `/shop/cart/` → không chip, không báo lỗi MIN_ORDER ("Nhập mã" sạch) |
+| B1 (đường B8) | ✅ | "Đặt hàng không dùng mã" → đơn 610.000đ không mã, `localStorage` không có mã; "Quay lại giỏ" → giỏ không mã |
+| B2 | ✅ | bảng ERP có cột "Đơn tối thiểu" (CAVE10: 250.000 đ, mã không có: "—") |
+| L2 Esc ở B8 | ✅ | sau Esc focus về nút "Đặt hàng" (không còn `body`) |
+| L3 BETTER_PROMO | ✅ | câu "Ưu đãi đang áp (−186.000đ) đã có lợi hơn mã này." (360 và 1280) |
+| L5 | ✅ | mã hết hạn không còn nút "Tắt" |
+| Hồi quy | ✅ | áp mã → đặt hàng → D1 có "Mã giảm giá (CAVE10) −50.000đ", tổng 560.000đ; ERP tạo mã (+ báo trùng), tắt có lý do, bật lại, Esc đóng dialog; 0 lỗi JS (chỉ dòng "Failed to load resource 400" của phản hồi lỗi có chủ ý) |
+
+Còn nguyên (Low, chấp nhận): L1 ô tìm mã ERP chỉ lọc trong các dòng đã tải, L4 thay mã phải "Bỏ mã" trước, L6 `customer_terms` khoá khi mã đang chạy. Chưa chạy lại lần 2: BE `manage.py test` (điều phối đã chạy ở nhánh), đua Postgres (CI). Đã dọn server/DB tạm; `frontend/out` giữ build `USE_MOCK=0`, API `localhost:8000`.
