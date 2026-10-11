@@ -108,3 +108,13 @@ export function minOrderOf(
 export function shouldClearVoucher(ready: boolean, itemCount: number): boolean {
   return ready && itemCount === 0;
 }
+
+/**
+ * Mã gửi kèm đơn. Luôn gửi mã khách đã áp (hook hoặc bộ nhớ trình duyệt) kể cả khi FE chưa kiểm lại xong: máy chủ quyết định
+ * và trả VOUCHER_INVALID nếu mã hết hiệu lực để mở hộp hỏi, không bao giờ im lặng đặt đơn giá gốc (UI-RULES §2b.4).
+ * "Đặt hàng không dùng mã" thì không gửi.
+ */
+export function voucherCodeToSend(hookCode: string | null, storedCode: string | null, withoutVoucher: boolean): string | undefined {
+  if (withoutVoucher) return undefined;
+  return hookCode ?? storedCode ?? undefined;
+}

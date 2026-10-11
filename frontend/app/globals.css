@@ -138,6 +138,13 @@ a {
   text-decoration: none;
 }
 
+/* Liên kết trơn nằm trong câu chữ: gạch chân để không chỉ phân biệt bằng màu (axe link-in-text-block, UI-RULES §8). */
+p a:not([class]),
+li a:not([class]) {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 img {
   max-width: 100%;
   display: block;

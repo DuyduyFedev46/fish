@@ -217,7 +217,7 @@ _DEFAULT_THROTTLE_RATES = {
     "login_ip": _rate("THROTTLE_LOGIN_IP", "10/min"),
     "login_user": _rate("THROTTLE_LOGIN_USER", "30/hour"),
     "customer_search": _rate("THROTTLE_CUSTOMER_SEARCH", "30/min"),
-    "public_content": _rate("THROTTLE_PUBLIC_CONTENT", "120/min"),
+    "public_content": _rate("THROTTLE_PUBLIC_CONTENT", "600/min"),
 }
 
 CAVEVE_THROTTLE_RATES = {k: None for k in _DEFAULT_THROTTLE_RATES} if TESTING else _DEFAULT_THROTTLE_RATES

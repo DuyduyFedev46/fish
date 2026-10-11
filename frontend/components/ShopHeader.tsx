@@ -88,6 +88,11 @@ function cartLabel(count: number) {
 
 /* ------------------------------------------------------------------ điện thoại */
 
+/** Dải chữ xanh đầu trang trên điện thoại (A2, A4, A5, A6); cuộn đi cùng trang. */
+function MobileStrip({ text }: { text?: string }) {
+  return text ? <p className={s.mobileStrip}>{text}</p> : null;
+}
+
 function MobileHome({ cartCount, hotline, onBrandClick, logoSrc }: ShopHeaderProps) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [stuck, setStuck] = useState(false);
@@ -136,15 +141,18 @@ function MobileHome({ cartCount, hotline, onBrandClick, logoSrc }: ShopHeaderPro
   );
 }
 
-function MobileSticky({ cartCount, onBrandClick, logoSrc }: ShopHeaderProps) {
+function MobileSticky({ cartCount, onBrandClick, logoSrc, introText }: ShopHeaderProps) {
   return (
-    <header className={cx(s.mobile, s.bar, s.stickyBar)}>
-      <div className={s.barLogo}>
-        <LogoSlot size={28} src={logoSrc} onClick={onBrandClick} />
-      </div>
-      <IconButton label="Tìm sản phẩm" icon="search" href="/shop/?focus=search" />
-      <IconButton label={cartLabel(cartCount)} icon="cart" href={CART_HREF} badgeCount={cartCount} />
-    </header>
+    <>
+      <MobileStrip text={introText} />
+      <header className={cx(s.mobile, s.bar, s.stickyBar)}>
+        <div className={s.barLogo}>
+          <LogoSlot size={28} src={logoSrc} onClick={onBrandClick} />
+        </div>
+        <IconButton label="Tìm sản phẩm" icon="search" href="/shop/?focus=search" />
+        <IconButton label={cartLabel(cartCount)} icon="cart" href={CART_HREF} badgeCount={cartCount} />
+      </header>
+    </>
   );
 }
 

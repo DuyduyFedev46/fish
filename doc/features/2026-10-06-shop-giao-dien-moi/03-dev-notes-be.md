@@ -147,3 +147,7 @@ $ python3 scripts/check_naming.py   # backend sạch; còn lỗi ở frontend/ (
 - L1: chứng từ đảo một phần chia theo tỉ lệ `cl.qty / silb.qty` của phần doanh thu đã ghi. L2: docstring test đã sửa. L4 (mkt-brand): không đụng.
 - Test mới: PricingRule không mã = 600.000; lô đã chốt có đơn PricingRule không đổi; mã + PricingRule = tiền thực thu của hoá đơn.
 - Câu hỏi mở cho Duy: có trừ cả ưu đãi tự động cho đơn từ nay không (cần mốc ngày bằng setting). Chưa có thì giữ như trên.
+
+### Sửa sau QA lô 7
+- L11: bỏ khoá `gateway: "SEPAY"` khỏi JSON `POST /api/shop/orders/<mã>/checkout/` (`apps/sales/payments/checkout.py`). Frontend không đọc khoá này (grep chỉ thấy tên file `gateway.ts`). Các khoá còn lại (`checkout_url`, `fields`, `merchant`...) giữ nguyên. Test `test_qa_l11_...`.
+- L12: throttle `public_content` nâng 120/min thành 600/min mỗi IP (`config/settings.py`, đổi được bằng env `THROTTLE_PUBLIC_CONTENT`), vì mỗi trang gọi khoảng 3 lần và mạng dùng chung dễ dính 429. Test `test_qa_l12_...`; test throttle cũ vẫn xanh.

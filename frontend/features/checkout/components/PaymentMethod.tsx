@@ -23,6 +23,11 @@ export default function PaymentMethod() {
           <Icon name="check" size={20} strokeWidth={2.4} />
         </span>
       </div>
+      <ol className={s.steps} aria-label="Cách thanh toán">
+        <li>Bấm nút bên dưới để sang trang thanh toán an toàn.</li>
+        <li>Mở app ngân hàng, quét mã QR. Số tiền và nội dung đã điền sẵn.</li>
+        <li>Thanh toán xong, bạn được đưa về trang đơn hàng của Cá Về.</li>
+      </ol>
     </section>
   );
 }

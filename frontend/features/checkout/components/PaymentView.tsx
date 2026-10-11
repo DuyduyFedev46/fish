@@ -3,6 +3,7 @@
 import Banner from "@/components/ui/Banner";
 import Button from "@/components/ui/Button";
 import CartSummary from "@/components/cart/CartSummary";
+import { formatPriceVnd } from "@/lib/format";
 import { formatQty } from "@/lib/quantity";
 import type { OrderLookupResult } from "@/lib/types";
 import HoldCountdown from "./HoldCountdown";
@@ -22,6 +23,12 @@ export interface PaymentViewProps {
   reordering: boolean;
 }
 
+function unitText(qty: string, unit: string, amount: string): string | undefined {
+  const q = Number(qty);
+  const price = Number(amount) / q;
+  return q > 0 && Number.isInteger(price) ? `${formatQty(q)} ${unit} × ${formatPriceVnd(price)}` : undefined;
+}
+
 /** Thanh toán (D1), thanh toán chưa thành công (D2), nền của hộp thoại hết giờ (D4). Không có nút "Huỷ đơn" (BR-BH-28). */
 export default function PaymentView({ order, mode, paying, payError, onPay, onExpire, onReorder, reordering }: PaymentViewProps) {
   const expired = mode === "expired";
@@ -29,6 +36,8 @@ export default function PaymentView({ order, mode, paying, payError, onPay, onEx
   const summaryLines = order.lines.map((l) => ({
     name: l.name,
     qtyText: `${formatQty(Number(l.qty))} ${l.unit}`,
+    // Đơn giá = thành tiền gộp / số lượng, chỉ hiện khi chia đúng số đồng (không làm tròn ngầm).
+    unitText: unitText(l.qty, l.unit, l.amount),
     amount: l.amount,
   }));
   return (

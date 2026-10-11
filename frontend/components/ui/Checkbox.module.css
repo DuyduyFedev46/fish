@@ -44,3 +44,10 @@
   outline: 2px solid var(--crit);
   outline-offset: 1px;
 }
+
+/* Liên kết nằm trong câu chữ phải phân biệt được không chỉ bằng màu (axe link-in-text-block, UI-RULES §8). */
+.text a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

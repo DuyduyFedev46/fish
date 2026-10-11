@@ -33,6 +33,15 @@ type LoadState =
 
 type Section = { heading: string; blocks: PublicBlock[] };
 
+/**
+ * Thẻ món nổi trong hero (màn Landing / LandingMobile, QA lô 7 L10): một món lẻ đang "Còn hàng" (ưu tiên),
+ * không có thì món "Sắp hết"; không món nào bán được thì ẩn thẻ. Thứ tự giữ theo catalog.
+ */
+function pickHeroItem(items: CatalogItem[]): CatalogItem | null {
+  const simple = items.filter((i) => i.item_type === "SIMPLE");
+  return simple.find((i) => i.stock_level === "in") ?? simple.find((i) => i.stock_level === "low") ?? null;
+}
+
 /** Tách thân bài: các khối trước H2 đầu tiên là câu mở hero; mỗi H2 mở một mục. */
 function splitSections(blocks: PublicBlock[]): { intro: PublicBlock[]; sections: Section[] } {
   const intro: PublicBlock[] = [];
@@ -174,6 +183,7 @@ function Block({ block }: { block: PublicBlock }) {
 export default function AboutScreen() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [catalog, setCatalog] = useState<Map<string, CatalogItem>>(new Map());
+  const [heroItem, setHeroItem] = useState<CatalogItem | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [retrying, setRetrying] = useState(false);
 
@@ -186,6 +196,7 @@ export default function AboutScreen() {
       .then(([entry, cat]) => {
         if (!active) return;
         setCatalog(new Map((cat?.items ?? []).map((item) => [item.item_code, item])));
+        setHeroItem(pickHeroItem(cat?.items ?? []));
         setState({ kind: "ready", entry });
       })
       .catch((err: unknown) => {
@@ -256,26 +267,37 @@ export default function AboutScreen() {
     content = (
       <>
         <section className={s.hero} aria-labelledby="about-title">
-          <div className={s.inner}>
-            <span className={s.badge}>Hải sản cấp đông theo lô</span>
-            <h1 id="about-title" className={s.heroTitle}>
-              Từ cảng về bếp nhà bạn
-            </h1>
-            {intro.map((block, k) => (
-              <div key={k} className={s.heroText}>
-                <Block block={block} />
-              </div>
-            ))}
-            <div className={s.heroActions}>
-              <Button href={SHOP_HREF} variant="on-brand" size="lg">
-                Xem hàng đang có
-              </Button>
-              {sections.length > 0 ? (
-                <Button href="#cach-lam" variant="on-brand-outline" size="lg">
-                  Cách chúng tôi làm
+          <div className={[s.inner, heroItem ? s.heroWithCard : ""].filter(Boolean).join(" ")}>
+            <div className={s.heroMain}>
+              <span className={s.badge}>Hải sản cấp đông theo lô</span>
+              <h1 id="about-title" className={s.heroTitle}>
+                Từ cảng về bếp nhà bạn
+              </h1>
+              {intro.map((block, k) => (
+                <div key={k} className={s.heroText}>
+                  <Block block={block} />
+                </div>
+              ))}
+              <div className={s.heroActions}>
+                <Button href={SHOP_HREF} variant="on-brand" size="lg">
+                  Xem hàng đang có
                 </Button>
-              ) : null}
+                {sections.length > 0 ? (
+                  <Button href="#cach-lam" variant="on-brand-outline" size="lg">
+                    Cách chúng tôi làm
+                  </Button>
+                ) : null}
+              </div>
             </div>
+            {heroItem ? (
+              <div className={s.heroCard}>
+                <ProductCard
+                  variant="rail"
+                  item={toCardItem(heroItem)}
+                  href={`/shop/item/?code=${encodeURIComponent(heroItem.item_code)}`}
+                />
+              </div>
+            ) : null}
           </div>
         </section>
         {sections.map((section, k) => {

@@ -469,3 +469,12 @@ $ cd erp-console && ./node_modules/.bin/tsc --noEmit -> 0 · npx vitest run feat
 $ grep -rn "cá tươi" erp-console/ (bỏ node_modules) -> chỉ còn app/print/label/page.tsx:164 (xem Lệch 1)
 $ python3 scripts/check_naming.py -> OK, không phát sinh mới
 ```
+
+## Lô 7 — QA L10: thẻ món nổi trong hero `/about/`
+
+> `mkt-brand` · 11/10/2026 · nhánh `shop/lo-7-e2e` · Không commit, không build (fe-dev build).
+
+- `frontend/app/about/AboutScreen.tsx` + `.module.css`: hero thêm thẻ món theo màn Landing / LandingMobile. Dùng `ProductCard variant="rail"` (ảnh, tên, giá `/ kg`, nút vào trang món), không có số kg tồn.
+  Lấy từ catalog đã nạp sẵn (không thêm request) một **món lẻ**: ưu tiên "Còn hàng", không có thì "Sắp hết". Không có món nào hoặc catalog lỗi thì ẩn thẻ.
+  Điện thoại: thẻ nằm dưới hai nút (rộng tối đa 280 px). Máy tính (≥ 768 px): chữ bên trái, thẻ 260 px bên phải. Chỉ dùng token.
+- Kiểm: `cd frontend && npx tsc --noEmit` cho tsc=0 · grep hex `app/about` = 0 · `check_naming` OK. Chưa chụp 360/1280 (QA chụp sau khi fe-dev build).

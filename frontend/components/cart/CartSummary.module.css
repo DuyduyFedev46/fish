@@ -141,3 +141,9 @@
   font-size: 12px;
   line-height: 1.45;
 }
+
+.lineUnit {
+  display: block;
+  color: var(--ink-3);
+  font-size: 13px;
+}
