@@ -811,7 +811,8 @@ export async function mockCreateOrder(payload: CreateOrderPayload): Promise<Crea
     delivery_code: null,
     cancel: null,
     late_payment: false,
-    checkout_fails: 0,
+    // Tên có "#payfail": mở cổng lỗi một lần ngay sau khi đặt (SHOP-FIX-01 AC3).
+    checkout_fails: name.includes("#payfail") ? 1 : 0,
   };
   saveOrder(order);
 

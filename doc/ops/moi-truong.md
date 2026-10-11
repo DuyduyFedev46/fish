@@ -57,6 +57,7 @@ Trang quản trị bên ngoài:
 
 ## Cấu hình trên SePay (Cổng thanh toán → Cấu hình → IPN)
 - **Sandbox:** IPN URL trỏ adapter **staging**, Auth Type = **Secret Key** (khoá sandbox).
+  URL đúng: `https://cangca-adapter-staging-675411800433.asia-southeast1.run.app/ipn/sepay`, khoá = secret `cangca-sepay-sandbox-secret-key`. **Sự cố 11/10:** sandbox trỏ nhầm `cangca-adapter-…` (production, đang tắt ingress → 404) nên đơn staging đứng ở "Đang chờ xác nhận"; adapter staging không nhận yêu cầu nào. Kiểm nhanh: log `cangca-adapter-staging` phải có `POST /ipn/sepay` sau khi trả tiền.
 - **Live:** IPN URL trỏ adapter **production**, Auth Type = **Secret Key** (khoá live).
 
 ## Biến môi trường Khung go-live pháp lý (GL-01..GL-05)

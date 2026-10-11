@@ -13,6 +13,7 @@ Môi trường dựng: SQLite tạm → migrate → seed_demo + seed_qa + shop_s
 load_shop_content --publish → BE runserver. Cổng thanh toán giả lập qua cửa IPN nội bộ. Không đụng DB thật.
 
 Kịch bản (mỗi cái là một file chạy được riêng, cần SHOP_E2E_WORKDIR do lệnh này đặt):
+  payment_choice    SHOP-FIX-01: chọn PTTT ở form, đặt xong vào thẳng cổng, nhánh mở cổng lỗi (ảnh vào shots/qa)
   full_flow         khách đi trọn luồng 360 và 1280, nhánh lỗi, tra đơn từ phiên khác, quét dữ liệu cá nhân
   design_screens    86 màn thiết kế → ảnh 360/1280 cạnh bản thiết kế (ảnh vào thư mục shots/lo7)
   general_rules     AC chung G1–G8 trên toàn Shop (API, HTML, storage, popup, hex, code cũ, axe nếu có)
@@ -40,7 +41,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shop_e2e_lib import BACKEND, BE_PORT, ERP, ERP_PORT, FRONTEND, QA_PASSWORD, ROOT, SHOP_PORT  # noqa: E402
 
-SUITES = ["full_flow", "design_screens", "general_rules", "erp_flow", "content_pages", "footer_consent", "formats_timezones"]
+SUITES = ["payment_choice", "full_flow", "design_screens", "general_rules", "erp_flow", "content_pages", "footer_consent", "formats_timezones"]
 PYTHON = str(BACKEND / ".venv/bin/python")
 
 

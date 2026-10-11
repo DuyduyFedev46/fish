@@ -32,9 +32,26 @@ def create_voucher(code, **kw):
     return body
 
 
+def stub_gateway(page):
+    """Chặn cổng thanh toán ngoài: ghi lại form POST (url, body) thay vì ra mạng thật. Trả danh sách ghi."""
+    posts = []
+
+    def handler(route):
+        posts.append((route.request.url, route.request.post_data))
+        route.fulfill(status=200, content_type="text/html", body="<html><body>gateway giả lập</body></html>")
+    page.route(re.compile(r"https://(?!localhost).*sepay.*"), handler)
+    return posts
+
+
+def code_from_gateway_post(post):
+    """Mã đơn nằm trong success_url của form gửi cổng (SHOP-FIX-01: đặt hàng xong vào thẳng cổng)."""
+    return re.search(r"code%3D(SO[\w-]+)", post or "") or re.search(r"code=(SO[\w-]+)", post or "")
+
+
 def fresh_context(browser, width, **kw):
     ctx = browser.new_context(viewport={"width": width, "height": 800 if width < 600 else 900}, **kw)
     page = ctx.new_page()
+    page.gateway_posts = stub_gateway(page)
     return ctx, page, PageWatch(page)
 
 
@@ -51,13 +68,7 @@ def journey(browser, width):
     tag = str(width)
     ctx, page, watch = fresh_context(browser, width)
     # chặn cổng thanh toán ngoài: ghi lại form POST thay vì ra mạng thật
-    gateway_posts = []
-    page.route("**/pay-sandbox.sepay.vn/**", lambda r: (gateway_posts.append((r.request.url, r.request.post_data)),
-                                                       r.fulfill(status=200, content_type="text/html",
-                                                                 body="<html><body>gateway giả lập</body></html>")))
-    page.route(re.compile(r"https://(?!localhost).*sepay.*"), lambda r: (gateway_posts.append((r.request.url, r.request.post_data)),
-                                                                          r.fulfill(status=200, content_type="text/html",
-                                                                                    body="<html><body>gateway giả lập</body></html>")))
+    gateway_posts = page.gateway_posts
 
     # 1. Trang chủ
     goto(page, "/")
@@ -148,11 +159,16 @@ def journey(browser, width):
     snap(page, "08-checkout-filled", width, SUB)
     # bấm đúp: chỉ 1 đơn
     page.get_by_role("button", name="Đặt hàng").dblclick()
-    page.wait_for_url(re.compile(r"/shop/orders/\?code="), timeout=15000)
-    page.wait_for_load_state("networkidle")
+    # SHOP-FIX-01 AC2: đặt xong tự mở cổng thanh toán (không dừng ở trang đơn)
+    page.wait_for_url(re.compile(r"pay-sandbox\.sepay\.vn|sepay"), timeout=15000)
     page.wait_for_timeout(600)
-    R.ok(f"[{tag}] bấm đúp 'Đặt hàng' → đúng 1 đơn mới", order_count() == before + 1, (before, order_count()))
-    code = re.search(r"code=(SO[\w-]+)", page.url).group(1)
+    R.ok(f"[{tag}] bấm đúp 'Đặt hàng' → đúng 1 đơn mới và đúng 1 lần mở cổng (SHOP-FIX-01 AC2)",
+         order_count() == before + 1 and len(gateway_posts) == 1, (before, order_count(), len(gateway_posts)))
+    m = code_from_gateway_post(__import__("urllib.parse").parse.unquote_plus(gateway_posts[0][1]) if gateway_posts else "")
+    code = m.group(1) if m else re.search(r"(SO[\w-]+)", gateway_posts[0][1] or "").group(1)
+    gateway_posts.clear()
+    # AC4: quay lại trang đơn (khách đóng cổng giữa chừng) vẫn còn nút Thanh toán
+    goto(page, f"/shop/orders/?code={code}", 1200)
     R.ok(f"[{tag}] URL trang đơn chỉ có mã đơn (không SĐT/tên/địa chỉ)", not contains_pii(page.url), page.url)
     ptext = page.inner_text("main")
     R.ok(f"[{tag}] thanh toán: đếm ngược giữ hàng, 'Chuyển khoản ngân hàng (quét mã QR)', tổng 647.500đ, không tên cổng",
@@ -291,7 +307,7 @@ def error_branches(browser):
     else:
         page.keyboard.press("Escape")
         page.get_by_role("button", name="Đặt hàng").click()
-    page.wait_for_url(re.compile(r"/shop/orders/\?code="), timeout=15000)
+    page.wait_for_url(re.compile(r"sepay"), timeout=15000)
     R.ok("[360] thử lại sau mất mạng → đúng 1 đơn (cùng client_request_id, BR-BH-27)", order_count() == cnt + 1, (cnt, order_count()))
     ids = {json.loads(p)["client_request_id"] for p in reqs if p}
     R.ok("[360] hai lần gửi dùng cùng một client_request_id", len(ids) == 1, ids)
@@ -401,7 +417,7 @@ def error_branches(browser):
         page.locator("#f-consent").check()
     page.get_by_role("button", name="Đặt hàng").click()
     page.wait_for_timeout(2500)
-    code_fast = re.search(r"code=(SO[\w-]+)", page.url)
+    code_fast = code_from_gateway_post(__import__("urllib.parse").parse.unquote_plus(page.gateway_posts[0][1] or "")) if page.gateway_posts else re.search(r"code=(SO[\w-]+)", page.url)
     if code_fast:
         _, lk = lookup_api(code_fast.group(1), "0900000012")
         R.ok("[360] bấm Đặt hàng ngay sau khi vào form có mã đã áp: đơn vẫn có giảm giá (không bỏ mã im lặng)", lk["discount"]["amount"] != "0" and lk["total_amount"] != "165000", lk["total_amount"])

@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { ApiError, checkVoucher, createOrder, getCatalog } from "@/lib/api";
+import { ApiError, USE_MOCK, checkVoucher, createOrder, getCatalog, startCheckoutSession } from "@/lib/api";
 import { formatPriceVnd } from "@/lib/format";
 import { parseQtyRule, qtyToApiString, formatQty } from "@/lib/quantity";
 import { contactTarget } from "@/components/shopLinks";
@@ -34,10 +34,13 @@ import { clearVoucherCode, readVoucherCode } from "@/features/cart/voucherStorag
 import { minOrderOf, voucherCodeToSend, voucherMessage } from "@/features/cart/voucherView";
 import { cartFingerprint, clearRequestId, getRequestId, renewRequestId } from "../requestId";
 import { saveLookupToken } from "../lookupToken";
+import { goToMockGateway, redirectToGateway } from "../gateway";
+import { orderUrl } from "../afterCreate";
 import { shouldOpenFallbackDirectly } from "../googleMaps";
 import { errorSummary, MESSAGES, normalizeVnPhone, validateForm, type FormErrors, type FormField } from "../formRules";
 import AddressField from "./AddressField";
 import AddressMapPicker from "./AddressMapPicker";
+import PaymentChoice from "./PaymentChoice";
 import SoldOutSheet, { type SoldOutLine } from "./SoldOutSheet";
 import s from "./CheckoutScreen.module.css";
 
@@ -104,6 +107,7 @@ function CheckoutForm() {
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const placedRef = useRef(false);
+  const openingRef = useRef(false); // đã tạo đơn và đang chuyển sang cổng: không mở khoá nút
   // Mức tối thiểu của từng món theo catalog (C3 đổi về mức này). Chưa tải được thì dùng 1 (min_qty hiện hành).
   const minQtyRef = useRef<Map<string, number>>(new Map());
 
@@ -249,14 +253,26 @@ function CheckoutForm() {
         saveLookupToken(res.order_code, res.lookup_token);
         clearRequestId();
         cart.clear();
-        router.replace(`/shop/orders/?code=${encodeURIComponent(res.order_code)}`);
-        return;
+        // SHOP-FIX-01: mở cổng ngay, khách vào thẳng trang quét mã. Lỗi thì vào trang đơn (D1) có nút "Thanh toán".
+        try {
+          const session = await startCheckoutSession(res.order_code);
+          if (USE_MOCK) goToMockGateway(res.order_code, Number(res.total_amount));
+          else redirectToGateway(session);
+          // Trình duyệt sắp điều hướng đi: giữ nút ở trạng thái đang xử lý.
+          openingRef.current = true;
+          return;
+        } catch {
+          router.replace(orderUrl(res.order_code, true));
+          return;
+        }
       } catch (err) {
         if (opts?.withoutVoucher) setVoucherGone(null);
         handleSendError(err, lines);
       } finally {
-        submittingRef.current = false;
-        setSubmitting(false);
+        if (!openingRef.current) {
+          submittingRef.current = false;
+          setSubmitting(false);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -530,6 +546,10 @@ function CheckoutForm() {
                   readOnly={submitting}
                   onOpenMap={openMap}
                 />
+              </section>
+
+              <section className={s.section}>
+                <PaymentChoice disabled={submitting} />
               </section>
 
               {consentRequired === null ? (
