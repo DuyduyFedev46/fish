@@ -16,7 +16,7 @@ S = DeliveryNote.Status
 O = SalesOrder.Status
 TOP_KEYS = {
     "order_code", "status", "state", "status_label", "placed_at", "paid_at", "delivered_at", "booked_expires_at",
-    "server_now", "hold_minutes", "payment_pending_minutes", "delivery", "lines", "subtotal", "discount",
+    "server_now", "hold_minutes", "payment_pending_minutes", "payment_pending_since", "delivery", "lines", "subtotal", "discount",
     "total_amount", "cancel_notice", "late_payment", "lookup_token",
 }
 
@@ -53,7 +53,7 @@ class ShopLookupCompletedTests(CompletionBase):
         self.assertEqual(body["status"], "COMPLETED")
         self.assertEqual(body["state"], "completed")
         self.assertEqual(body["status_label"], "Đã giao")
-        self.assertEqual(body["delivery"], {"step": "delivered", "step_label": "Đã giao"})
+        self.assertEqual(body["delivery"], {"step": "delivered", "step_label": "Đã giao", "awaiting_confirmation": False})
 
     def test_s8_ac2_label_table_all_seven_rows(self):
         order = self._paid_order(phone=PHONE)
@@ -75,7 +75,7 @@ class ShopLookupCompletedTests(CompletionBase):
         resp = self._lookup(order)
         body = resp.json()
         self.assertEqual(set(body), TOP_KEYS)
-        self.assertEqual(set(body["delivery"]), {"step", "step_label"})
+        self.assertEqual(set(body["delivery"]), {"step", "step_label", "awaiting_confirmation"})
         raw = json.dumps(body, ensure_ascii=False)
         for secret in (PHONE, NAME, ADDRESS, "Lê Lợi", "assigned_to", "courier", "giao1"):
             self.assertNotIn(secret, raw)

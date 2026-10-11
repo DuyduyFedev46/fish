@@ -79,6 +79,8 @@ CAPABILITY_LABELS = {
     "sales.view_customer_list": "Xem khách hàng",
     # PV-07 (2026-10-02-pham-vi-du-lieu-cau-hinh): việc V2, cấp cho 5 nhóm (Q-4).
     "sales.view_order_customer_info": "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền",
+    # SHOP-3b-01 (BR-DM-23): chỉ Chủ có sẵn, uỷ được.
+    "catalog.manage_voucher": "Quản lý mã giảm giá",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"

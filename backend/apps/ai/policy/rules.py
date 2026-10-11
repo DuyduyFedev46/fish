@@ -21,6 +21,7 @@ FORBIDDEN_PREFIXES = (
     "/api/sales/customer-directory/",  # danh bạ khách: tên, SĐT, địa chỉ, ghi chú (B2, bất biến 9)
     "/api/sales/orders/search/",  # tìm đơn theo SĐT/tên khách bằng POST (NEW-1, bất biến 9): AI không dò dữ liệu cá nhân
     "/api/sales/customers/",  # endpoint khách cũ (S5/CS-01): cùng dữ liệu cá nhân
+    "/api/catalog/vouchers/",  # mã giảm giá (SHOP-3b-01, BR-DM-23): tiền rời túi, chỉ Chủ/người được uỷ làm bằng tay
 )
 
 # Hậu tố URL cấm hẳn (tem có tên/SĐT/địa chỉ khách)

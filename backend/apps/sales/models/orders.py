@@ -43,6 +43,11 @@ class SalesOrder(models.Model):
     checkout_attempts = models.PositiveIntegerField(
         "Số lần lập tham số thanh toán cổng", default=0,
     )
+    # Lô 3b (nợ D3 lô 3+4): lần gần nhất khách được đưa sang cổng thanh toán. Trang đơn Shop đếm "Đã chờ" từ mốc này
+    # (`payment_pending_since` trong tra đơn) thay vì sessionStorage. Không phải dữ liệu cá nhân, không đổi trạng thái đơn.
+    payment_started_at = models.DateTimeField(
+        "Mở cổng thanh toán lần gần nhất", null=True, blank=True, editable=False,
+    )
     # Ghi chú khi huỷ đơn đã thanh toán với lý do OTHER (bắt buộc ở API). Chữ nằm ở chứng từ,
     # không chép vào AuditLog (bất biến 9, TL-AN-M1). Lọc SĐT/số tài khoản theo BR-GH-19.
     cancel_note = models.CharField("Ghi chú huỷ đơn", max_length=200, blank=True, default="")

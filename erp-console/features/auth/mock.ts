@@ -53,7 +53,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "auth.view_group", "auth.view_user", "catalog.add_bundleline", "catalog.add_item", "catalog.add_itemgroup",
     "catalog.add_itemprice", "catalog.add_pricelist", "catalog.add_pricingrule", "catalog.change_bundleline",
     "catalog.change_item", "catalog.change_item_image", "catalog.change_itemgroup", "catalog.change_itemprice", "catalog.change_pricelist",
-    "catalog.change_pricingrule", "catalog.delete_bundleline", "catalog.delete_item", "catalog.delete_itemgroup",
+    "catalog.change_pricingrule", "catalog.manage_voucher", "catalog.delete_bundleline", "catalog.delete_item", "catalog.delete_itemgroup",
     "catalog.delete_itemprice", "catalog.delete_pricelist", "catalog.delete_pricingrule", "catalog.view_bundleline",
     "catalog.view_item", "catalog.view_itemgroup", "catalog.view_itemprice", "catalog.view_pricelist",
     "catalog.view_pricingrule", "delivery.add_deliverynote", "delivery.change_deliverynote",

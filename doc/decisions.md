@@ -271,3 +271,7 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 - **Deploy staging** các lô Shop đã QA APPROVED và merge `main` (Duy 11/10: "xong thì deploy staging các phần đã xong"). Production chưa.
 - **Mọi tài liệu quy trình có sơ đồ Mermaid ngay dưới tiêu đề**, nhãn tiếng Việt dễ hiểu, để Duy đọc luồng (Duy 11/10). Luật ghi ở `CLAUDE.md`.
 - **Đổi URL Shop sang tiếng Anh** (Duy chốt 11/10, chọn khuyến nghị): thư mục và URL `/gioi-thieu/` → `/about/`, `/trang/?slug=` → `/pages/?slug=`, `/bai-viet/` → `/blog/`. Production chưa chạy nên không giữ đường cũ. Slug nội dung CMS (vd `cach-mua-hang`) là dữ liệu, giữ tiếng Việt. Nhắc lại luật: tên file, thư mục, hàm, biến, route trong source là tiếng Anh; chỉ comment, chữ hiển thị và tài liệu là tiếng Việt.
+
+## 2026-10-11 (chiều) — Test Postgres và lãi lỗ theo lô khi có mã giảm giá — [DUY CHỐT]
+- **Test PostgreSQL chạy trên GitHub Actions** (thực hiện chốt 10/10 "chạy trên cloud, DB test riêng"): mỗi lần push, GitHub dựng Postgres tạm, chạy toàn bộ test backend, không cần bí mật, không đụng staging/production, không deploy.
+- **Lãi lỗ theo lô trừ phần giảm giá mã đã phân bổ vào từng dòng đơn**, áp cho đơn từ nay; kỳ/lô đã chốt không đổi số (giữ luật "không sửa số kỳ cũ"). Làm thành lô nhỏ riêng sau lô 3b, có test.

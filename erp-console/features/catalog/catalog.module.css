@@ -106,3 +106,10 @@
 
 /* Nút trong ô bảng (Bật/Tắt ưu đãi). */
 .cellAction { min-height: 32px; }
+
+/* ---------- Mã giảm giá (SHOP-3b-02) ---------- */
+.voucherActions { display: flex; flex-wrap: wrap; gap: var(--space-1-5); }
+.voucherActionsRow { flex-wrap: nowrap; }
+.voucherSub { display: block; margin-top: 2px; font-size: var(--text-xs); }
+.statusInline { display: none; margin-top: var(--space-1); }
+@container lt-list (max-width: 799px) { .statusInline { display: block; } }

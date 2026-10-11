@@ -1,0 +1,239 @@
+.onlyDesktop {
+  display: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 32px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.rowLabel {
+  min-width: 0;
+}
+
+.openBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--h-input);
+  margin: -6px calc(-1 * var(--space-2)) -6px 0;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.openBtn:focus-visible,
+.chipRemove:focus-visible,
+.removeText:focus-visible,
+.retry:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--h-chip-brand);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--good-border);
+  border-radius: var(--radius-full);
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: 13px;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+
+.chipCode {
+  letter-spacing: 0.04em;
+}
+
+/* Nút bỏ mã trong chip (điện thoại): vùng chạm 44, hình chỉ 22. */
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -6px -6px -6px -10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--good);
+  cursor: pointer;
+}
+
+.chipRemoveDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+}
+
+.inline {
+  flex-direction: column;
+  gap: 6px;
+  padding-top: var(--space-1);
+}
+
+.inlineLabel {
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.inputRow {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: var(--h-input);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color var(--dur-color) ease-out,
+    box-shadow var(--dur-color) ease-out;
+}
+
+.input::placeholder {
+  color: var(--ink-3);
+  letter-spacing: 0;
+}
+
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.inputBad,
+.inputBad:focus {
+  border-color: var(--crit);
+}
+
+.inputBad:focus {
+  box-shadow: 0 0 0 3px var(--crit-soft);
+}
+
+.input[readonly] {
+  color: var(--ink-2);
+}
+
+.sheetBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sheetBtn {
+  flex: none;
+  width: 104px;
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--crit);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.error svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+/* "Ưu đãi lợi hơn" là thông tin, không phải lỗi: chữ ink-2, không đỏ. */
+.errorInfo {
+  color: var(--ink-2);
+}
+
+.retry {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.appliedRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Máy tính: chip không có X, đã có nút chữ "Bỏ mã". */
+.inline .chipRemove {
+  display: none;
+}
+
+.removeText {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--h-input);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .removeText:hover {
+    color: var(--crit);
+  }
+}
+
+@media (min-width: 768px) {
+  .onlyMobile {
+    display: none;
+  }
+  .onlyDesktop {
+    display: flex;
+  }
+}

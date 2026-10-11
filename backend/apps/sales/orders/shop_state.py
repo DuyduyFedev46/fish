@@ -7,6 +7,7 @@ Server luôn thắng: `awaiting_payment` -> `hold_expired` khi quá `booked_expi
 from apps.delivery.models import DeliveryNote
 from apps.sales.models import SalesOrder
 
+from .customer_notices import late_payment_total
 from .shop_labels import SHOP_DELIVERY_STATUS_LABELS, shop_state_label
 
 S = DeliveryNote.Status
@@ -31,7 +32,8 @@ def latest_delivery_note(order):
 
 
 def has_payment_transaction(order) -> bool:
-    return order.payments.exists()
+    """Có tiền THẬT về đơn (bỏ dòng nghi trùng): cùng nguồn với `cancel_notice`, nên hai nơi không bao giờ lệch nhau."""
+    return late_payment_total(order) > 0
 
 
 def order_state(order, *, now, note=None, has_payment=False) -> str:
@@ -60,6 +62,8 @@ def delivery_block(note):
     return {
         "step": _DELIVERY_STEP[note.status],
         "step_label": SHOP_DELIVERY_STATUS_LABELS.get(note.status, ""),
+        # Q1 review lô 3+4: FE hiện khối giờ gọi xác nhận theo cờ này, không dò chữ trong `step_label`.
+        "awaiting_confirmation": note.status == S.CONFIRMING,
     }
 
 

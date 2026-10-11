@@ -30,7 +30,7 @@ EXPECTED = {
 }
 TOP_KEYS = {
     "order_code", "status", "state", "status_label", "placed_at", "paid_at", "delivered_at", "booked_expires_at",
-    "server_now", "hold_minutes", "payment_pending_minutes", "delivery", "lines", "subtotal", "discount",
+    "server_now", "hold_minutes", "payment_pending_minutes", "payment_pending_since", "delivery", "lines", "subtotal", "discount",
     "total_amount", "cancel_notice", "late_payment", "lookup_token",
 }
 
@@ -59,7 +59,7 @@ class ShopLookupLabelTests(OrderApiBase):
                 self.assertIsNone(delivery)  # phiếu đã huỷ theo đơn: không có khối giao (02b §3.4.2)
                 continue
             self.assertEqual(delivery["step_label"], label, code)
-            self.assertEqual(set(delivery), {"step", "step_label"})
+            self.assertEqual(set(delivery), {"step", "step_label", "awaiting_confirmation"})
             self.assertNotEqual(delivery["step_label"], code)
             self.assertIsNone(RAW_CODE.match(delivery["step_label"]))
             self.assertEqual(set(body), TOP_KEYS)

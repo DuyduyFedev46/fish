@@ -9,9 +9,12 @@ BusinessError. actor=None nghĩa là Hệ thống.
                           ItemPrice hiệu lực; BR-DM-08 áp DUY NHẤT 1 PricingRule lợi nhất;
                           BR-BH-05/06 FEFO + phân bổ lô; BR-BH-07 BUNDLE giữ chỗ đồng thời
                           mọi thành phần; BR-BH-08/DM-07 đóng băng giá & công thức.
-- cancel_unpaid_expired : job TTL BR-BH-03/04 — idempotent, actor=None.
+                          Mã giảm giá (SHOP-3b-04, BR-DM-17…21): tối đa 1 mã/đơn, KHÔNG cộng dồn với PricingRule (lấy
+                          lợi hơn; hoà thì giữ ưu đãi tự động -> VOUCHER_INVALID BETTER_PROMO), giữ 1 lượt khi tạo đơn.
+- cancel_unpaid_expired : job TTL BR-BH-03/04 — idempotent, actor=None; nhả lượt mã của đơn hết giờ (BR-DM-20).
 - cancel_paid_order     : hoàn kho lô gốc (CANCEL_RESTORE), audit (BR-HT-05).
 """
+from dataclasses import dataclass
 from decimal import Decimal
 
 from django.conf import settings
@@ -20,7 +23,8 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.catalog.items import services as catalog_stock
-from apps.catalog.models import Item, ItemPrice, PricingRule
+from apps.catalog.models import Item, ItemPrice, PricingRule, Voucher
+from apps.catalog.vouchers import services as voucher_services
 from apps.catalog.pricing.services import effective_price as listed_price
 from apps.common.audit import note_marker, record_audit
 from apps.common.exceptions import BusinessError
@@ -32,8 +36,16 @@ from apps.inventory.stock import services as stock
 from apps.sales.credit_notes import services as credit_note_services
 from apps.sales.customers import services as customers
 from apps.sales.models import SalesOrder, SalesOrderLine, SalesOrderLineBatch
+from apps.sales.orders import voucher_redemptions
 from apps.sales.orders.consent import resolve_privacy_consent
-from apps.sales.orders.shop_errors import LEVEL_OUT, LEVEL_SHORT, InvalidQtyError, OutOfStockError
+from apps.sales.orders.shop_errors import (
+    LEVEL_OUT,
+    LEVEL_SHORT,
+    InvalidQtyError,
+    OutOfStockError,
+    VoucherInvalidError,
+    validation_error,
+)
 from apps.sales.utils import ZERO
 from apps.sales.utils import gen_code as _gen_code
 from apps.sales.utils import money as _q
@@ -230,6 +242,84 @@ def _out_of_stock_lines(resolved, today):
     return result
 
 
+# --- SHOP-3b-03/04: báo giá giỏ, ưu đãi tự động, mã giảm giá ------------------------------
+
+def _build_lines_data(resolved, today):
+    """Bước 1 của tạo đơn: dòng + đơn giá hiệu lực + thành tiền GỘP (chưa giảm)."""
+    lines_data = []
+    for _raw, item, qty in resolved:
+        rate = _effective_price(item, today)  # BR-DM-02 (BUNDLE dùng giá độc lập, BR-DM-04)
+        lines_data.append({"item": item, "qty": qty, "rate": rate, "gross": _q(qty * rate)})
+    return lines_data
+
+
+def _auto_discount(lines_data, today):
+    """(rule hoặc None, {idx: giảm}, tổng giảm) của ưu đãi tự động lợi nhất (BR-DM-08)."""
+    best = _best_pricing_rule(lines_data, today)
+    if best is None:
+        return None, {}, ZERO
+    rule, per_line = best
+    return rule, per_line, sum(per_line.values(), ZERO)
+
+
+@dataclass
+class CartQuote:
+    """Giá giỏ trước/sau ưu đãi tự động (V-11). `subtotal` là tổng gộp CHƯA làm tròn nguyên đồng."""
+
+    lines_data: list
+    subtotal: Decimal
+    auto_discount: Decimal
+
+
+def quote_cart(lines, today=None):
+    """
+    Báo giá giỏ cho `POST /api/shop/vouchers/check/` (02b §3.8): kiểm số lượng (INVALID_QTY), món không còn bán
+    (VALIDATION `items`), rồi tính tổng gộp + ưu đãi tự động. KHÔNG kiểm tồn (kiểm mã không phụ thuộc kho).
+    """
+    today = today or timezone.localdate()
+    resolved = _resolve_lines(lines)
+    _check_line_quantities(resolved)
+    if any(item is None or not item.is_active or listed_price(item, today) is None for _raw, item, _qty in resolved):
+        raise validation_error(items="Có món không còn bán. Quay lại giỏ để cập nhật.")
+    lines_data = _build_lines_data(resolved, today)
+    _rule, _per_line, auto_total = _auto_discount(lines_data, today)
+    subtotal = sum((ld["gross"] for ld in lines_data), ZERO)
+    return CartQuote(lines_data=lines_data, subtotal=subtotal, auto_discount=auto_total)
+
+
+def _evaluate_code(code, *, lines_data, auto_total, now, lock):
+    """Tìm mã (khoá dòng khi `lock`, KHÔNG select_related) rồi tính bằng `evaluate_voucher` (đếm lượt bằng truy vấn mới)."""
+    qs = Voucher.objects.select_for_update() if lock else Voucher.objects
+    voucher = qs.filter(code=code).first()
+    committed = voucher_services.committed_count(voucher) if voucher is not None else 0
+    subtotal = sum((ld["gross"] for ld in lines_data), ZERO)
+    result = voucher_services.evaluate_voucher(
+        voucher=voucher, subtotal=subtotal, auto_discount=auto_total, now=now, committed=committed,
+    )
+    return voucher, result
+
+
+def check_voucher(code, quote, *, now=None):
+    """Kiểm mã với giỏ đã báo giá (không khoá, chỉ đọc): trả `(voucher hoặc None, VoucherEvaluation)`."""
+    return _evaluate_code(
+        code, lines_data=quote.lines_data, auto_total=quote.auto_discount, now=now or _now(), lock=False,
+    )
+
+
+def _precheck_voucher(resolved, code, today, now):
+    """
+    Thứ tự lỗi 02b §3.3: VOUCHER_INVALID (#5) đứng TRƯỚC OUT_OF_STOCK (#6). Kiểm nhanh KHÔNG khoá ở đây; kết quả có thẩm
+    quyền là lần kiểm dưới khoá trong `create_order`. Giỏ có món không bán được thì bỏ qua (OUT_OF_STOCK sẽ báo).
+    """
+    if any(item is None or not item.is_active or listed_price(item, today) is None for _raw, item, _qty in resolved):
+        return
+    lines_data = _build_lines_data(resolved, today)
+    _rule, _per_line, auto_total = _auto_discount(lines_data, today)
+    _voucher, result = _evaluate_code(code, lines_data=lines_data, auto_total=auto_total, now=now, lock=False)
+    if not result.valid:
+        raise VoucherInvalidError(result.reason_code, result.missing_amount)
+
+
 # --- P-05: tạo đơn (giữ chỗ) ------------------------------------------------
 
 def create_order(
@@ -241,6 +331,7 @@ def create_order(
     lines,
     privacy_consent=None,
     client_request_id=None,
+    voucher_code=None,
 ):
     """
     Tạo đơn ở trạng thái BOOKED — do Hệ thống tạo (BR-PQ-11). TẤT CẢ trong 1 transaction:
@@ -249,7 +340,11 @@ def create_order(
     lines: list[{"item_code": str, "qty": Decimal}]. `qty` của combo là SỐ COMBO (nguyên), của món thường là kg.
 
     Lỗi Shop có cấu trúc (02b §3.3, đều xảy ra trước khi ghi DB hoặc giữ chỗ, rollback cả đơn):
-    `InvalidQtyError` (BR-BH-22), `PolicyChanged` (BR-BH-17) rồi `OutOfStockError` (BR-BH-24).
+    `InvalidQtyError` (BR-BH-22), `PolicyChanged` (BR-BH-17), `VoucherInvalidError` (BR-DM-19) rồi `OutOfStockError`
+    (BR-BH-24).
+
+    `voucher_code` (SHOP-3b-04): tối đa một mã, không cộng dồn với PricingRule. Thứ tự khoá: đơn -> mã -> lô (02b §2.2).
+    Mã không hợp lệ dưới khoá (kể cả hết lượt khi đua) -> rollback cả đơn, không giữ chỗ, không giữ lượt.
 
     `client_request_id` (BR-BH-27): ghi vào đơn; unique ở DB. Hai request cùng mã: request sau bị chặn ở unique index
     và nhận `IntegrityError` — `place_order` bắt NGOÀI `atomic` này và trả đơn đã có.
@@ -268,6 +363,9 @@ def create_order(
 
     today = timezone.localdate()
     now = _now()
+    code = voucher_services.normalize_code(voucher_code)
+    if code:
+        _precheck_voucher(resolved, code, today, now)
 
     with transaction.atomic():
         # BR-BH-24: kiểm đủ hàng theo thành phần trước khi ghi gì (chưa khoá; `reserve` bên dưới mới là nguồn quyết định).
@@ -295,18 +393,24 @@ def create_order(
         )
 
         # Bước 1: dựng dữ liệu dòng + giá (đóng băng), chưa áp ưu đãi.
-        lines_data = []
-        for raw, item, qty in resolved:
-            rate = _effective_price(item, today)  # BR-DM-02 (BUNDLE dùng giá độc lập, BR-DM-04)
-            gross = _q(qty * rate)
-            lines_data.append({"item": item, "qty": qty, "rate": rate, "gross": gross})
+        lines_data = _build_lines_data(resolved, today)
 
         # Bước 2: chọn DUY NHẤT 1 PricingRule lợi nhất (BR-DM-08).
-        best = _best_pricing_rule(lines_data, today)
-        rule = None
-        per_line_discount = {}
-        if best is not None:
-            rule, per_line_discount = best
+        rule, per_line_discount, auto_total = _auto_discount(lines_data, today)
+
+        # Bước 2b (SHOP-3b-04): có mã -> khoá mã SAU khi đã chèn đơn, TRƯỚC khi khoá lô (02b §2.2), đếm lượt bằng truy vấn
+        # mới, so với ưu đãi tự động. Mã hợp lệ thì thay hẳn PricingRule (không cộng dồn, BR-DM-18) và giữ 1 lượt.
+        voucher = None
+        if code:
+            voucher, result = _evaluate_code(
+                code, lines_data=lines_data, auto_total=auto_total, now=now, lock=True,
+            )
+            if not result.valid:
+                raise VoucherInvalidError(result.reason_code, result.missing_amount)
+            shares = voucher_services.allocate_whole_vnd(result.discount, [ld["gross"] for ld in lines_data])
+            per_line_discount = dict(enumerate(shares))
+            rule = None
+            voucher_redemptions.hold(order=order, voucher=voucher, discount=result.discount)
 
         # Bước 3: tạo dòng đơn + giữ chỗ từng thành phần (FEFO, BR-BH-05). Thiếu tồn -> rollback cả đơn.
         total = ZERO
@@ -417,6 +521,7 @@ def cancel_unpaid_expired(*, now=None):
                     batches.release(batch=res.batch, qty=res.qty)
             o.status = SalesOrder.Status.AUTO_CANCELLED
             o.save(update_fields=["status"])
+            voucher_redemptions.release(order=o)  # BR-DM-20: nhả lượt mã cùng giao dịch với nhả giữ chỗ
             record_audit("cancel_unpaid_expired", actor=None, obj=o)
             cancelled += 1
     return cancelled

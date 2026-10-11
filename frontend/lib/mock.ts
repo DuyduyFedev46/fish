@@ -22,6 +22,10 @@ import {
   type PaymentCheckoutSession,
   type SaleUnit,
   type StockLevel,
+  type VoucherCheckInput,
+  type VoucherCheckResult,
+  type VoucherReason,
+  type VoucherTerms,
 } from "./types";
 import { todayInVietnam } from "./format";
 
@@ -251,6 +255,10 @@ type MockOrder = {
   late_payment: boolean;
   /** Số lần mở cổng thanh toán còn phải báo lỗi (ca D1 lỗi mở cổng). */
   checkout_fails: number;
+  /** Mã giảm giá đã áp lúc đặt (3b). `total` là tổng sau giảm. */
+  voucher?: { code: string; amount: number } | null;
+  /** Mốc bắt đầu chờ tiền về (D3), do mock ghi như máy chủ thật sẽ ghi. */
+  pending_since?: number | null;
 };
 
 const ORDERS_STORAGE_KEY = "cangcaloc_mock_orders_v4";
@@ -430,11 +438,11 @@ const CANCEL_LABELS: Record<string, string> = {
 function deliveryOf(code: string | null): OrderDelivery | null {
   switch (code) {
     case "CONFIRMING":
-      return { step: "preparing", step_label: "Chờ vựa gọi xác nhận" };
+      return { step: "preparing", step_label: "Chờ vựa gọi xác nhận", awaiting_confirmation: true };
     case "PREPARING":
-      return { step: "preparing", step_label: "Đang soạn hàng" };
+      return { step: "preparing", step_label: "Đang soạn hàng", awaiting_confirmation: false };
     case "READY":
-      return { step: "preparing", step_label: "Đã soạn xong, chờ giao" };
+      return { step: "preparing", step_label: "Đã soạn xong, chờ giao", awaiting_confirmation: false };
     case "DELIVERING":
       return { step: "delivering", step_label: "Đang giao" };
     case "COMPLETED":
@@ -457,7 +465,9 @@ function mockLookupToken(orderCode: string): string {
 function toWireLookup(o: MockOrder, now: number): OrderLookupResult {
   const state = stateOf(o, now);
   const delivery = deliveryOf(o.delivery_code);
-  const noDiscount: OrderDiscount = { source: null, code: null, amount: "0" };
+  const discount: OrderDiscount = o.voucher
+    ? { source: "voucher", code: o.voucher.code, amount: String(o.voucher.amount) }
+    : { source: null, code: null, amount: "0" };
   let cancel_notice: CancelNotice | null = null;
   if (o.cancel) {
     cancel_notice = {
@@ -488,6 +498,7 @@ function toWireLookup(o: MockOrder, now: number): OrderLookupResult {
     server_now: new Date(now).toISOString(),
     hold_minutes: MOCK_HOLD_MINUTES,
     payment_pending_minutes: MOCK_PAYMENT_PENDING_MINUTES,
+    payment_pending_since: o.pending_since ? new Date(o.pending_since).toISOString() : null,
     delivery: state === "cancelled" || state === "expired" || state === "hold_expired" || state === "awaiting_payment" ? null : delivery,
     lines: o.lines.map((l) => ({
       item_code: l.item_code,
@@ -497,7 +508,7 @@ function toWireLookup(o: MockOrder, now: number): OrderLookupResult {
       amount: String(l.amount),
     })),
     subtotal: String(o.lines.reduce((sum, l) => sum + l.amount, 0)),
-    discount: noDiscount,
+    discount,
     total_amount: String(o.total),
     cancel_notice,
     late_payment: o.late_payment,
@@ -529,6 +540,134 @@ export async function mockGetCatalog(): Promise<CatalogResponse> {
 export async function mockGetCatalogItem(itemCode: string): Promise<CatalogItemDetail | null> {
   const found = MOCK_CATALOG.find((i) => i.item_code === itemCode);
   return delay(found ? toWireDetail(found) : null);
+}
+
+// ---- Mã giảm giá giả (02b §3.8). Mã cố định để QA thử từng ca:
+//   CAVE10 (10%, trần 100.000đ, đơn từ 300.000đ) · GIAM50K (50.000đ) · MINLON (đơn từ 2.000.000đ -> MIN_ORDER)
+//   HETHAN (EXPIRED) · HETLUOT (USED_UP) · UUDAI (BETTER_PROMO) · HETLUC (hợp lệ khi kiểm, hết hiệu lực lúc đặt -> B8)
+//   MANGLOI (kiểm mã mất mạng) · NHANH (429). Mã khác -> INVALID.
+const MOCK_VOUCHER_ENDS = "2026-12-31T16:59:00Z";
+const MOCK_VOUCHER_STARTS = "2026-10-01T00:00:00Z";
+
+function voucherTerms(over: Partial<VoucherTerms>): VoucherTerms {
+  return {
+    kind: "AMOUNT",
+    value: "50000",
+    max_discount: null,
+    min_order_amount: "0",
+    starts_at: MOCK_VOUCHER_STARTS,
+    ends_at: MOCK_VOUCHER_ENDS,
+    customer_terms: "",
+    ...over,
+  };
+}
+
+const MOCK_VOUCHERS: Record<string, { terms: VoucherTerms; reason?: VoucherReason; autoDiscount?: number }> = {
+  CAVE10: {
+    terms: voucherTerms({ kind: "PERCENT", value: "10", max_discount: "100000", min_order_amount: "300000", customer_terms: "Áp dụng cho đơn đặt trên web." }),
+  },
+  GIAM50K: { terms: voucherTerms({}) },
+  MINLON: { terms: voucherTerms({ value: "100000", min_order_amount: "2000000" }) },
+  HETHAN: { terms: voucherTerms({}), reason: "EXPIRED" },
+  HETLUOT: { terms: voucherTerms({}), reason: "USED_UP" },
+  UUDAI: { terms: voucherTerms({ value: "20000" }), autoDiscount: 60000 },
+  HETLUC: { terms: voucherTerms({ kind: "PERCENT", value: "10", max_discount: "100000", min_order_amount: "300000" }) },
+};
+
+type VoucherEval = {
+  code: string | null;
+  valid: boolean | null;
+  reason: VoucherReason | null;
+  discount: number;
+  auto: number;
+  missing: number | null;
+  terms: VoucherTerms | null;
+};
+
+function normalizeVoucherCode(raw: string | undefined): string {
+  return (raw ?? "").replace(/\s+/g, "").toUpperCase();
+}
+
+/** Cùng thứ tự lý do như `evaluate_voucher` ở máy chủ; giảm làm tròn xuống nguyên đồng, trần 50% đơn. */
+function evaluateMockVoucher(rawCode: string | undefined, subtotal: number): VoucherEval {
+  const code = normalizeVoucherCode(rawCode);
+  if (!code) return { code: null, valid: null, reason: null, discount: 0, auto: 0, missing: null, terms: null };
+  const v = MOCK_VOUCHERS[code];
+  if (!v) return { code, valid: false, reason: "INVALID", discount: 0, auto: 0, missing: null, terms: null };
+  if (v.reason === "EXPIRED" || v.reason === "USED_UP") {
+    return { code, valid: false, reason: v.reason, discount: 0, auto: 0, missing: null, terms: null };
+  }
+  const minOrder = Number(v.terms.min_order_amount);
+  if (subtotal < minOrder) {
+    return { code, valid: false, reason: "MIN_ORDER", discount: 0, auto: 0, missing: minOrder - subtotal, terms: v.terms };
+  }
+  let discount = Number(v.terms.value);
+  if (v.terms.kind === "PERCENT") {
+    discount = Math.floor((subtotal * Number(v.terms.value)) / 100);
+    if (v.terms.max_discount) discount = Math.min(discount, Number(v.terms.max_discount));
+  }
+  discount = Math.min(discount, Math.floor(subtotal / 2));
+  const auto = v.autoDiscount ?? 0;
+  if (auto >= discount) return { code, valid: false, reason: "BETTER_PROMO", discount: 0, auto, missing: null, terms: v.terms };
+  return { code, valid: true, reason: null, discount, auto: 0, missing: null, terms: v.terms };
+}
+
+function mockSubtotal(items: { item_code: string; qty: string }[]): number | null {
+  let sum = 0;
+  for (const line of items) {
+    const item = MOCK_CATALOG.find((i) => i.item_code === line.item_code);
+    if (!item) return null;
+    sum += Math.round(item.price * Number(line.qty));
+  }
+  return sum;
+}
+
+/** Kiểm mã giả (02b §3.8). */
+export async function mockCheckVoucher(input: VoucherCheckInput): Promise<VoucherCheckResult> {
+  const code = normalizeVoucherCode(input.code);
+  if (code === "NHANH") throw new ApiError("Bạn thao tác quá nhanh. Vui lòng thử lại sau 60 giây.", 429, "throttled");
+  if (code === "MANGLOI" && !sessionFlag("mock_voucher_network_ok")) {
+    setSessionFlag("mock_voucher_network_ok");
+    throw new TypeError("Failed to fetch");
+  }
+  if (!input.items?.length) throw new ApiError("Giỏ hàng đang trống.", 400, "VALIDATION", { code: "VALIDATION", fields: { items: "Giỏ hàng đang trống" } });
+  const subtotal = mockSubtotal(input.items);
+  if (subtotal === null) throw new ApiError("Có món không còn bán.", 400, "VALIDATION", { code: "VALIDATION", fields: { items: "Có món không còn bán" } });
+  const ev = evaluateMockVoucher(code === "MANGLOI" ? "GIAM50K" : code, subtotal);
+  const discount = ev.valid ? ev.discount : 0;
+  const totalAfter = subtotal - discount - (ev.reason === "BETTER_PROMO" ? ev.auto : 0);
+  const promoApplied = ev.reason === "BETTER_PROMO";
+  return delay({
+    code: ev.code,
+    valid: ev.valid,
+    reason_code: ev.reason,
+    subtotal: String(subtotal),
+    auto_discount_amount: String(ev.auto),
+    discount_amount: String(discount),
+    missing_amount: ev.missing === null ? null : String(ev.missing),
+    applied: promoApplied
+      ? { source: "promo", amount: String(ev.auto) }
+      : discount > 0
+        ? { source: "voucher", amount: String(discount) }
+        : { source: null, amount: "0" },
+    total_after: String(totalAfter),
+    terms: ev.terms,
+  });
+}
+
+function sessionFlag(key: string): boolean {
+  try {
+    return typeof window !== "undefined" && window.sessionStorage.getItem(key) === "1";
+  } catch {
+    return false;
+  }
+}
+function setSessionFlag(key: string): void {
+  try {
+    window.sessionStorage.setItem(key, "1");
+  } catch {
+    // bỏ qua
+  }
 }
 
 function genOrderCode(): string {
@@ -641,12 +780,28 @@ export async function mockCreateOrder(payload: CreateOrderPayload): Promise<Crea
     throw new ApiError("Một số món vừa hết hàng.", 400, "OUT_OF_STOCK", { code: "OUT_OF_STOCK", lines: short });
   }
 
+  // Mã giảm giá (3b): server kiểm lại lúc đặt. HETLUC mô phỏng mã vừa hết hiệu lực giữa lúc khách đang điền form (B8).
+  let voucher: MockOrder["voucher"] = null;
+  if (payload.voucher_code) {
+    const forced = normalizeVoucherCode(payload.voucher_code) === "HETLUC";
+    const ev = forced ? evaluateMockVoucher("HETHAN", total) : evaluateMockVoucher(payload.voucher_code, total);
+    if (!ev.valid) {
+      throw new ApiError("Mã giảm giá không còn dùng được.", 400, "VOUCHER_INVALID", {
+        code: "VOUCHER_INVALID",
+        reason_code: ev.reason ?? "INVALID",
+        ...(ev.missing !== null ? { missing_amount: String(ev.missing) } : {}),
+      });
+    }
+    voucher = { code: ev.code ?? "", amount: ev.discount };
+  }
+
   const order: MockOrder = {
     order_code: genOrderCode(),
     phone_key: phoneKey(phone),
     request_id: payload.client_request_id,
     lines,
-    total,
+    voucher,
+    total: total - (voucher?.amount ?? 0),
     placed_at: now,
     hold_until: now + MOCK_HOLD_MINUTES * MIN,
     pay_confirm_at: null,
@@ -736,5 +891,6 @@ export function mockMarkPaymentPending(orderCode: string, delayMs: number | null
   const record = allOrders(now).find((o) => o.order_code === orderCode);
   if (!record) return;
   record.pay_confirm_at = delayMs === null ? null : now + delayMs;
+  record.pending_since = now;
   saveOrder(record);
 }

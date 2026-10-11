@@ -36,6 +36,7 @@ from apps.sales.models import (
     SalesInvoiceLineBatch,
     SalesOrder,
 )
+from apps.sales.orders import voucher_redemptions
 from apps.sales.utils import gen_code as _gen_code
 from apps.sales.utils import money_str, vnd_display
 
@@ -328,6 +329,21 @@ def _record_payment(*, order, bank_txn_id, amount, received_at, source, raw_payl
             )
 
     return payment, True
+
+
+def start_checkout(*, order):
+    """
+    Lập tham số cổng thanh toán (`checkout.build_checkout_params`, KHÔNG sửa file đó, 02b §7.0) rồi ghi mốc server
+    `payment_started_at` cho đơn còn Giữ chỗ (lô 3b, nguồn của `payment_pending_since` ở tra đơn). Ghi bằng UPDATE trực
+    tiếp, không khoá đơn, không đổi trạng thái. Lỗi nghiệp vụ của `build_checkout_params` đi thẳng lên người gọi.
+    """
+    from apps.sales.payments import checkout
+
+    params = checkout.build_checkout_params(order=order)
+    SalesOrder.objects.filter(pk=order.pk, status=SalesOrder.Status.BOOKED).update(
+        payment_started_at=timezone.now()
+    )
+    return params
 
 
 # --- BR-TT-18 (#15): Chủ ghi tay khoản tiền về muộn ----------------------------------------------------------
@@ -686,6 +702,8 @@ def issue_invoice(*, order, txn_ref, issued_at, code=None):
                     qty=res.qty,
                     unit_cost=fresh.landed_unit_cost,
                 )
+        # SHOP-3b-04 AC5 / BR-DM-20: đơn có mã -> lượt "đã dùng" cùng giao dịch lập hoá đơn (IPN khớp, hoặc Chủ xác nhận).
+        voucher_redemptions.mark_used(order=order)
     return invoice
 
 

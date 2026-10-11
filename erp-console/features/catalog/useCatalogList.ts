@@ -5,8 +5,8 @@
 // Bộ lọc chạy PHÍA SERVER; riêng ô tìm chữ là lọc phía máy trong phần đã tải (BE chưa có tham số `q`).
 
 import { usePagedList } from "@/shared/lib/usePagedList";
-import { listItemGroups, listItemPrices, listItems, listPricingRules } from "./api";
-import type { CatalogItem, ItemGroup, ItemListParams, ItemPrice, PricingRule, PricingRuleListParams } from "./types";
+import { listItemGroups, listItemPrices, listItems, listPricingRules, listVouchers } from "./api";
+import type { CatalogItem, ItemGroup, ItemListParams, ItemPrice, PricingRule, PricingRuleListParams, Voucher, VoucherListParams } from "./types";
 
 export function useCatalogList(params: ItemListParams, enabled: boolean) {
   return usePagedList<CatalogItem, ItemListParams>((p, page) => listItems(p, page), params, enabled);
@@ -28,4 +28,9 @@ export function usePricingRules(params: PricingRuleListParams, enabled: boolean)
 
 export function useItemGroups(enabled: boolean) {
   return usePagedList<ItemGroup, { scope: "all" }>((_p, page) => listItemGroups(page), { scope: "all" }, enabled);
+}
+
+/** Danh sách mã giảm giá (SHOP-3b-02). Lọc trạng thái chạy phía máy chủ. */
+export function useVouchers(params: VoucherListParams, enabled: boolean) {
+  return usePagedList<Voucher, VoucherListParams>((p, page) => listVouchers(p, page), params, enabled);
 }

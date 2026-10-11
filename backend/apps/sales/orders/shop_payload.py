@@ -29,18 +29,29 @@ def lines_payload(order):
     return rows
 
 
+def _discount_source(order, lines):
+    """
+    Nguồn giảm SUY RA, không thêm cột dòng (02b §4): dòng có `pricing_rule` -> "promo"; đơn có lượt mã -> "voucher" kèm mã
+    (BR-DM-18 bảo đảm một nguồn/đơn). Lượt đã nhả (đơn hết giờ) vẫn là mã vì giá đã đóng băng. Trả (source, code).
+    """
+    if any(line.pricing_rule_id is not None for line in lines):
+        return "promo", None
+    redemption = getattr(order, "voucher_redemption", None)
+    if redemption is not None:
+        return "voucher", redemption.code
+    return "promo", None
+
+
 def money_block(order):
     """`subtotal`, `discount`, `total_amount` nguyên đồng. `discount.amount` = subtotal − total nên cộng trừ luôn khớp."""
-    subtotal = money_vnd(sum((l.amount + l.discount_amount for l in order.lines.all()), ZERO))
+    lines = list(order.lines.all())
+    subtotal = money_vnd(sum((l.amount + l.discount_amount for l in lines), ZERO))
     total = money_vnd(order.total_amount)
     discount = max(subtotal - total, ZERO)
+    source, code = _discount_source(order, lines) if discount > ZERO else (None, None)
     return {
         "subtotal": money_str(subtotal),
-        "discount": {
-            "source": "promo" if discount > ZERO else None,
-            "code": None,
-            "amount": money_str(discount),
-        },
+        "discount": {"source": source, "code": code, "amount": money_str(discount)},
         "total_amount": money_str(total),
     }
 

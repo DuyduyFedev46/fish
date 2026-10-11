@@ -36,3 +36,12 @@ Sửa giá cho phép, nhưng giá nằm trong đơn đã đặt KHÔNG đổi. G
 - Ô tìm ở tab Mặt hàng chỉ lọc trong phần đã tải vì BE chưa có tham số `q`. Bộ lọc nhóm, trạng thái, ảnh, loại chạy phía server.
 - Tạo combo là hai bước (mặt hàng rồi từng dòng công thức). Nếu một dòng lỗi, mặt hàng đã có: form khoá phần đã lưu và "Thử lại" chỉ gửi các dòng còn thiếu.
 - Bộ lọc, từ khoá, tên, giá không ghi vào URL, localStorage hay log. URL chỉ có id số, `type` và `tab`.
+
+## Mã giảm giá (SHOP-3b-02)
+
+Màn riêng `/vouchers/` (danh sách), `/vouchers/new/`, `/vouchers/edit/?id=`. Chỉ người có `catalog.manage_voucher` (Chủ, hoặc người Chủ uỷ) thấy menu và vào được; người khác nhận "không có quyền" và không có request nào được gọi.
+
+- `voucherModel.ts`: hàm thuần (kiểm form, nháp ↔ thân gửi, trường khoá khi mã đã chạy, đọc lỗi `fields` của BE). Giờ nhập là GMT+7 qua `vnInputToIso`. Test ở `voucher.test.ts`.
+- `voucherMock.ts`: mock đúng 02b §3.9 (chỉ chạy khi `NEXT_PUBLIC_USE_MOCK=1`), gọi từ `mock.ts`; `window.__caveMock.resetCatalog()` đưa mã về seed.
+- `components/VoucherList`, `VoucherForm` (tạo và sửa), `VoucherDisableDialog` (bắt chọn lý do), `VoucherRedemptions` (chỉ mã đơn, số giảm, giờ, trạng thái, không có thông tin khách).
+- Mã và kiểu giảm không đổi sau khi tạo; từ `starts_at` chỉ sửa được theo hướng có lợi cho khách (BR-DM-22). Không có nút xoá.

@@ -139,7 +139,12 @@ export type CancelNotice = {
   policy_url: string;
 };
 
-export type OrderDelivery = { step: "preparing" | "delivering" | "delivered" | "failed"; step_label: string };
+/** `awaiting_confirmation`: máy chủ báo phiếu giao mới nhất đang chờ vựa gọi xác nhận (02b §3.4.2, bổ sung 11/10). */
+export type OrderDelivery = {
+  step: "preparing" | "delivering" | "delivered" | "failed";
+  step_label: string;
+  awaiting_confirmation?: boolean;
+};
 
 /** Kết quả tra đơn (`POST /api/shop/orders/lookup/`). Không có tên, SĐT hay địa chỉ người nhận. */
 export type OrderLookupResult = {
@@ -154,6 +159,8 @@ export type OrderLookupResult = {
   server_now: string;
   hold_minutes: number;
   payment_pending_minutes: number;
+  /** Mốc máy chủ bắt đầu chờ tiền về (D3). Tên theo ví dụ ở 02b §12; vắng thì FE dùng mốc ghi trong phiên. */
+  payment_pending_since?: string | null;
   delivery: OrderDelivery | null;
   lines: OrderLineData[];
   subtotal: Money;
@@ -178,6 +185,44 @@ export type PaymentCheckoutSession = {
   checkout_url: string;
   fields: PaymentGatewayField[];
   environment?: "SANDBOX" | "PRODUCTION";
+};
+
+// ---- Mã giảm giá (02b §3.8: POST /api/shop/vouchers/check/) ----
+
+export type VoucherReason = "INVALID" | "EXPIRED" | "MIN_ORDER" | "USED_UP" | "BETTER_PROMO";
+
+/** Điều kiện công khai của mã, đủ dựng dòng điều kiện ở giỏ. Không có số lượt còn lại (BR-DM-24). */
+export type VoucherTerms = {
+  kind: "PERCENT" | "AMOUNT";
+  value: string;
+  /** AMOUNT thì null. */
+  max_discount: Money | null;
+  /** "0" = không có đơn tối thiểu. */
+  min_order_amount: Money;
+  starts_at: string;
+  ends_at: string;
+  customer_terms: string;
+};
+
+export type VoucherCheckInput = {
+  /** Vắng thì chỉ báo giá giỏ và ưu đãi tự động. */
+  code?: string;
+  items: CreateOrderItemInput[];
+};
+
+export type VoucherCheckResult = {
+  code: string | null;
+  /** null khi không gửi mã. */
+  valid: boolean | null;
+  reason_code: VoucherReason | null;
+  subtotal: Money;
+  auto_discount_amount: Money;
+  discount_amount: Money;
+  missing_amount: Money | null;
+  applied: { source: "promo" | "voucher" | null; amount: Money };
+  /** Tổng hiển thị = số này, FE không tự tính giảm. */
+  total_after: Money;
+  terms: VoucherTerms | null;
 };
 
 export class ApiError extends Error {

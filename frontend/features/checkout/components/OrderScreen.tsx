@@ -38,10 +38,23 @@ import PendingView from "./PendingView";
 import s from "./OrderScreen.module.css";
 
 const BANNER_KEY = "shop_paid_banner_dismissed";
-// Mốc bắt đầu chờ tiền (D3) giữ trong phiên theo mã đơn, để tải lại trang không đếm lại từ 0. Contract tra đơn không có mốc này.
+// Mốc bắt đầu chờ tiền (D3): ưu tiên mốc máy chủ (`payment_pending_since`, lô 3b). Chỉ khi máy chủ chưa trả mốc thì dự phòng
+// bằng mốc ghi trong phiên theo mã đơn, để tải lại trang không đếm lại từ 0.
 const PENDING_KEY = "shop_pending_since_v1";
 
-function pendingStart(code: string): number {
+/** Mốc máy chủ đổi sang đồng hồ máy khách (bù lệch giờ bằng `server_now`); null nếu thiếu hoặc sai. */
+function serverPendingStart(order: OrderLookupResult): number | null {
+  const since = order.payment_pending_since ? Date.parse(order.payment_pending_since) : NaN;
+  const serverNow = Date.parse(order.server_now);
+  if (!Number.isFinite(since) || !Number.isFinite(serverNow)) return null;
+  const waited = Math.max(0, serverNow - since);
+  return Date.now() - waited;
+}
+
+function pendingStart(order: OrderLookupResult): number {
+  const fromServer = serverPendingStart(order);
+  if (fromServer !== null) return fromServer;
+  const code = order.order_code;
   try {
     const raw = window.sessionStorage.getItem(PENDING_KEY);
     const v = raw ? (JSON.parse(raw) as { code?: string; at?: number }) : null;
@@ -191,7 +204,7 @@ export default function OrderScreen() {
 
   const state = order ? (expiredLocal ? effectiveState(order.state, 0) : order.state) : null;
   const waitStarted = order && state === "awaiting_payment" && result === "success";
-  if (waitStarted && pendingSince.current === null && order) pendingSince.current = pendingStart(order.order_code);
+  if (waitStarted && pendingSince.current === null && order) pendingSince.current = pendingStart(order);
 
   const decision = order && state
     ? screenFor(

@@ -230,6 +230,29 @@ export const ENUMS = {
     PERCENT: e("Giảm phần trăm"),
   },
 
+  // ---- mã giảm giá (SHOP-3b-02, 02b §3.9) ----
+  voucherStatus: {
+    running: e("Đang chạy", "good"),
+    scheduled: e("Chưa tới ngày", "info"),
+    paused: e("Đã tắt"),
+    expired: e("Hết hạn"),
+    used_up: e("Hết lượt", "warn"),
+  },
+  voucherKind: {
+    PERCENT: e("Giảm phần trăm"),
+    AMOUNT: e("Giảm số tiền"),
+  },
+  voucherDisableReason: {
+    BUDGET: e("Hết ngân sách"),
+    INCIDENT: e("Có sự cố"),
+    OTHER: e("Lý do khác"),
+  },
+  voucherRedemptionState: {
+    held: e("Đang giữ", "warn"),
+    used: e("Đã dùng", "good"),
+    released: e("Đã nhả"),
+  },
+
   // ---- content ----
   entryStatus: {
     draft: e("Nháp"),

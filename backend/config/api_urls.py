@@ -35,6 +35,8 @@ from apps.catalog.images.api import ItemImageDetailView
 from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemViewSet
 from apps.catalog.items.shop_api import ShopCatalogView, ShopItemDetailView
 from apps.catalog.pricing.api import ItemPriceViewSet, PriceListViewSet, PricingRuleViewSet
+from apps.catalog.vouchers.api import VoucherViewSet
+from apps.catalog.vouchers.shop_api import ShopVoucherCheckView
 from apps.delivery.api import DeliverersView, DeliveryNoteViewSet
 from apps.delivery.attention_api import DashboardAttentionView
 from apps.delivery.confirmation.api import ConfirmationQueueViewSet, CustomerSearchView
@@ -65,6 +67,7 @@ router.register("catalog/bundle-lines", BundleLineViewSet)
 router.register("catalog/price-lists", PriceListViewSet)
 router.register("catalog/item-prices", ItemPriceViewSet)
 router.register("catalog/pricing-rules", PricingRuleViewSet)
+router.register("catalog/vouchers", VoucherViewSet, basename="catalog-vouchers")
 # inventory
 router.register("inventory/warehouses", WarehouseViewSet)
 router.register("inventory/batches", BatchViewSet)
@@ -137,6 +140,7 @@ urlpatterns = [
     # Shop công khai (guest)
     path("shop/catalog/", ShopCatalogView.as_view()),
     path("shop/catalog/<str:item_code>/", ShopItemDetailView.as_view()),
+    path("shop/vouchers/check/", ShopVoucherCheckView.as_view()),
     path("shop/orders/", ShopOrderCreateView.as_view()),
     # Tra đơn bằng POST (SHOP-3-02): đặt TRƯỚC mọi route shop/orders/<mã>/…; GET 4 số cuối đã gỡ (không còn route).
     path("shop/orders/lookup/", ShopOrderLookupView.as_view()),

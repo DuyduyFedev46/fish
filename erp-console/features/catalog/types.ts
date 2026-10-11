@@ -181,3 +181,60 @@ export type PricingRuleListParams = {
 };
 
 export type ItemPriceListParams = { item: number | null };
+
+// ---- Mã giảm giá (SHOP-3b-02, 02b §3.9). Tiền là chuỗi số nguyên đồng; giờ là ISO UTC có `Z`, hiển thị theo GMT+7. ----
+
+export type VoucherKind = "PERCENT" | "AMOUNT";
+/** Do máy chủ tính theo thứ tự ưu tiên: paused, expired, used_up, scheduled, running. FE không tự suy ra. */
+export type VoucherStatus = "running" | "scheduled" | "paused" | "expired" | "used_up";
+export type VoucherDisableReason = "BUDGET" | "INCIDENT" | "OTHER";
+
+export type Voucher = {
+  id: number;
+  code: string;
+  name: string;
+  kind: VoucherKind;
+  /** PERCENT: số phần trăm ("10"). AMOUNT: số đồng. */
+  value: string;
+  /** Chỉ PERCENT (bắt buộc); AMOUNT thì null. */
+  max_discount: string | null;
+  min_order_amount: string;
+  starts_at: string;
+  ends_at: string;
+  total_uses: number;
+  used_count: number;
+  held_count: number;
+  status: VoucherStatus;
+  is_active: boolean;
+  disabled_reason: "" | VoucherDisableReason;
+  /** Chỉ Chủ đọc được; ≤ 200 ký tự, không dãy 9 chữ số. */
+  disabled_note: string;
+  customer_terms: string;
+  created_at: string;
+};
+
+export type VoucherInput = {
+  code: string;
+  name: string;
+  kind: VoucherKind;
+  value: string;
+  max_discount: string | null;
+  min_order_amount: string;
+  starts_at: string;
+  ends_at: string;
+  total_uses: number;
+  customer_terms: string;
+};
+
+/** PATCH: chỉ gửi trường đổi. `code` và `kind` không bao giờ đổi (FIELD_LOCKED). */
+export type VoucherPatch = Partial<Omit<VoucherInput, "code" | "kind">>;
+
+export type VoucherListParams = { status: "" | VoucherStatus };
+
+/** Một lượt dùng mã: chỉ 4 khoá, không tên, SĐT, địa chỉ (bất biến 9). */
+export type VoucherRedemption = {
+  order_code: string;
+  discount_amount: string;
+  at: string;
+  state: "held" | "used" | "released";
+};

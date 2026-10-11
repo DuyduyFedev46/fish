@@ -25,3 +25,9 @@ theo thứ tự SHOP_CLOSED, VALIDATION, đơn cũ (200), INVALID_QTY, POLICY_CH
 `lookup_token.py` ký mã tra đơn (chỉ mã đơn + mốc giờ, hạn `SHOP_LOOKUP_TOKEN_DAYS`); `shop_state.py` tính `state` (E6) và
 `delivery.step`; `shop_labels.py` nhãn theo `state`; `customer_notices.py` dựng `cancel_notice` (nhãn lý do cố định, không khoá `refund*`).
 Lô này không đổi trạng thái đơn.
+
+Shop lô 3b (SHOP-3b-04, BR-DM-17…21; 02b §2.2, §3.3, §4): `create_order(voucher_code=…)` kiểm mã bằng `catalog.vouchers.services.evaluate_voucher`
+(cùng hàm với `POST /api/shop/vouchers/check/`), khoá `Voucher` SAU khi chèn đơn và TRƯỚC khi khoá lô, đếm lượt bằng truy vấn mới, không cộng dồn
+với `PricingRule`, chia số giảm nguyên đồng vào từng dòng (`allocate_whole_vnd`). `voucher_redemptions.py`: `hold` (tạo đơn), `mark_used`
+(`payments.issue_invoice`), `release` (`cancel_unpaid_expired`); huỷ đơn đã trả KHÔNG nhả lượt. Lỗi `VOUCHER_INVALID` + `reason_code`.
+Tra đơn thêm `payment_pending_since` (mốc server khách mở cổng thanh toán, từ `SalesOrder.payment_started_at`) và `delivery.awaiting_confirmation`.

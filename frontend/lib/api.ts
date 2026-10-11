@@ -11,6 +11,8 @@ import {
   type OrderLookupInput,
   type OrderLookupResult,
   type PaymentCheckoutSession,
+  type VoucherCheckInput,
+  type VoucherCheckResult,
 } from "./types";
 // KHÔNG import tĩnh "./mock": bản build thật (USE_MOCK != "1") phải không mang seed mock.
 // Mỗi nhánh mock dưới đây dùng điều kiện literal `process.env.NEXT_PUBLIC_USE_MOCK === "1"`
@@ -165,6 +167,22 @@ export async function startCheckoutSession(
     `/api/shop/orders/${encodeURIComponent(orderCode)}/checkout/`,
     { method: "POST" }
   );
+}
+
+/**
+ * Kiểm mã giảm giá cho giỏ (02b §3.8, công khai, 20 lần/phút/IP). Mã sai/hết hạn... là HTTP 200 với `valid:false`
+ * và `reason_code`; 400 (VALIDATION, INVALID_QTY) và 429 để nguyên `ApiError`. FE không tự tính số giảm.
+ * Mã giảm giá không phải dữ liệu cá nhân nhưng vẫn không đưa vào log.
+ */
+export async function checkVoucher(input: VoucherCheckInput): Promise<VoucherCheckResult> {
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
+    const m = await import("./mock");
+    return m.mockCheckVoucher(input);
+  }
+  return apiFetch<VoucherCheckResult>("/api/shop/vouchers/check/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export { ApiError };

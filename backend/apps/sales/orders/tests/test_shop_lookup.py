@@ -25,7 +25,7 @@ ADDRESS = "12 Lê Lợi, Vũng Tàu"
 URL = "/api/shop/orders/lookup/"
 KEYS = {
     "order_code", "status", "state", "status_label", "placed_at", "paid_at", "delivered_at", "booked_expires_at",
-    "server_now", "hold_minutes", "payment_pending_minutes", "delivery", "lines", "subtotal", "discount",
+    "server_now", "hold_minutes", "payment_pending_minutes", "payment_pending_since", "delivery", "lines", "subtotal", "discount",
     "total_amount", "cancel_notice", "late_payment", "lookup_token",
 }
 S = DeliveryNote.Status
@@ -418,7 +418,7 @@ class StateTableTests(LookupBase):
         self.set_state(order, O.PROCESSING, S.DELIVERING)
         state, label, delivery, _ = self.state_of(order)
         self.assertEqual((state, label), ("delivering", "Đang giao"))
-        self.assertEqual(delivery, {"step": "delivering", "step_label": "Đang giao"})
+        self.assertEqual(delivery, {"step": "delivering", "step_label": "Đang giao", "awaiting_confirmation": False})
 
         self.set_state(order, O.PROCESSING, S.FAILED)
         state, label, delivery, _ = self.state_of(order)
@@ -428,7 +428,7 @@ class StateTableTests(LookupBase):
         self.set_state(order, O.COMPLETED, S.COMPLETED)
         state, label, delivery, _ = self.state_of(order)
         self.assertEqual((state, label), ("completed", "Đã giao"))
-        self.assertEqual(delivery, {"step": "delivered", "step_label": "Đã giao"})
+        self.assertEqual(delivery, {"step": "delivered", "step_label": "Đã giao", "awaiting_confirmation": False})
 
     def test_delivery_step_mapping_covers_every_note_status(self):
         order = self._paid_order(phone=PHONE)
@@ -442,7 +442,7 @@ class StateTableTests(LookupBase):
                 delivery = self.by_phone(order).json()["delivery"]
                 self.assertEqual(delivery["step"] if delivery else None, step)
                 if delivery:
-                    self.assertEqual(set(delivery), {"step", "step_label"})
+                    self.assertEqual(set(delivery), {"step", "step_label", "awaiting_confirmation"})
 
     def test_every_state_value_is_one_of_the_eight(self):
         allowed = {"awaiting_payment", "hold_expired", "expired", "cancelled", "preparing", "delivering",

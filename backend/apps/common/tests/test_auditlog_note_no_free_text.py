@@ -405,6 +405,8 @@ class AiScrubCoversFreeTextFieldsTests(TestCase):
         ("content.EntryVersion", "description"): "mô tả bài viết công khai",
         ("sales.SalesCreditNote", "reason_code"): "mã lý do cố định, không phải chữ tự do",
         ("content.Entry", "return_reason"): "mã chọn từ danh sách cố định BR-ND-15",
+        ("catalog.Voucher", "disabled_note"): "ghi chú nội bộ của Chủ khi tắt mã (SHOP-3b-01): ≤ 200 ký tự, chặn dãy ≥ 9 chữ "
+                                              "số, không dữ liệu khách; AuditLog disable_voucher chỉ ghi note_marker",
     }
 
     def test_every_note_or_reason_field_is_scrubbed_or_allowlisted(self):

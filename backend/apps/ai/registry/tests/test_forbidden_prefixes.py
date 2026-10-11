@@ -51,3 +51,17 @@ class ForbiddenPrefixesTests(TestCase):
             registry.build(force=True)
             leaked = [s.path for s in registry.get_specs() if s.path.startswith(LIVE_PREFIX)]
         self.assertGreater(len(leaked), 0, f"Thiếu {LIVE_PREFIX} trong danh sách cấm thì phải thấy lệnh lọt vào chỉ mục.")
+
+
+class VoucherForbiddenForAiTests(TestCase):
+    """Lô 3b (BR-DM-23): mã giảm giá là việc tiền rời túi, chỉ Chủ/người được uỷ làm bằng tay; AI không thấy."""
+
+    def test_voucher_routes_are_forbidden(self):
+        self.assertIn("/api/catalog/vouchers/", FORBIDDEN_PREFIXES)
+        for path in ("/api/catalog/vouchers/", "/api/catalog/vouchers/1/", "/api/catalog/vouchers/1/disable/",
+                     "/api/catalog/vouchers/1/redemptions/"):
+            self.assertTrue(is_url_forbidden(path), path)
+
+    def test_registry_has_no_voucher_command(self):
+        specs = get_registry().get_specs()
+        self.assertEqual([s.id for s in specs if "voucher" in s.id or s.path.startswith("/api/catalog/vouchers")], [])

@@ -6,6 +6,8 @@
 //   GET   /api/catalog/item-prices/?item=<id>    POST /item-prices/          (đặt giá mới; BE tự đóng giá cũ)
 //   GET   /api/catalog/price-lists/              GET/POST/PATCH /pricing-rules/?is_active=&apply_on=
 //   GET   /api/catalog/item-groups/              POST /item-groups/
+//   GET/POST /api/catalog/vouchers/  GET/PATCH /vouchers/{id}/  POST /vouchers/{id}/disable|enable/  GET /vouchers/{id}/redemptions/
+//                                                                            (SHOP-3b-02; mọi endpoint cần catalog.manage_voucher)
 //   GET   /api/guidance/item/{id}/                                           (chỉ dùng `timeline`)
 // Không có DELETE (BE trả 405). Người thiếu quyền xem giá (NV kho) nhận 403 ở item-prices, price-lists, pricing-rules,
 // và không có key `current_price` ở mặt hàng — FE chỉ ẩn cho gọn, BE là lớp chặn thật.
@@ -35,6 +37,12 @@ import {
   type PricingRuleListParams,
   type UploadImageInput,
   type UploadImageResponse,
+  type Voucher,
+  type VoucherDisableReason,
+  type VoucherInput,
+  type VoucherListParams,
+  type VoucherPatch,
+  type VoucherRedemption,
 } from "./types";
 
 const ITEMS = "/api/catalog/items/";
@@ -171,4 +179,46 @@ export function createPricingRule(input: PricingRuleInput): Promise<PricingRule>
 /** PATCH /api/catalog/pricing-rules/{id}/ — bật/tắt ưu đãi (không xoá). */
 export function setPricingRuleActive(id: number, active: boolean): Promise<PricingRule> {
   return apiFetch<PricingRule>(`/api/catalog/pricing-rules/${id}/`, { method: "PATCH", body: { is_active: active }, mock: mock() });
+}
+
+// ---- Mã giảm giá (SHOP-3b-02, 02b §3.9). Mọi endpoint cần catalog.manage_voucher; không có DELETE (405). ----
+
+export function voucherQuery(params: VoucherListParams, page: number): string {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  return withPage(qs, page);
+}
+
+/** GET /api/catalog/vouchers/?status=&page= */
+export function listVouchers(params: VoucherListParams, page = 1, signal?: AbortSignal): Promise<Paginated<Voucher>> {
+  return apiFetch<Paginated<Voucher>>(`/api/catalog/vouchers/${voucherQuery(params, page)}`, { signal, mock: mock() });
+}
+
+export function getVoucher(id: number, signal?: AbortSignal): Promise<Voucher> {
+  return apiFetch<Voucher>(`/api/catalog/vouchers/${id}/`, { signal, mock: mock() });
+}
+
+/** POST /api/catalog/vouchers/ → 201. Lỗi 400 `VALIDATION` kèm `fields` theo từng trường. */
+export function createVoucher(input: VoucherInput): Promise<Voucher> {
+  return apiFetch<Voucher>("/api/catalog/vouchers/", { method: "POST", body: input, mock: mock() });
+}
+
+/** PATCH /api/catalog/vouchers/{id}/ — 400 `UNFAVORABLE_CHANGE` (mã đang chạy, đổi ngược hướng) hoặc `FIELD_LOCKED`. */
+export function updateVoucher(id: number, patch: VoucherPatch): Promise<Voucher> {
+  return apiFetch<Voucher>(`/api/catalog/vouchers/${id}/`, { method: "PATCH", body: patch, mock: mock() });
+}
+
+/** POST .../disable/ — `reason` bắt buộc; `OTHER` bắt buộc `note`. Đơn đang giữ lượt vẫn giữ giá đã đóng băng. */
+export function disableVoucher(id: number, input: { reason: VoucherDisableReason; note: string }): Promise<Voucher> {
+  return apiFetch<Voucher>(`/api/catalog/vouchers/${id}/disable/`, { method: "POST", body: input, mock: mock() });
+}
+
+/** POST .../enable/ — 400 `EXPIRED` hoặc `USED_UP` khi mã không bật lại được. */
+export function enableVoucher(id: number): Promise<Voucher> {
+  return apiFetch<Voucher>(`/api/catalog/vouchers/${id}/enable/`, { method: "POST", body: {}, mock: mock() });
+}
+
+/** GET .../redemptions/?page= — chỉ mã đơn, số giảm, giờ, trạng thái. */
+export function listVoucherRedemptions(id: number, page = 1, signal?: AbortSignal): Promise<Paginated<VoucherRedemption>> {
+  return apiFetch<Paginated<VoucherRedemption>>(`/api/catalog/vouchers/${id}/redemptions/${withPage(new URLSearchParams(), page)}`, { signal, mock: mock() });
 }
