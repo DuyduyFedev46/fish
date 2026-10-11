@@ -55,6 +55,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
+      - name: Gom file tĩnh (admin cần manifest, như Dockerfile)
+        run: python manage.py collectstatic --noinput
       - name: Kiểm migration không sinh thêm
         run: python manage.py makemigrations --check --dry-run
       - name: Chạy toàn bộ test (tuần tự, test đua Postgres không bị skip)
@@ -84,6 +86,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt
+      - name: Gom file tĩnh (admin cần manifest, như Dockerfile)
+        run: python manage.py collectstatic --noinput
       - name: Chạy toàn bộ test (tuần tự)
         run: python manage.py test --noinput 2>&1 | tee test-output.txt
         shell: bash
