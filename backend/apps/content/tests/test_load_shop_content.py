@@ -65,10 +65,10 @@ class LoadShopContentBase(TestCase):
 
 class LoadShopContentPublishTests(LoadShopContentBase):
     def test_ac1_publish_creates_categories_pages_posts_all_published(self):
-        """AC1: staging --publish -> 3 chuyên mục, 10 trang, 5 bài, tất cả Đã đăng; bìa tạm có nhãn Ảnh minh hoạ."""
+        """AC1: staging --publish -> 3 chuyên mục, 12 trang (10 trang + 2 khối trang chủ), 5 bài, tất cả Đã đăng; bìa tạm có nhãn Ảnh minh hoạ."""
         self.run_cmd("--publish")
         self.assertEqual(Category.objects.count(), 3)
-        self.assertEqual(Entry.objects.filter(kind="page").count(), 10)
+        self.assertEqual(Entry.objects.filter(kind="page").count(), 12)
         self.assertEqual(Entry.objects.filter(kind="post").count(), 5)
         self.assertFalse(Entry.objects.exclude(status="published").exists())
         self.assertFalse(Entry.objects.filter(slug="ca-nuc-chien-gion").exists())  # S-23
@@ -123,7 +123,7 @@ class LoadShopContentDraftTests(LoadShopContentBase):
     def test_ac2_default_loads_draft_only(self):
         """AC2: không cờ -> mọi trang, bài ở Nháp; không phiên bản đăng nào."""
         self.run_cmd()
-        self.assertEqual(Entry.objects.count(), 15)
+        self.assertEqual(Entry.objects.count(), 17)
         self.assertFalse(Entry.objects.exclude(status="draft").exists())
         self.assertEqual(EntryVersion.objects.count(), 0)
         # Production: bài để Lộc tải ảnh thật, không gắn ảnh tạm.
@@ -190,7 +190,7 @@ class LoadShopContentGuardTests(LoadShopContentBase):
         self.assertNotIn("0900 000 009", text)  # không in lại số (bất biến 9)
         self.assertFalse(Entry.objects.filter(slug="lien-he").exists())
         self.assertTrue(Entry.objects.filter(slug="cach-mua-hang").exists())
-        self.assertEqual(Entry.objects.count(), 14)
+        self.assertEqual(Entry.objects.count(), 16)
 
     def test_ac4_hotline_is_allowed(self):
         """AC4 + AC8: hotline từ settings được thay vào {hotline} và không bị chặn như SĐT lạ."""
@@ -269,7 +269,7 @@ class LoadShopContentGuardTests(LoadShopContentBase):
                 self.run_cmd("--environment", "production", "--publish")
             self.assertEqual(Entry.objects.count(), 0)
             self.run_cmd("--environment", "production")
-        self.assertEqual(Entry.objects.count(), 15)
+        self.assertEqual(Entry.objects.count(), 17)
         self.assertFalse(Entry.objects.exclude(status="draft").exists())
 
     def test_author_must_exist_and_have_publish_permission(self):
@@ -315,7 +315,7 @@ class LoadShopContentCleanupTests(LoadShopContentBase):
             with self.assertRaises(CommandError):
                 self.run_cmd("--publish")
         self.assertFalse(Entry.objects.filter(kind="post").exists())
-        self.assertEqual(Entry.objects.filter(kind="page", status="published").count(), 10)
+        self.assertEqual(Entry.objects.filter(kind="page", status="published").count(), 12)
         content_dir = Path(self.media) / "content"
         leftover = [p for p in content_dir.rglob("*") if p.is_file()] if content_dir.exists() else []
         self.assertEqual(leftover, [])
@@ -350,7 +350,7 @@ class LoadShopContentPageRoleTests(LoadShopContentBase):
         self.run_cmd("--publish")
         self.assertEqual(self.roles_of(), self.EXPECTED)
         self.assertEqual(EntryVersion.objects.count(), versions)
-        self.assertEqual(Entry.objects.filter(kind="page").count(), 10)
+        self.assertEqual(Entry.objects.filter(kind="page").count(), 12)
         before = self.entry_state()
         out = self.run_cmd("--publish")
         self.assertEqual(self.entry_state(), before)
@@ -389,3 +389,117 @@ class LoadShopContentPageRoleTests(LoadShopContentBase):
         self.assertIn("vai trò shipping đã có trang khác giữ", out)
         self.assertEqual(Entry.objects.get(page_role="shipping").pk, other.pk)
         self.assertIsNone(Entry.objects.get(slug="giao-hang").page_role)
+
+
+def _inline_text(nodes):
+    return "".join(n.get("text", "") for n in nodes)
+
+
+class LoadShopContentHomeBlockTests(LoadShopContentBase):
+    """SHOP-5-03 (02b §3.7.2): trang cố định `home-banner`, `home-commitments` cho banner và dải cam kết trang chủ."""
+
+    def test_shop_5_03_home_pages_published_outside_footer_without_role(self):
+        self.run_cmd("--publish")
+        for slug in ("home-banner", "home-commitments"):
+            page = Entry.objects.get(slug=slug)
+            self.assertEqual((page.kind, page.status, page.show_in_footer, page.page_role), ("page", "published", False, None))
+            self.assertEqual(APIClient().get(f"/api/public/content/entries/{slug}/").status_code, 200)
+        slugs = [row["slug"] for row in APIClient().get("/api/public/content/footer-links/").json()]
+        self.assertNotIn("home-banner", slugs)
+        self.assertNotIn("home-commitments", slugs)
+
+    def test_shop_5_03_banner_shape_follows_contract(self):
+        """Mỗi slide: heading cấp 2 + paragraph + (tuỳ chọn) paragraph chỉ có một link nội bộ. Tối đa 3 slide.
+        excerpt = dải chữ đầu trang, số kg tối thiểu lấy từ settings (L7)."""
+        self.run_cmd("--publish")
+        data = APIClient().get("/api/public/content/entries/home-banner/").json()
+        blocks = data["body"]["blocks"]
+        headings = [b for b in blocks if b["type"] == "heading"]
+        self.assertTrue(1 <= len(headings) <= 3)
+        self.assertEqual(blocks[0], {"type": "heading", "level": 2, "text": "Mua theo lô tại cảng"})
+        self.assertEqual(blocks[1]["type"], "paragraph")
+        self.assertNotIn("href", json.dumps(blocks[1]))
+        button = blocks[2]
+        self.assertEqual(button["type"], "paragraph")
+        links = [n for n in button["children"] if n.get("href")]
+        self.assertEqual(len(links), 1)
+        self.assertEqual(_inline_text(button["children"]).strip(), links[0]["text"])
+        self.assertTrue(links[0]["href"].startswith("/") and not links[0]["href"].startswith("//"))
+        self.assertEqual(data["excerpt"], "Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà")
+
+    @override_settings(SHOP_MIN_QTY_KG="0.5")
+    def test_shop_5_03_strip_text_reads_min_qty_from_settings(self):
+        self.run_cmd("--publish")
+        self.assertIn("mua từ 0,5 kg", Entry.objects.get(slug="home-banner").excerpt)
+
+    def test_shop_5_03_commitments_one_list_bold_title_and_detail(self):
+        """Một khối list, mỗi mục = phần đậm (tiêu đề) + phần thường (mô tả); 3 mục; không "Cân đúng" (S-18)."""
+        self.run_cmd("--publish")
+        blocks = APIClient().get("/api/public/content/entries/home-commitments/").json()["body"]["blocks"]
+        self.assertEqual([b["type"] for b in blocks], ["list"])
+        items = blocks[0]["items"]
+        self.assertEqual(len(items), 3)
+        titles = []
+        for item in items:
+            self.assertIn("bold", item[0].get("marks", []))
+            self.assertTrue(_inline_text(item[1:]).strip())
+            titles.append(item[0]["text"])
+        self.assertEqual(titles, ["Cấp đông theo lô", "Giao tận nhà", "Quét mã QR"])
+        self.assertIn("Đã gồm giao hàng", _inline_text(items[1]))
+        self.assertNotIn("cân đúng", json.dumps(blocks, ensure_ascii=False).lower())
+
+    def test_shop_5_03_home_pages_have_no_claim_warnings(self):
+        """Nội dung nạp sẵn sạch theo máy quét CMS (không cảnh báo nào)."""
+        from apps.content.body.scan import scan_entry_warnings
+
+        self.run_cmd("--publish")
+        for slug in ("home-banner", "home-commitments"):
+            self.assertEqual(scan_entry_warnings(Entry.objects.get(slug=slug)), [], slug)
+
+
+class LoadShopContentPolicyTextTests(LoadShopContentBase):
+    """SHOP-5-06: câu tạm theo doc/ops/hoi-loc.md + Duy chốt 11/10; ô chờ số thật giữ ngoặc vuông (AC3)."""
+
+    def page_text(self, slug):
+        e = Entry.objects.get(slug=slug)
+        return " ".join([e.title, e.excerpt, json.dumps(e.body, ensure_ascii=False)])
+
+    def test_shop_5_06_duy_confirmed_numbers(self):
+        self.run_cmd()
+        self.assertIn("Phan Thiết", self.page_text("giao-hang"))
+        complaints = self.page_text("khieu-nai")
+        self.assertIn("trong vòng 2 giờ", complaints)
+        self.assertNotIn("chờ Duy xác nhận", complaints)
+        refund = self.page_text("doi-tra")
+        self.assertIn("gọi cho bạn trong 1 ngày làm việc", refund)
+        self.assertIn("chuyển tiền trong 3 ngày làm việc", refund)
+
+    def test_shop_5_06_ac3_waiting_slots_keep_brackets(self):
+        self.run_cmd()
+        self.assertIn("[số] giờ", self.page_text("doi-tra"))
+        self.assertIn("[Thời gian giao dự kiến", self.page_text("giao-hang"))
+        self.assertIn("[mã số thuế]", self.page_text("thong-tin-nguoi-ban"))
+
+    def test_shop_5_06_every_loaded_entry_passes_cms_scan(self):
+        """Mọi trang, bài nạp sẵn không có cụm khẳng định cấm theo máy quét CMS (02b §3.7.5)."""
+        from apps.content.body.scan import scan_entry_warnings
+
+        self.run_cmd()
+        for e in Entry.objects.all():
+            claims = [w for w in scan_entry_warnings(e) if w["type"] == "claim"]
+            self.assertEqual(claims, [], e.slug)
+
+    @override_settings(SEPAY_ENV="PRODUCTION")
+    def test_shop_5_06_ac5_production_policy_pages_flagged_waiting_legal(self):
+        """AC5: production -> mọi trang Nháp; trang chính sách có ghi chú "chờ legal-vn duyệt" ở dòng nạp (AuditLog)."""
+        from apps.accounts.models import AuditLog
+        from apps.content.entries.services import GOLIVE_PAGE_ROLES
+
+        self.run_cmd("--environment", "production")
+        self.assertFalse(Entry.objects.exclude(status="draft").exists())
+        for e in Entry.objects.all():
+            log = AuditLog.objects.filter(action="content_load", object_id=str(e.pk)).latest("id")
+            if e.page_role in GOLIVE_PAGE_ROLES:
+                self.assertIn("chờ legal-vn duyệt", log.note, e.slug)
+            else:
+                self.assertNotIn("legal-vn", log.note, e.slug)

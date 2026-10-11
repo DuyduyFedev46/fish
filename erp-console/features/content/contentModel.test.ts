@@ -54,6 +54,15 @@ describe("quyền thật của app content", () => {
 });
 
 describe("đọc lỗi BE từ details", () => {
+  it("CONTENT_WARNINGS: loại claim giữ cụm và snippet", () => {
+    const err = new ApiError("x", 409, "CONTENT_WARNINGS", {
+      warnings: [{ type: "claim", field: "body", claim: "miễn phí giao", snippet: "…đơn nào cũng miễn phí giao." }],
+    });
+    expect(warningsOf(err)).toEqual([
+      { type: "claim", field: "body", claim: "miễn phí giao", snippet: "…đơn nào cũng miễn phí giao.", item_code: undefined },
+    ]);
+  });
+
   it("CONTENT_WARNINGS: lấy details.warnings, bỏ loại lạ", () => {
     const err = new ApiError("x", 409, "CONTENT_WARNINGS", { warnings: [{ type: "phone_like", field: "body" }, { type: "lạ" }, null, { type: "item_unavailable", item_code: "CA-1" }] });
     expect(warningsOf(err).map((w) => w.type)).toEqual(["phone_like", "item_unavailable"]);
@@ -93,6 +102,8 @@ describe("đọc lỗi BE từ details", () => {
   it("nhãn cảnh báo và lý do", () => {
     expect(warningLine({ type: "phone_like" })).toMatch(/điện thoại/);
     expect(warningLine({ type: "item_unavailable", item_code: "CA-1" })).toContain("CA-1");
+    // 02b §3.7.5: cụm khẳng định cấm, câu nêu đúng cụm đã gặp
+    expect(warningLine({ type: "claim", claim: "tươi sống" })).toContain("“tươi sống”");
     expect(reasonLabelOf("wrong_price")).toBe("Giá chưa đúng");
     expect(reasonLabelOf("không_biết")).toBe("không_biết");
   });

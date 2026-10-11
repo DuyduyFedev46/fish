@@ -1190,7 +1190,7 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
           "type": "paragraph",
           "children": [
             {
-              "text": "Cá Về phản hồi lần đầu trong vòng 2 giờ kể từ khi nhận phản ánh [trong giờ làm việc: chờ Duy xác nhận]."
+              "text": "Cá Về phản hồi lần đầu trong vòng 2 giờ kể từ khi nhận phản ánh trong giờ làm việc ([giờ mở] – [giờ đóng])."
             }
           ]
         },
@@ -1872,6 +1872,55 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
 
 // Đường dẫn cũ còn trong e2e cũ và `lib/mock.ts` (409 chính sách đổi phiên bản): trỏ về trang quyền riêng tư.
 MOCK_ENTRY_MAP["chinh-sach-bao-mat"] = { ...MOCK_ENTRY_MAP["quyen-rieng-tu"], slug: "chinh-sach-bao-mat" };
+
+// Hai trang cố định của trang chủ (SHOP-5-03; 02b §3.7.2), chép từ backend shop_content/pages.json.
+const HOME_PAGE_BASE = {
+  kind: "page" as const,
+  seo_title: "",
+  category: null,
+  cover_image: null,
+  published_at: "2026-10-11T01:00:00Z",
+  updated_at: "2026-10-11T01:00:00Z",
+  version: 1,
+  effective_from: "2026-10-11T01:00:00Z",
+  author: "Cá Về",
+};
+MOCK_ENTRY_MAP["home-banner"] = {
+  ...HOME_PAGE_BASE,
+  slug: "home-banner",
+  title: "Banner trang chủ",
+  description: "Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà",
+  excerpt: "Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà",
+  body: {
+    type: "doc",
+    blocks: [
+      { type: "heading", level: 2, text: "Mua theo lô tại cảng" },
+      { type: "paragraph", children: [{ text: "Hải sản cấp đông, giá theo kg, mua từ 1 kg." }] },
+      { type: "paragraph", children: [{ text: "Xem hàng đang có", href: "/shop/" }] },
+    ],
+  },
+};
+MOCK_ENTRY_MAP["home-commitments"] = {
+  ...HOME_PAGE_BASE,
+  slug: "home-commitments",
+  title: "Cam kết trang chủ",
+  description: "Cấp đông theo lô, giao tận nhà ở Phan Thiết, thanh toán bằng chuyển khoản quét mã QR.",
+  excerpt: "Cấp đông theo lô, giao tận nhà ở Phan Thiết, thanh toán bằng chuyển khoản quét mã QR.",
+  body: {
+    type: "doc",
+    blocks: [
+      {
+        type: "list",
+        ordered: false,
+        items: [
+          [{ text: "Cấp đông theo lô", marks: ["bold"] }, { text: " Mua tại cảng, mỗi lô có hạn dùng riêng." }],
+          [{ text: "Giao tận nhà", marks: ["bold"] }, { text: " Đã gồm giao hàng ở Phan Thiết, không trả thêm khi nhận hàng." }],
+          [{ text: "Quét mã QR", marks: ["bold"] }, { text: " Chuyển khoản bằng app ngân hàng, tiền về đủ là đơn tự xác nhận." }],
+        ],
+      },
+    ],
+  },
+};
 
 /**
  * Bài mẫu chứa payload XSS/link độc (SR-24 F9). CHỈ để Playwright kiểm bộ hiển thị thân bài

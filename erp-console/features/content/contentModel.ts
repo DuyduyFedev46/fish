@@ -54,7 +54,7 @@ export function isStale(err: unknown): boolean {
   return isApiCode(err, "STALE_VERSION");
 }
 
-const WARNING_TYPES = new Set(["phone_like", "cost_keyword", "item_unavailable"]);
+const WARNING_TYPES = new Set(["phone_like", "cost_keyword", "item_unavailable", "claim"]);
 
 /** 409 CONTENT_WARNINGS → danh sách cảnh báo; thiếu/hỏng → mảng rỗng. */
 export function warningsOf(err: unknown): ContentWarning[] {
@@ -71,6 +71,7 @@ export function warningsOf(err: unknown): ContentWarning[] {
       field: typeof r.field === "string" ? r.field : undefined,
       snippet: typeof r.snippet === "string" ? r.snippet : undefined,
       item_code: typeof r.item_code === "string" ? r.item_code : undefined,
+      claim: typeof r.claim === "string" ? r.claim : undefined,
     });
   }
   return out;
@@ -132,6 +133,7 @@ export function missingSentence(missing: string[], action: "publish" | "submit")
 export function warningLine(w: ContentWarning): string {
   if (w.type === "phone_like") return M.warnPhone;
   if (w.type === "cost_keyword") return M.warnCost;
+  if (w.type === "claim") return M.warnClaim(w.claim ?? "");
   return M.warnItem(w.item_code ?? "");
 }
 

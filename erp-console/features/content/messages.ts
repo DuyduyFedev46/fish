@@ -27,7 +27,7 @@ export const CONTENT_MSG = {
   colNote: "Ghi chú",
   colUpdated: "Cập nhật",
   emptyTitle: "Chưa có bài viết hoặc trang nào",
-  emptyHint: "Viết bài đầu tiên để giới thiệu cá tươi và công thức cho khách.",
+  emptyHint: "Viết bài đầu tiên để giới thiệu hàng và công thức cho khách.",
   emptyFilteredTitle: "Không có bài nào ở bộ lọc này",
   emptyFilteredHint: "Chọn trạng thái hoặc loại khác để xem tiếp.",
   loadMore: "Tải thêm",
@@ -225,6 +225,8 @@ export const CONTENT_MSG = {
   warningsForceSubmit: "Đã kiểm tra, vẫn gửi duyệt",
   warnPhone: "Có số giống số điện thoại",
   warnCost: "Có từ nhắc tới giá vốn",
+  // Cụm khẳng định cấm (02b §3.7.5): hàng cấp đông, nguồn theo mùa, chưa có phí ship, chưa hứa giờ giao.
+  warnClaim: (phrase: string) => `Có câu “${phrase}”: Cá Về chưa cam kết điều này, nên sửa lại`,
   warnItem: (code: string) => `Mặt hàng ${code} đang hết hoặc ngừng bán`,
   returnTitle: "Trả về nháp",
   returnArticle: "Bài viết",

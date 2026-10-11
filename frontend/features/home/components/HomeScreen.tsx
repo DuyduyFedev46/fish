@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { getCatalog } from "@/lib/api";
 import { pickHotline } from "@/lib/phone";
 import { formatDate, formatPriceVnd } from "@/lib/format";
@@ -21,13 +22,24 @@ import Icon from "@/components/ui/Icon";
 import Skeleton, { ProductCardSkeleton } from "@/components/ui/Skeleton";
 import { cx } from "@/components/ui/cx";
 import { groupHref } from "@/components/shopLinks";
-import { HOME_BANNER, HOME_COMMITMENTS, HOME_PAYMENT_TILE } from "../content";
+import { isSafeHref } from "@/features/content/safeHref";
+import { DESKTOP_COMMITMENTS, MOBILE_COMMITMENTS, parseBanner, parseCommitments } from "../homeBlocks";
+import type { BannerSlide, Commitment } from "../homeBlocks";
+import { loadHomeBanner, loadHomeCommitments } from "../homeContent";
 import s from "./HomeScreen.module.css";
 
 const RAIL_LIMIT = 8;
 const COMBO_LIMIT = 3;
 const POST_LIMIT = 3;
 
+// Khẩu hiệu thương hiệu (06-marketing K1, chữ giao diện ở code) và ô phụ thanh toán (06-marketing H6, ĐÃ ĐỐI CHIẾU:
+// BR-TT-04 tiền thiếu thì không tự xác nhận). Chữ banner và cam kết lấy từ CMS (SHOP-5-03).
+const BRAND_SLOGAN = "Từ cảng về bếp nhà bạn";
+const PAYMENT_TILE = {
+  eyebrow: "Chuyển khoản quét mã QR",
+  title: "Tiền về đủ là đơn tự xác nhận",
+  note: "Quét bằng app ngân hàng của bạn",
+};
 
 /** Món hết xếp cuối, còn lại giữ thứ tự catalog. */
 function outLast(items: CatalogItem[]): CatalogItem[] {
@@ -41,6 +53,9 @@ export default function HomeScreen() {
   const [retrying, setRetrying] = useState(false);
   const [hotline, setHotline] = useState<string | undefined>(undefined);
   const [posts, setPosts] = useState<PublicEntryListItem[]>([]);
+  // undefined: đang tải; []: CMS chưa có, đã gỡ hoặc lỗi -> ẩn khối (5-03 AC2).
+  const [slides, setSlides] = useState<BannerSlide[] | undefined>(undefined);
+  const [commitments, setCommitments] = useState<Commitment[]>([]);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   const load = useCallback((fresh: boolean) => {
@@ -68,6 +83,12 @@ export default function HomeScreen() {
     fetchPublicEntries({ page: 1 })
       .then((res) => active && setPosts((res.results || []).slice(0, POST_LIMIT)))
       .catch(() => active && setPosts([]));
+    loadHomeBanner()
+      .then((entry) => active && setSlides(entry ? parseBanner(entry.body) : []))
+      .catch(() => active && setSlides([]));
+    loadHomeCommitments()
+      .then((entry) => active && setCommitments(entry ? parseCommitments(entry.body) : []))
+      .catch(() => active && setCommitments([]));
     return () => {
       active = false;
     };
@@ -94,24 +115,7 @@ export default function HomeScreen() {
     <ShopFrame header="home" footer="full" bottomNav tone="muted">
       <div className={cx("container", s.page)}>
         <section className={s.hero} aria-label="Khuyến mãi">
-          <div className={s.banner}>
-            <div className={s.bannerText}>
-              <span className={s.eyebrow}>{HOME_BANNER.eyebrow}</span>
-              <h1 ref={headingRef} tabIndex={-1} className={s.bannerTitle}>
-                {HOME_BANNER.title}
-              </h1>
-              <p className={s.bannerSub}>{HOME_BANNER.subtitle}</p>
-              <span className={s.bannerBtn}>
-                <Button href="/shop/" variant="on-brand" size="md">
-                  <span className={s.onlyMobile}>{HOME_BANNER.buttonMobile}</span>
-                  <span className={s.onlyDesktop}>{HOME_BANNER.buttonDesktop}</span>
-                </Button>
-              </span>
-            </div>
-            <span className={s.bannerArt} aria-hidden="true">
-              <Icon name="fish" size={300} strokeWidth={0.7} />
-            </span>
-          </div>
+          <HomeBanner slides={slides} headingRef={headingRef} />
           <div className={s.sideTiles}>
             {view.featuredCombo ? (
               <Link href={itemHref(view.featuredCombo.item_code)} className={cx(s.tile, s.tileCombo)}>
@@ -127,9 +131,9 @@ export default function HomeScreen() {
             ) : null}
             <Link href="/shop/" className={cx(s.tile, s.tilePay)}>
               <span className={s.tileText}>
-                <span className={s.tileEyebrowGood}>{HOME_PAYMENT_TILE.eyebrow}</span>
-                <span className={s.tileTitle}>{HOME_PAYMENT_TILE.title}</span>
-                <span className={s.tileNote}>{HOME_PAYMENT_TILE.note}</span>
+                <span className={s.tileEyebrowGood}>{PAYMENT_TILE.eyebrow}</span>
+                <span className={s.tileTitle}>{PAYMENT_TILE.title}</span>
+                <span className={s.tileNote}>{PAYMENT_TILE.note}</span>
               </span>
               <Icon name="qr" size={48} strokeWidth={1.3} />
             </Link>
@@ -178,19 +182,7 @@ export default function HomeScreen() {
                 )}
               </section>
 
-              <section className={s.commitments} aria-label="Cam kết của Cá Về">
-                {HOME_COMMITMENTS.map((c) => (
-                  <div key={c.key} className={cx(s.commit, c.mobileOnly && s.onlyMobileBlock)}>
-                    <span className={s.commitIcon}>
-                      <Icon name={c.icon} size={20} strokeWidth={1.6} />
-                    </span>
-                    <span className={s.commitText}>
-                      <span className={s.commitTitle}>{c.title}</span>
-                      {c.detail ? <span className={s.commitDetail}>{c.detail}</span> : null}
-                    </span>
-                  </div>
-                ))}
-              </section>
+              <HomeCommitments items={commitments} />
 
               <section className={s.block} aria-labelledby="home-in-stock">
                 <div className={s.blockHead}>
@@ -249,6 +241,93 @@ export default function HomeScreen() {
         </div>
       </div>
     </ShopFrame>
+  );
+}
+
+/**
+ * Banner trang chủ từ CMS `home-banner` (SHOP-5-03). Đang tải: giữ khung (không nhảy bố cục). CMS không có slide:
+ * ẩn banner, vẫn giữ một h1 ẩn cho trình đọc màn hình. Nhiều slide: chấm chọn slide, không tự chạy.
+ */
+function HomeBanner({
+  slides,
+  headingRef,
+}: {
+  slides: BannerSlide[] | undefined;
+  headingRef: RefObject<HTMLHeadingElement>;
+}) {
+  const [index, setIndex] = useState(0);
+  if (slides === undefined) {
+    return <div className={s.banner} aria-hidden="true" />;
+  }
+  if (slides.length === 0) {
+    return (
+      <h1 ref={headingRef} tabIndex={-1} className="visually-hidden">
+        Cá Về: hải sản cấp đông theo lô
+      </h1>
+    );
+  }
+  const current = slides[Math.min(index, slides.length - 1)];
+  const button = current.button && isSafeHref(current.button.href) ? current.button : null;
+  return (
+    <div className={s.banner}>
+      {current.image ? <img className={s.bannerImage} src={current.image.src} alt={current.image.alt} /> : null}
+      <div className={s.bannerText}>
+        <span className={s.eyebrow}>{BRAND_SLOGAN}</span>
+        <h1 ref={headingRef} tabIndex={-1} className={s.bannerTitle}>
+          {current.title}
+        </h1>
+        {current.subtitle ? <p className={s.bannerSub}>{current.subtitle}</p> : null}
+        {button ? (
+          <span className={s.bannerBtn}>
+            <Button href={button.href} variant="on-brand" size="md">
+              {button.label}
+            </Button>
+          </span>
+        ) : null}
+      </div>
+      {current.image ? null : (
+        <span className={s.bannerArt} aria-hidden="true">
+          <Icon name="fish" size={300} strokeWidth={0.7} />
+        </span>
+      )}
+      {slides.length > 1 ? (
+        <div className={s.dots}>
+          {slides.map((slide, i) => (
+            <button
+              key={`${i}-${slide.title}`}
+              type="button"
+              className={s.dot}
+              aria-label={`Xem banner ${i + 1}: ${slide.title}`}
+              aria-current={i === index ? "true" : undefined}
+              onClick={() => setIndex(i)}
+            >
+              <span className={s.dotMark} />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Dải cam kết từ CMS `home-commitments`: điện thoại 3 ô (tiêu đề), máy tính 2 ô (tiêu đề + mô tả). Rỗng: ẩn. */
+function HomeCommitments({ items }: { items: Commitment[] }) {
+  const shown = items.slice(0, Math.max(MOBILE_COMMITMENTS, DESKTOP_COMMITMENTS));
+  if (shown.length === 0) return null;
+  return (
+    <section className={s.commitments} aria-label="Cam kết của Cá Về">
+      {shown.map((c, i) => (
+        <div key={`${i}-${c.title}`} className={cx(s.commit, i >= DESKTOP_COMMITMENTS && s.onlyMobileBlock)}>
+          <span className={s.commitIcon}>
+            <Icon name={c.icon} size={20} strokeWidth={1.6} />
+          </span>
+          <span className={s.commitText}>
+            <span className={s.commitTitle}>{c.title}</span>
+            {c.detail ? <span className={s.commitDetail}>{c.detail}</span> : null}
+          </span>
+        </div>
+      ))}
+    </section>
   );
 }
 

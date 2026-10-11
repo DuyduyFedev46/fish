@@ -232,7 +232,7 @@
         "## 1. Gửi phản ánh, khiếu nại",
         "Bạn chọn một trong các cách: gọi {hotline}, nhắn Zalo [số Zalo] hoặc gửi email [email]. Thông tin ở trang [Liên hệ](/pages/?slug=lien-he). Ghi mã đơn (bắt đầu bằng SO), số điện thoại đặt hàng, nội dung, kèm ảnh hoặc video nếu có.",
         "## 2. Thời hạn",
-        "Cá Về phản hồi lần đầu trong vòng 2 giờ kể từ khi nhận phản ánh [trong giờ làm việc: chờ Duy xác nhận].",
+        "Cá Về phản hồi lần đầu trong vòng 2 giờ kể từ khi nhận phản ánh trong giờ làm việc ([giờ mở] – [giờ đóng]).",
         "Thời hạn dự kiến giải quyết:",
         "- Hàng không đúng món, thiếu hoặc không đạt chất lượng khi nhận: [2 ngày làm việc].",
         "- Trả lại tiền khi đơn huỷ: theo mục 4 của [Chính sách đổi trả và hoàn tiền](/pages/?slug=doi-tra).",
@@ -270,6 +270,35 @@
         "- Địa chỉ: [địa chỉ kinh doanh]",
         "- Điện thoại: {hotline}",
         "- Email: [email]"
+      ]
+    },
+    {
+      "_note": "SHOP-5-03 (02b §3.7.2): banner trang chủ. Mỗi slide = một tiêu đề '##' + một đoạn câu phụ + (tuỳ chọn) một đoạn chỉ chứa một link nội bộ làm nút. Tối đa 3 slide. Tóm tắt (excerpt) = dải chữ đầu trang máy tính; để trống thì ẩn dải chữ. Slide 2–3 chờ Duy; khuyến mãi phải qua legal-vn.",
+      "slug": "home-banner",
+      "title": "Banner trang chủ",
+      "excerpt": "Hải sản cấp đông theo lô · mua từ {min_qty_kg} kg · giao tận nhà",
+      "seo_title": "",
+      "seo_description": "",
+      "show_in_footer": false,
+      "body": [
+        "⟨ghi chú⟩ Slide 1. Nguồn: 06-marketing C5 (H2 bản không 'biết rõ nguồn', H3 bỏ câu hứa cân ký theo S-18).",
+        "## Mua theo lô tại cảng",
+        "Hải sản cấp đông, giá theo kg, mua từ {min_qty_kg} kg.",
+        "[Xem hàng đang có](/shop/)"
+      ]
+    },
+    {
+      "_note": "SHOP-5-03 (02b §3.7.2): dải cam kết trang chủ. Một danh sách; mỗi mục = **tiêu đề** + mô tả. Điện thoại hiện tiêu đề 3 mục đầu, máy tính hiện 2 mục đầu kèm mô tả. Không hứa cân ký (S-18).",
+      "slug": "home-commitments",
+      "title": "Cam kết trang chủ",
+      "excerpt": "Cấp đông theo lô, giao tận nhà ở Phan Thiết, thanh toán bằng chuyển khoản quét mã QR.",
+      "seo_title": "",
+      "seo_description": "",
+      "show_in_footer": false,
+      "body": [
+        "- **Cấp đông theo lô** Mua tại cảng, mỗi lô có hạn dùng riêng.",
+        "- **Giao tận nhà** Đã gồm giao hàng ở Phan Thiết, không trả thêm khi nhận hàng.",
+        "- **Quét mã QR** Chuyển khoản bằng app ngân hàng, tiền về đủ là đơn tự xác nhận."
       ]
     }
   ]

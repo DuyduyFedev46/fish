@@ -18,7 +18,9 @@ from apps.accounts import roles
 User = get_user_model()
 
 
-class ScanWarningsTests(TestCase):
+class ScanWarningsBase(TestCase):
+    """Dữ liệu chung: một bài đủ điều kiện đăng, user Quản lý và NV giao."""
+
     def setUp(self):
         self.client = APIClient()
 
@@ -75,6 +77,8 @@ class ScanWarningsTests(TestCase):
         self.entry.cover_image = self.cover_image
         self.entry.save()
 
+
+class ScanWarningsTests(ScanWarningsBase):
     def test_cms_08_ac1_phone_formats_detected_and_masked(self):
         """
         CMS-08-AC1: Thân bài chứa 0912 345 678, 0912.345.678, +84 912345678, 84912345678
@@ -256,3 +260,53 @@ class ScanWarningsTests(TestCase):
             },
         )
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class ClaimWarningApiTests(ScanWarningsBase):
+    """02b §3.7.5, SHOP-5-03 AC3/AC4: cụm khẳng định cấm -> cảnh báo 409 (không chặn); xác nhận thì đăng được."""
+
+    def setUp(self):
+        super().setUp()
+        self.manager = User.objects.get(username=roles.MANAGER)
+
+    def _set_body(self, text):
+        self.entry.body = {"type": "doc", "blocks": [{"type": "paragraph", "children": [{"text": text}]}]}
+        self.entry.save()
+
+    def test_shop_5_03_ac3_claim_returns_warning_before_publish(self):
+        self._set_body("Hải sản tươi sống, miễn phí giao toàn thành phố.")
+        self.client.force_authenticate(user=self.manager)
+        res = self.client.post(
+            f"/api/content/entries/{self.entry.pk}/publish/",
+            {"row_version": self.entry.row_version, "checklist_confirmed": True},
+        )
+        self.assertEqual(res.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(res.data.get("code"), "CONTENT_WARNINGS")
+        claims = sorted(w["claim"] for w in res.data["warnings"] if w["type"] == "claim")
+        self.assertEqual(claims, ["miễn phí giao", "tươi sống"])
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.status, "draft")
+
+    def test_shop_5_03_ac3_claim_is_warning_not_block(self):
+        self._set_body("Hàng giao trong ngày.")
+        self.client.force_authenticate(user=self.manager)
+        res = self.client.post(
+            f"/api/content/entries/{self.entry.pk}/publish/",
+            {"row_version": self.entry.row_version, "checklist_confirmed": True, "acknowledge_warnings": True},
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        log = AuditLog.objects.latest("id")
+        self.assertIn("claim", log.changes["warnings_acknowledged"])
+
+    def test_shop_5_03_ac4_warehouse_staff_cannot_publish(self):
+        staff = User.objects.create_user(username="warehouse_claim", password="x")
+        staff.groups.add(Group.objects.get(name=roles.WAREHOUSE_STAFF))
+        self._set_body("Hàng tươi sống.")
+        self.client.force_authenticate(user=staff)
+        res = self.client.post(
+            f"/api/content/entries/{self.entry.pk}/publish/",
+            {"row_version": self.entry.row_version, "checklist_confirmed": True, "acknowledge_warnings": True},
+        )
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.status, "draft")

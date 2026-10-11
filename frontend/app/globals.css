@@ -1,7 +1,7 @@
 /*
  * Token và reset của Shop. Giá trị chép từ DESIGN.md (phần Shop) và doc/design/shop/SO-CHUAN.md.
  * Component chỉ dùng var(--…), không viết mã màu. Shop chỉ có giao diện sáng (Duy chốt D8).
- * Class cũ của trang chưa viết lại nằm ở legacy.css.
+ * Mọi màn dùng CSS Module; file class cũ đã xoá ở lô 5c.
  */
 :root {
   color-scheme: light;

@@ -7,6 +7,8 @@ import { getCatalog } from "@/lib/api";
 import { pickHotline, zaloUrlOf } from "@/lib/phone";
 import { getFooterLinks, getSiteInfo } from "@/features/site/api";
 import type { FooterLinkItem, SiteInfoResponse } from "@/features/site/types";
+import { fallbackStripText, stripTextOf } from "@/features/home/homeBlocks";
+import { loadHomeBanner } from "@/features/home/homeContent";
 import BottomNav, { type BottomNavTab } from "./BottomNav";
 import ShopFooter, { type FooterLinkEntry } from "./ShopFooter";
 import ShopHeader, { type NavGroup } from "./ShopHeader";
@@ -39,8 +41,8 @@ export interface ShopFrameProps {
   children: ReactNode;
 }
 
-// Dải chữ đầu trang máy tính (06-marketing K2, ĐÃ ĐỐI CHIẾU). Chờ CMS hỗ trợ (SHOP-5-03).
-const INTRO_TEXT = "Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà";
+// Dải chữ đầu trang máy tính (06-marketing K2): tóm tắt của trang CMS `home-banner` (SHOP-5-03; rỗng thì ẩn).
+// CMS chưa có trang này hoặc lỗi mạng thì dùng câu dự phòng, số kg tối thiểu đọc từ site-info (review lô 1, L7).
 
 /** Khung trang Shop: header, nội dung, footer, thanh đáy. Mỗi màn tự bọc (02b §1.4). */
 export default function ShopFrame({
@@ -63,6 +65,8 @@ export default function ShopFrame({
   const [footerLinks, setFooterLinks] = useState<FooterLinkItem[]>([]);
   const [groups, setGroups] = useState<NavGroup[] | undefined>(undefined);
   const [groupsLoading, setGroupsLoading] = useState(true);
+  // undefined: đang tải; string: tóm tắt CMS (có thể rỗng); null: không có trang hoặc lỗi -> câu dự phòng.
+  const [bannerStrip, setBannerStrip] = useState<string | null | undefined>(undefined);
 
   // Ba nguồn độc lập, gọi song song. Lỗi nguồn nào thì ẩn khối liên quan, không vỡ bố cục (1-03 AC7, 1-05 AC6).
   useEffect(() => {
@@ -70,6 +74,9 @@ export default function ShopFrame({
     getSiteInfo()
       .then((v) => active && setInfo(v))
       .catch(() => {});
+    loadHomeBanner()
+      .then((entry) => active && setBannerStrip(entry ? stripTextOf(entry.excerpt) : null))
+      .catch(() => active && setBannerStrip(null));
     getFooterLinks()
       .then((v) => active && setFooterLinks(Array.isArray(v) ? v : []))
       .catch(() => {});
@@ -103,6 +110,9 @@ export default function ShopFrame({
   const seller = info?.seller;
   // Ưu tiên số của người bán, rồi mới tới số trong cấu hình xác nhận đơn (02b §6.5).
   const hotline = pickHotline(seller?.phone, info?.confirmation_policy?.hotline);
+
+  const introText =
+    bannerStrip === undefined ? "" : bannerStrip === null ? fallbackStripText(info?.policies?.min_qty_kg) : bannerStrip;
 
   const policyLinks: FooterLinkEntry[] = useMemo(
     () =>
@@ -145,7 +155,7 @@ export default function ShopFrame({
         groupsLoading={groupsLoading}
         currentGroupSlug={currentGroupSlug}
         currentPath={normalized}
-        introText={INTRO_TEXT}
+        introText={introText}
       />
       <main id="main-content" className={s.main} tabIndex={-1}>
         {children}
