@@ -276,3 +276,12 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 - **Test PostgreSQL chạy trên GitHub Actions** (thực hiện chốt 10/10 "chạy trên cloud, DB test riêng"): mỗi lần push, GitHub dựng Postgres tạm, chạy toàn bộ test backend, không cần bí mật, không đụng staging/production, không deploy.
 - **Lãi lỗ theo lô trừ phần giảm giá mã đã phân bổ vào từng dòng đơn**, áp cho đơn từ nay; kỳ/lô đã chốt không đổi số (giữ luật "không sửa số kỳ cũ"). Làm thành lô nhỏ riêng sau lô 3b, có test.
 - **Chọn phương thức thanh toán ngay ở form đặt hàng** (Duy 11/10): khối "Phương thức thanh toán" dưới ô địa chỉ; bấm "Đặt hàng" là vào thẳng cổng quét mã, bỏ bước bấm "Thanh toán" ở trang đơn (trang đơn giữ nút dự phòng khi mở cổng lỗi hoặc khách quay lại). Thay luồng C1 → D1 trong thiết kế 06/10.
+
+## 2026-10-27 — Lộc xem thiết kế Shop, thống nhất cách làm tiếp — [DUY – LỘC THỐNG NHẤT QUA TIN NHẮN]
+Nguồn: `doc/features/2026-10-27-danh-gia-cua-loc/00-bien-ban.md`.
+- Lộc thấy thiết kế Shop **nhìn chung đúng ý**. Không làm lại.
+- **Yêu cầu mới:** Lộc gửi cho Duy, Duy cùng dev thêm dần, không chờ chốt toàn bộ. Mỗi yêu cầu vẫn đi theo workflow đội.
+- **Mục tiêu chạy thật: tháng 4 hoặc 5 năm 2027** (mong muốn của Lộc, chưa phải hạn chốt).
+- **Duy là người chính lo workshop, đào tạo nhân viên và hỗ trợ sau go-live.**
+- Tháng 11/2026 Duy và Lộc ngồi lại: chốt màu, tính năng thêm, cách trình bày Góc bếp (câu L17–L21 ở `doc/ops/hoi-loc.md`).
+- Chưa đổi: phương thức thanh toán (vẫn chỉ VietQR, mục 2026-09-26), quy trình đội Claude trong `CLAUDE.md` (chờ Duy ngồi với dev thuê rồi báo lại).

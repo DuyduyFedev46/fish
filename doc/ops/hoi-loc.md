@@ -43,3 +43,12 @@ flowchart LR
 |---|---|---|---|
 | L15 | Thông tin doanh nghiệp: tên, mã số thuế, địa chỉ, giấy chứng nhận ĐKKD (nơi cấp, ngày cấp); tên miền riêng | Ẩn khối pháp lý và logo thông báo trên staging | |
 | L16 | Kế toán xác nhận nghĩa vụ lập hoá đơn (NĐ 254/2026) | Shop không có ô hoá đơn | |
+
+## Buổi ngồi tháng 11/2026 (thêm 27/10, nguồn `doc/features/2026-10-27-danh-gia-cua-loc/00-bien-ban.md`)
+| # | Câu hỏi | Đang dùng tạm | Lộc trả lời |
+|---|---|---|---|
+| L17 | Chốt màu thương hiệu: giữ xanh `#1F66D1` hay đổi? | Token trong `DESIGN.md` | |
+| L18 | Góc bếp: đặt tên và giới thiệu thế nào cho khách hiểu? Mỗi bài dẫn sang combo hay mặt hàng nào? | Tên "Góc bếp", bài chưa gắn mặt hàng thật | |
+| L19 | Lộc muốn thêm tính năng gì (danh sách sau khi thử Shop và kho)? | Chưa có | |
+| L20 | "Chạy" tháng 4–5/2027 nghĩa là có khách thật và đồng bộ kho? Bên Lộc có ai kiểm quy trình cùng Duy? | Chưa có | |
+| L21 | Thanh toán thêm những loại nào (thẻ, ví, thu tiền khi nhận)? Lưu ý: hiện chốt chỉ chuyển khoản QR, trả trước 100% | Chỉ chuyển khoản QR | |
