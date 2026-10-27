@@ -5,11 +5,9 @@
 ```mermaid
 flowchart TD
   A["Lộc xem thiết kế và Shop staging"] --> B["Nhìn chung đúng ý"]
-  B --> C["Lộc tự thử hai phần"]
-  C --> C1["Giao diện khách mua hàng"]
-  C --> C2["Vận hành kho bãi"]
-  C1 --> D["Tháng 11 Duy và Lộc ngồi lại"]
-  C2 --> D
+  B --> C["Lộc tự thử giao diện khách mua hàng"]
+  R["ERP: Lộc đã đánh giá chi tiết từ trước"] --> D
+  C --> D["Tháng 11 Duy và Lộc ngồi lại"]
   D --> E{"Chốt màu và tính năng thêm?"}
   E -- "chốt" --> F["Lộc gửi yêu cầu cho Duy"]
   F --> G["Duy và dev thêm từ từ"]
@@ -29,7 +27,7 @@ flowchart TD
 | N5 | Duy: đã tuyển dev để kiểm tra code. Còn **thanh toán nhiều loại** và **lắp giao diện** là xong. Sau đó xuống quán của Lộc ráp quy trình và đào tạo nhân viên. | D |
 | N6 | Lộc: chốt xong UI/UX, chạy ổn hết chức năng rồi mới deploy. Duy: phải có workshop với đội và đào tạo, không thì hệ thống cũng chỉ vậy. | L / D |
 | N7 | Ai đào tạo? Duy: **phần lớn là Duy.** | L / D |
-| N8 | Hiện có hai phần chính cần thử: **(1) UI/UX của khách**, **(2) vận hành kho bãi**. Duy xác nhận đúng. | L / D |
+| N8 | Hiện có hai phần chính cần thử: **(1) UI/UX của khách**, **(2) vận hành kho bãi**. Duy xác nhận đúng. Duy bổ sung 27/10: **phần ERP Lộc đã đánh giá chi tiết rồi**, nên việc còn lại chủ yếu là thử phía khách. | L / D |
 | N9 | Lộc sẽ thử rồi gặp Duy để làm cho xong, sau đó cho dev làm từ từ. Lộc hỏi có cần chốt hết rồi mới dev không, dev nối thêm được không. | L |
 | N10 | Duy: **Lộc cứ ra yêu cầu rồi gửi qua Duy, Duy với dev thêm từ từ.** Thêm tính năng thì làm thêm UI/UX rồi dev thêm. | D |
 | N11 | Lộc hỏi chi phí dev Duy thuê, nhờ **ghi ra để Lộc cân đối**. Duy: sẽ ngồi với dev rồi báo lại. Duy đề nghị hai bên làm thành quy trình làm việc. | L / D |
@@ -41,12 +39,12 @@ flowchart TD
 - **Cách nhận yêu cầu mới:** Lộc gửi yêu cầu cho Duy, Duy cùng dev thêm dần. Không cần chốt toàn bộ trước rồi mới làm. Mỗi yêu cầu vẫn đi qua workflow đội như hiện nay (BA → PO → … với tính năng mới).
 - **Mục tiêu chạy thật:** tháng 4 hoặc tháng 5 năm 2027 (mong muốn của Lộc, chưa phải hạn chốt).
 - **Đào tạo và hỗ trợ sau go-live:** Duy là người chính.
-- **Hai mảng thử trước khi chốt:** giao diện khách (Shop) và vận hành kho (ERP).
+- **Hai mảng thử:** giao diện khách (Shop) và vận hành kho (ERP). ERP Lộc **đã đánh giá chi tiết** (Duy bổ sung 27/10); trước buổi tháng 11 chủ yếu còn thử Shop.
 
 ## 3. Việc cần làm
 | # | Việc | Ai | Khi nào |
 |---|---|---|---|
-| V1 | Thử Shop staging theo vai khách và ERP staging theo vai kho, ghi lại chỗ chưa ổn | Lộc | Trước buổi tháng 11 |
+| V1 | Thử Shop staging theo vai khách, ghi lại chỗ chưa ổn (ERP đã đánh giá chi tiết) | Lộc | Trước buổi tháng 11 |
 | V2 | Ngồi với dev, ước lượng chi phí, gửi Lộc | Duy | Duy hẹn "báo lại" |
 | V3 | Viết quy trình làm việc Duy – Lộc – dev (yêu cầu đi từ đâu, ai duyệt, bao lâu một đợt) | Duy + Lộc | Chưa hẹn |
 | V4 | Buổi ngồi tháng 11: chốt màu, tính năng thêm, Góc bếp, các câu còn chờ ở `doc/ops/hoi-loc.md` | Duy + Lộc | Tháng 11/2026 |
@@ -59,4 +57,4 @@ flowchart TD
 4. **Chốt màu (N2).** Màu hiện tại nằm ở `DESIGN.md`: một màu nhấn `#1F66D1`, thêm `brand-deep` `#0E3A73`. Đổi màu chỉ cần sửa token, nhưng phải chạy lại QA so ảnh màn và kiểm tương phản. Nên chốt trước khi lắp giao diện các màn còn lại.
 5. **Dev người thật (N5, N11).** Quy trình hiện tại trong `CLAUDE.md` là đội Claude tự code, QA và commit. Khi có dev Duy thuê, cần chốt dev làm phần nào và review ra sao. Duy đã nói sẽ ngồi với dev rồi báo lại; **chưa đổi gì** trong `CLAUDE.md` tới lúc đó.
 6. **Mốc tháng 4–5/2027.** Còn khoảng 5–6 tháng. Những việc không phải code nhưng chặn go-live: thông tin doanh nghiệp và tên miền (L15), nghĩa vụ hoá đơn (L16), đơn vị giao hàng và việc gửi dữ liệu khách cho hãng (L3, L4), ảnh thật (L13), hotline và giờ làm việc (L14), thủ tục pháp lý AI nếu bật AI tự ghi trên production. Danh sách ở `doc/ops/hoi-loc.md` và `doc/ops/go-live-phap-ly.md`.
-7. **Thử vận hành kho (N8).** Nên có kịch bản thử cho Lộc theo từng vai (nhập lô ở cảng, soạn hàng, gọi xác nhận, giao, hao hụt, chốt lô). Điều phối viên soạn được khi Duy cần.
+7. **ERP (N8).** Lộc đã đánh giá chi tiết phần ERP (Duy bổ sung 27/10). Trong repo chưa có bản ghi các góp ý đó; khi Duy gửi lại thì ghi vào hồ sơ này để các góp ý không chỉ nằm trong tin nhắn.
