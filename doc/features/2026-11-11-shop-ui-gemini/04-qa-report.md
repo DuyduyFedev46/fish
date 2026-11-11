@@ -55,3 +55,11 @@
 | Danh mục (`/shop/`) ở 360 px và 1280 px: lưới thẻ đều, tag `Combo` không đè badge `Hết hàng`, bộ lọc & tìm kiếm mượt | So trực quan ảnh trước/sau + chạy `design_screens` (`A2,DK2,A9,DP4`), `general_rules`, `full_flow` | **PASS** (360 px & 1280 px) | `shots/gui-05/b-catalog-before-360.png` → `shots/gui-05/b-catalog-after-360.png`; `shots/gui-05/b-catalog-before-1280.png` → `shots/gui-05/b-catalog-after-1280.png` |
 | Chi tiết món (`/shop/item/?code=CA-THU`) ở 360 px và 1280 px: hộp chọn mua và bảng thông tin đóng thẻ rõ ràng | So trực quan ảnh trước/sau + `design_screens` (`A3,DK3,A10,DE10`) | **PASS** (360 px & 1280 px) | `shots/gui-05/b-item-before-360.png` → `shots/gui-05/b-item-after-360.png`; `shots/gui-05/b-item-before-1280.png` → `shots/gui-05/b-item-after-1280.png` |
 | Ngoài đường thuận (món hết hàng `A7/DE2`, mất mạng `A6/DE9`, tìm không thấy `DE1`) | Kịch bản `design_screens` + `full_flow` | **PASS** | `shots/gui-05/b-outofstock-before-360.png` → `shots/gui-05/b-outofstock-after-360.png`; `shots/gui-05/b-outofstock-before-1280.png` → `shots/gui-05/b-outofstock-after-1280.png` |
+
+
+## GUI-05c — Giỏ hàng (`/shop/cart/`), ô mã giảm giá, giỏ mini
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh trước → sau |
+|---|---|---|---|
+| Giỏ hàng đủ món ở 360 px và 1280 px: thẻ món thoáng, số tiền `tabular-nums`, hộp mã giảm giá rõ nét, không cuộn ngang | So trực quan ảnh trước/sau + `design_screens` (`B1,DK4,B5,B6,DE13,DE7`) | **PASS** (360 px & 1280 px) | `shots/gui-05/c-cart-before-360.png` → `shots/gui-05/c-cart-after-360.png`; `shots/gui-05/c-cart-before-1280.png` → `shots/gui-05/c-cart-after-1280.png` |
+| Ngoài đường thuận (giỏ trống `B4`, giỏ có món hết & đổi giá `B3/DE11`, mã lỗi `B7`) | Kịch bản `design_screens` + `general_rules` + `full_flow` | **PASS** | `shots/gui-05/c-cart-empty-before-360.png` → `shots/gui-05/c-cart-empty-after-360.png`; `shots/gui-05/c-cart-changed-before-1280.png` → `shots/gui-05/c-cart-changed-after-1280.png` |

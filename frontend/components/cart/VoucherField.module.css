@@ -7,28 +7,48 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  min-height: 32px;
+  min-height: 40px;
+  padding: 2px 0;
   color: var(--ink-2);
   font-size: 14px;
 }
 
 .rowLabel {
   min-width: 0;
+  font-weight: 500;
 }
 
 .openBtn {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  min-height: var(--h-input);
-  margin: -6px calc(-1 * var(--space-2)) -6px 0;
-  padding: 0 var(--space-2);
-  border: 0;
-  background: transparent;
+  gap: var(--space-1);
+  min-height: var(--h-btn-sm);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--accent-border, var(--border));
+  border-radius: var(--radius-full);
+  background: var(--surface-tint, var(--accent-soft));
   color: var(--accent-text);
   font: inherit;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--dur-color) var(--ease-out),
+    border-color var(--dur-color) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+/* Giữ vùng chạm 44 px trên điện thoại trong khi hình viên thuốc gọn 36 px */
+.openBtn::after {
+  content: "";
+  position: absolute;
+  inset: -4px 0;
+}
+
+.openBtn:active {
+  transform: scale(0.97);
 }
 
 .openBtn:focus-visible,
@@ -40,11 +60,15 @@
   border-radius: var(--radius-sm);
 }
 
+.openBtn:focus-visible {
+  border-radius: var(--radius-full);
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  height: var(--h-chip-brand);
+  gap: 6px;
+  height: 34px;
   padding: 0 var(--space-3);
   border: 1px solid var(--good-border);
   border-radius: var(--radius-full);
@@ -52,11 +76,13 @@
   color: var(--good);
   font-size: 13px;
   font-weight: 600;
+  box-shadow: var(--shadow-xs, none);
   box-sizing: border-box;
 }
 
 .chipCode {
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
 }
 
 /* Nút bỏ mã trong chip (điện thoại): vùng chạm 44, hình chỉ 22. */
@@ -66,12 +92,13 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  margin: -6px -6px -6px -10px;
+  margin: -6px -8px -6px -8px;
   padding: 0;
   border: 0;
   background: transparent;
   color: var(--good);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .chipRemoveDot {
@@ -80,20 +107,32 @@
   justify-content: center;
   width: 22px;
   height: 22px;
+  border: 1px solid var(--good-border);
   border-radius: var(--radius-full);
   background: var(--surface);
+  transition:
+    background-color var(--dur-color) var(--ease-out),
+    border-color var(--dur-color) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.chipRemove:active .chipRemoveDot {
+  transform: scale(0.94);
 }
 
 .inline {
   flex-direction: column;
-  gap: 6px;
-  padding-top: var(--space-1);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--surface-warm, var(--surface-2));
 }
 
 .inlineLabel {
   color: var(--ink-2);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .inputRow {
@@ -112,22 +151,24 @@
   color: var(--ink);
   font: inherit;
   font-size: 16px;
-  letter-spacing: 0.04em;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   outline: none;
   box-sizing: border-box;
   transition:
-    border-color var(--dur-color) ease-out,
-    box-shadow var(--dur-color) ease-out;
+    border-color var(--dur-color) var(--ease-out),
+    box-shadow var(--dur-color) var(--ease-out);
 }
 
 .input::placeholder {
   color: var(--ink-3);
+  font-weight: 400;
   letter-spacing: 0;
 }
 
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-glow, var(--accent-soft));
 }
 
 .inputBad,
@@ -140,23 +181,24 @@
 }
 
 .input[readonly] {
+  background: var(--surface-2);
   color: var(--ink-2);
 }
 
 .sheetBody {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .sheetBtn {
   flex: none;
-  width: 104px;
+  width: 108px;
 }
 
 .hint {
   margin: 0;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 12px;
   font-weight: 500;
 }
@@ -165,7 +207,7 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin: 0;
+  margin: var(--space-1) 0 0;
   color: var(--crit);
   font-size: 12px;
   font-weight: 500;
@@ -212,19 +254,37 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: var(--h-input);
+  min-height: 36px;
   padding: 0 var(--space-2);
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--ink-2);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition:
+    color var(--dur-color) var(--ease-out),
+    background-color var(--dur-color) var(--ease-out);
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .openBtn:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .input:not(:disabled):not([readonly]):not(.inputBad):not(:focus):hover {
+    border-color: var(--accent-border, var(--accent));
+  }
+
+  .chipRemove:hover .chipRemoveDot {
+    border-color: var(--good);
+  }
+
   .removeText:hover {
+    background: var(--crit-soft);
     color: var(--crit);
   }
 }
@@ -235,5 +295,12 @@
   }
   .onlyDesktop {
     display: flex;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .openBtn:active,
+  .chipRemove:active .chipRemoveDot {
+    transform: none;
   }
 }

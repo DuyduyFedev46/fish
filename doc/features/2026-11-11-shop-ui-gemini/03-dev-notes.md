@@ -158,3 +158,22 @@ PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
 PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  design_screens (cụm b — 13 màn + HF): 19 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+
+---
+
+## GUI-05c — Làm đẹp giỏ hàng, dòng giỏ, ô mã giảm giá và giỏ mini
+
+### Thay đổi chính
+- `frontend/features/cart/components/CartScreen.module.css`, `frontend/components/cart/{CartLine.tsx,CartLine.module.css,VoucherField.module.css,CartBar.module.css,MiniCart.module.css}`: đóng thẻ từng dòng giỏ trên cả 360 px và 1280 px, phân tách rõ trạng thái đổi giá (viền hổ phách) và món hết hàng (nền xám nhạt viền đứt + pill đỏ), hộp nhắc giữ hàng nền `--surface-tint` kèm nút pill `"Mua thêm hàng khác"`, nút `"Nhập mã"` dạng pill trên điện thoại và hộp nhập mã nền ấm trên máy tính, khung hero giỏ trống cân đối.
+
+### Kết quả lệnh kiểm chứng (GUI-05c)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH · 9/9 script test-*.mjs xanh · check_naming: OK
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens (cụm c — 12 màn + HF): 18 đạt, 0 lỗi, 0 bỏ qua
+```

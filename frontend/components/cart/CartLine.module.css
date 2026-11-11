@@ -4,14 +4,26 @@
   grid-template-areas:
     "img name remove"
     "img price price"
-    "img qty total";
+    "qty qty total";
   align-items: center;
   column-gap: var(--space-3);
-  row-gap: 6px;
-  padding: 14px var(--space-4);
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  row-gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-card);
+  background: var(--card-gradient, var(--surface));
+  box-shadow: var(--shadow-card, var(--shadow-sm));
   list-style: none;
+  transition:
+    border-color var(--dur-color) var(--ease-out),
+    box-shadow var(--dur-color) var(--ease-out);
+}
+
+.priceChanged {
+  border-color: var(--warn);
+  box-shadow:
+    inset 3px 0 0 var(--warn),
+    var(--shadow-card, var(--shadow-sm));
 }
 
 .imageCell {
@@ -21,42 +33,62 @@
 }
 
 .image {
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px var(--border-subtle, var(--border));
 }
 
 .nameArea {
   grid-area: name;
+  align-self: start;
+  min-width: 0;
 }
 
 .name {
+  display: inline-block;
   color: var(--ink);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   line-height: 1.35;
+  letter-spacing: -0.01em;
   text-decoration: none;
+  transition: color var(--dur-color) var(--ease-out);
 }
 
 .removeCell {
   grid-area: remove;
+  align-self: start;
   /* Nút 44 kéo lên góc để không tốn chiều cao dòng */
-  margin: -12px -12px 0 0;
+  margin: -10px -10px 0 0;
 }
 
 .priceCell {
   grid-area: price;
+  align-self: start;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .qtyCell {
   grid-area: qty;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle, var(--border));
 }
 
 .totalCell {
   grid-area: total;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  align-self: stretch;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle, var(--border));
   text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .tag {
@@ -64,11 +96,12 @@
   align-items: center;
   height: 22px;
   padding: 0 var(--space-2);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-full);
   background: var(--warn-soft);
   color: var(--warn);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* ---- món đã hết ---- */
@@ -76,14 +109,19 @@
   grid-template-columns: 68px minmax(0, 1fr);
   grid-template-areas:
     "img text"
-    "img actions";
-  background: var(--canvas);
+    "actions actions";
+  row-gap: var(--space-3);
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  box-shadow: none;
 }
 
 .outText {
   grid-area: text;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-1);
   min-width: 0;
 }
@@ -93,16 +131,22 @@
 }
 
 .outInfo {
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .outFlag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--ink-2);
-  font-size: 13px;
+  margin-top: 2px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--crit-border);
+  border-radius: var(--radius-full);
+  background: var(--crit-soft);
+  color: var(--crit);
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -111,47 +155,79 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2);
-  margin-top: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
 }
 
 @media (min-width: 768px) {
   .line {
-    grid-template-columns: 64px minmax(0, 1fr) 160px 160px 120px 44px;
-    grid-template-areas: "img name price qty total remove";
-    column-gap: var(--space-3);
-    padding: var(--space-4) var(--space-3);
+    background: var(--surface);
+    box-shadow: var(--shadow-xs, none);
   }
 
-  .imageCell {
+  .priceChanged {
+    box-shadow: inset 3px 0 0 var(--warn);
+  }
+}
+
+@media (min-width: 1024px) {
+  .line {
+    grid-template-columns: 68px minmax(0, 1fr) 148px auto minmax(104px, auto) 40px;
+    grid-template-areas: "img name price qty total remove";
+    column-gap: var(--space-3);
+    row-gap: 0;
+    padding: var(--space-4);
+  }
+
+  .imageCell,
+  .nameArea,
+  .priceCell,
+  .removeCell {
     align-self: center;
   }
 
   .removeCell {
-    margin: 0;
+    margin: 0 -4px 0 0;
+    justify-self: end;
   }
 
   .priceCell {
     flex-direction: column;
     align-items: flex-start;
+    gap: 4px;
+  }
+
+  .qtyCell,
+  .totalCell {
+    padding-top: 0;
+    border-top: 0;
   }
 
   .totalCell {
-    font-weight: 600;
+    align-self: center;
   }
 
   .out {
-    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-columns: 68px minmax(0, 1fr) auto;
     grid-template-areas: "img text actions";
     align-items: center;
+    row-gap: 0;
+    background: var(--surface-2);
   }
 
   .outActions {
-    margin-top: 0;
     grid-template-columns: auto auto;
+    padding-top: 0;
+    border-top: 0;
   }
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .line:not(.out):not(.priceChanged):hover {
+    border-color: var(--accent-border, var(--border-strong));
+    box-shadow: var(--shadow-card-hover);
+  }
+
   .name:hover {
     color: var(--accent-text);
   }

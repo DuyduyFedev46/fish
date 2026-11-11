@@ -103,7 +103,7 @@ export default function CartLine({
   }
 
   return (
-    <li className={s.line}>
+    <li className={cx(s.line, status === "price-changed" && s.priceChanged)}>
       <span className={s.imageCell}>{image}</span>
       <Link href={href} className={cx(s.name, s.nameArea)} data-line-name={line.itemCode}>
         {line.name}
