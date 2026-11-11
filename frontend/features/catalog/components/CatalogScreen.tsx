@@ -201,7 +201,7 @@ export default function CatalogScreen() {
                 </>
               ) : state === "error" ? (
                 <ErrorState
-                hotline={hotline}
+                  hotline={hotline}
                   title="Chưa tải được hàng"
                   description="Kiểm tra kết nối mạng rồi thử lại"
                   onRetry={retry}

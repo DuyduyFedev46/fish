@@ -63,3 +63,26 @@ hex grep: rỗng · transition: all grep: rỗng
 PASS  general_rules: 132 đạt, 0 lỗi, 0 bỏ qua
 PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+
+---
+
+## GUI-03 — Dọn state chết ở giỏ và sửa thụt lề `hotline` (L4)
+
+### Thay đổi chính
+- `frontend/features/cart/components/CartScreen.tsx`: xoá state không có biến đọc `const [, setBlocked] = useState(false)`, `useEffect` gọi `setBlocked(false)` và lời gọi `setBlocked(true)` trong `proceed()`; logic chặn đặt hàng vẫn dựa hoàn toàn trên `result.outCount > 0` như thiết kế màn B3.
+- `frontend/features/catalog/components/CatalogScreen.tsx`: chỉnh thụt lề prop `hotline={hotline}` ở dòng 204.
+- `frontend/features/catalog/components/ItemDetailScreen.tsx`: chỉnh thụt lề prop `hotline={hotline}` ở dòng 98.
+
+### Kết quả lệnh kiểm chứng (GUI-03)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH — không thấy seed mock nào trong bản build.
+9/9 script test-*.mjs xanh (20/20, 21/21, 33/33, 37/37, 81/81, 17/17, 45/45, 40/40, 43/43)
+check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
+hex grep: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 132 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens (A1,B3,DE11): 9 đạt, 0 lỗi, 0 bỏ qua
+```

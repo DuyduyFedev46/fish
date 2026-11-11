@@ -95,7 +95,7 @@ export default function ItemDetailScreen() {
   } else if (state === "error") {
     body = (
       <ErrorState
-                hotline={hotline}
+        hotline={hotline}
         title="Chưa tải được món này"
         description="Kiểm tra kết nối mạng rồi thử lại"
         showGhostGrid={false}

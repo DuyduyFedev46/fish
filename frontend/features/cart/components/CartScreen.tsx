@@ -42,7 +42,6 @@ export default function CartScreen() {
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [retrying, setRetrying] = useState(false);
   const [adjustedNotice, setAdjustedNotice] = useState(false);
-  const [, setBlocked] = useState(false);
   const [holdMinutes, setHoldMinutes] = useState<number | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [live, setLive] = useState("");
@@ -89,11 +88,6 @@ export default function CartScreen() {
     cart.updateEntries((prev) => prev.map((e) => ({ ...e, qty: fixed.get(e.item_code) ?? e.qty })));
     setAdjustedNotice(true);
   }, [cart.ready, result, cart]);
-
-  // Hết món hết thì dòng báo lỗi mất.
-  useEffect(() => {
-    if (result.outCount === 0) setBlocked(false);
-  }, [result.outCount]);
 
   // Sau khi bỏ một dòng: tiêu điểm về tên dòng kế tiếp, hết dòng thì về tiêu đề.
   useEffect(() => {
@@ -157,7 +151,6 @@ export default function CartScreen() {
 
   function proceed() {
     if (result.outCount > 0) {
-      setBlocked(true);
       const first = result.lines.find((l) => l.status === "out");
       if (first) {
         focusSoon(document.querySelector<HTMLElement>(`[data-line-remove="${CSS.escape(first.entry.item_code)}"]`));
