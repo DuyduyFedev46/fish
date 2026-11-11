@@ -2,45 +2,71 @@
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 /* Trên ảnh */
 .overlay {
-  height: 22px;
+  height: 21px;
   padding: 0 6px;
   gap: 3px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
+  font-size: 11px;
+  font-weight: 600;
+}
+@media (min-width: 768px) {
+  .overlay {
+    height: 24px;
+    padding: 0 8px;
+    gap: 4px;
+  }
 }
 .overlay.md {
   height: 26px;
   padding: 0 10px;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 .overlay.low {
+  border: 1px solid var(--border-subtle, var(--border));
   background: var(--warn-soft);
   color: var(--warn);
 }
 .overlay.out {
-  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
   color: var(--ink-2);
 }
 
 /* Dưới giá */
 .inline {
+  height: 24px;
+  padding: 0 9px;
   gap: 4px;
+  border-radius: var(--radius-full);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+}
+.inline.md {
+  height: 28px;
+  padding: 0 12px;
+  gap: 5px;
+  font-size: 13px;
 }
 .inline.in {
+  border: 1px solid var(--good-border);
+  background: var(--good-soft);
   color: var(--good);
 }
 .inline.low {
+  border: 1px solid var(--border-strong);
+  background: var(--warn-soft);
   color: var(--warn);
 }
 .inline.out {
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   color: var(--ink-2);
 }

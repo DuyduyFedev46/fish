@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: 0 var(--space-4) var(--space-1);
+  padding: var(--space-3) var(--space-4) var(--space-2);
 }
 
 .desktop {
@@ -13,24 +13,29 @@
 .count {
   color: var(--ink-2);
   font-size: 13px;
+  font-weight: 600;
 }
 
 .trigger {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: 6px;
   min-height: 44px;
-  padding: 0 var(--space-1);
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
+  color: var(--ink);
   font: inherit;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition:
     transform var(--dur-press) var(--ease-out),
+    border-color var(--dur-color) ease-out,
+    background-color var(--dur-color) ease-out,
     color var(--dur-color) ease-out;
 }
 
@@ -39,6 +44,9 @@
 }
 
 .list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin: 0;
   padding: 0;
   border: 0;
@@ -51,12 +59,16 @@
   justify-content: space-between;
   gap: var(--space-3);
   min-height: 48px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
   color: var(--ink);
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .selected {
+  background: var(--accent-soft);
   color: var(--accent-text);
   font-weight: 600;
 }
@@ -89,11 +101,18 @@
 
 @media (hover: hover) and (pointer: fine) {
   .trigger:hover {
-    color: var(--ink);
+    border-color: var(--border-strong);
+    background: var(--surface-2);
+  }
+  .row:not(.selected):hover {
+    background: var(--surface-2);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .trigger {
+    transition: none;
+  }
   .trigger:active {
     transform: none;
   }

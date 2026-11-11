@@ -46,3 +46,12 @@
 |---|---|---|---|
 | Bố cục trang chủ ở 360 px và 1280 px đẹp, cân đối, đủ thông tin & chức năng, không cuộn ngang, đạt tương phản axe-core AA | So trực quan ảnh trước/sau trên trình duyệt thật + chạy `general_rules`, `full_flow`, `design_screens` | **PASS** (360 px & 1280 px) | `shots/gui-05/a-home-before-360.png` → `shots/gui-05/a-home-after-360.png`; `shots/gui-05/a-home-before-1280.png` → `shots/gui-05/a-home-after-1280.png` |
 | Ngoài đường thuận (`site-info` người bán rỗng / lỗi mạng) & đủ toàn bộ link HF1/HF2 ở Header + Footer | Chạy `footer_consent` (31/31 PASS) + `HF header/footer` 360 & 1280 | **PASS** | — |
+
+
+## GUI-05b — Danh mục, chi tiết món, thẻ sản phẩm và tìm kiếm
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh trước → sau |
+|---|---|---|---|
+| Danh mục (`/shop/`) ở 360 px và 1280 px: lưới thẻ đều, tag `Combo` không đè badge `Hết hàng`, bộ lọc & tìm kiếm mượt | So trực quan ảnh trước/sau + chạy `design_screens` (`A2,DK2,A9,DP4`), `general_rules`, `full_flow` | **PASS** (360 px & 1280 px) | `shots/gui-05/b-catalog-before-360.png` → `shots/gui-05/b-catalog-after-360.png`; `shots/gui-05/b-catalog-before-1280.png` → `shots/gui-05/b-catalog-after-1280.png` |
+| Chi tiết món (`/shop/item/?code=CA-THU`) ở 360 px và 1280 px: hộp chọn mua và bảng thông tin đóng thẻ rõ ràng | So trực quan ảnh trước/sau + `design_screens` (`A3,DK3,A10,DE10`) | **PASS** (360 px & 1280 px) | `shots/gui-05/b-item-before-360.png` → `shots/gui-05/b-item-after-360.png`; `shots/gui-05/b-item-before-1280.png` → `shots/gui-05/b-item-after-1280.png` |
+| Ngoài đường thuận (món hết hàng `A7/DE2`, mất mạng `A6/DE9`, tìm không thấy `DE1`) | Kịch bản `design_screens` + `full_flow` | **PASS** | `shots/gui-05/b-outofstock-before-360.png` → `shots/gui-05/b-outofstock-after-360.png`; `shots/gui-05/b-outofstock-before-1280.png` → `shots/gui-05/b-outofstock-after-1280.png` |

@@ -138,3 +138,23 @@ PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  footer_consent: 31 đạt, 0 lỗi, 1 bỏ qua
 PASS  design_screens (A1,DK1,HF1,HF2): 10 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+
+---
+
+## GUI-05b — Làm đẹp danh mục, chi tiết món, thẻ sản phẩm và tìm kiếm
+
+### Thay đổi chính
+- `frontend/components/catalog/{ProductCard,ImageFrame,PriceTag,StockBadge,QtyStepper}.module.css`: thẻ đồng đều chiều cao, khung ảnh nền `--surface-tint` viền mảnh, giá đậm `tabular-nums`, tách rời khoảng cách giữa tag `Combo` và badge `Hết hàng` trên thẻ hẹp 360 px để không chạm nhau.
+- `frontend/features/catalog/components/{CatalogScreen,ItemDetailScreen}.module.css`, `frontend/components/catalog/{AddToCart.tsx,AddToCart.module.css,SideFilter.module.css,SortControl.module.css}`, `frontend/components/search/{SearchBox,SearchSuggest}.module.css`: đóng thẻ bộ lọc bên trái, thanh tiêu đề/sắp xếp, hộp chọn mua (`detailBox` nền `--surface-tint` viền `--accent-border`) và thẻ bảng thông tin sản phẩm.
+
+### Kết quả lệnh kiểm chứng (GUI-05b)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH · 9/9 script test-*.mjs xanh · check_naming: OK
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens (cụm b — 13 màn + HF): 19 đạt, 0 lỗi, 0 bỏ qua
+```

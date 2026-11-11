@@ -5,12 +5,16 @@
   min-width: 0;
   margin: 0;
   background: var(--surface);
+  transition:
+    border-color var(--dur-color) ease-out,
+    box-shadow var(--dur-color) ease-out;
 }
 
 .glass {
   display: inline-flex;
   flex: none;
   color: var(--ink-3);
+  transition: color var(--dur-color) ease-out;
 }
 
 .input {
@@ -25,6 +29,10 @@
   outline: none;
   -webkit-appearance: none;
   appearance: none;
+}
+.input:focus,
+.input:focus-visible {
+  outline: none;
 }
 .input::placeholder {
   color: var(--ink-3);
@@ -50,6 +58,9 @@
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;
+  transition:
+    background-color var(--dur-color) ease-out,
+    color var(--dur-color) ease-out;
 }
 
 /* "Tìm" chỉ hiện ở máy tính; điện thoại gửi bằng Enter */
@@ -61,10 +72,16 @@
 .brand {
   height: var(--h-input);
   padding: 0 6px 0 var(--space-4);
+  border: 1px solid transparent;
   border-radius: var(--radius-full);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
 }
 .brand:focus-within {
+  border-color: var(--accent-border, var(--accent));
   box-shadow: 0 0 0 3px var(--on-brand-muted);
+}
+.brand:focus-within .glass {
+  color: var(--accent-text);
 }
 
 /* ---- page (trang danh mục) ---- */
@@ -72,11 +89,15 @@
   height: var(--h-input);
   padding: 0 var(--space-3);
   border: 1px solid var(--border-input);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
 }
 .page:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-glow, var(--accent-soft));
+}
+.page:focus-within .glass {
+  color: var(--accent-text);
 }
 
 @media (min-width: 768px) {
@@ -117,9 +138,19 @@
   .brand .submit:hover {
     background: var(--brand-deep-hover);
   }
+  .clear:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .form,
+  .glass,
+  .clear,
+  .brand .submit {
+    transition: none;
+  }
   .brand .submit:active {
     transform: none;
   }

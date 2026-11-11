@@ -4,11 +4,13 @@
   align-items: baseline;
   gap: 0 var(--space-1);
   min-width: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .amount {
-  font-weight: 600;
-  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--brand-deep);
 }
 
 .unit {
@@ -29,13 +31,15 @@
 
 .card .amount {
   font-size: 17px;
+  line-height: 1.25;
 }
 .card .unit {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .rail .amount {
   font-size: 16px;
+  line-height: 1.25;
 }
 .rail .unit {
   font-size: 12px;
@@ -43,8 +47,9 @@
 
 .detail .amount,
 .total .amount {
-  font-size: 24px;
-  line-height: 1.25;
+  font-size: 26px;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
 }
 .detail .unit {
   font-size: 14px;
@@ -54,11 +59,14 @@
 .meta .unit {
   font-size: 12px;
   font-weight: 500;
+  letter-spacing: 0;
   color: var(--ink-3);
 }
 
 .line .amount {
   font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .accent .amount {
@@ -70,7 +78,20 @@
 }
 
 @media (min-width: 768px) {
+  .card .amount {
+    font-size: 18px;
+  }
+  .card .unit {
+    font-size: 13px;
+  }
   .detail {
     gap: 0 6px;
+  }
+  .detail .amount,
+  .total .amount {
+    font-size: 28px;
+  }
+  .detail .unit {
+    font-size: 15px;
   }
 }
