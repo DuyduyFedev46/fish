@@ -73,5 +73,11 @@ eq("đặt không dùng mã", m.voucherCodeToSend("CAVE10", "CAVE10", true), und
 // Vân tay dòng: không phụ thuộc thứ tự
 eq("itemsKey", m.itemsKey([{ item_code: "B", qty: "1" }, { item_code: "A", qty: "1.5" }]), m.itemsKey([{ item_code: "A", qty: "1.5" }, { item_code: "B", qty: "1" }]));
 
+// GUI-01: dòng nhắc mã chờ kiểm khi mất mạng lúc kiểm lại ở trang đặt hàng
+eq("pendingVoucherText khi kiểm lỗi mạng", m.pendingVoucherText("CAVE10", false, true), "Mã CAVE10 · sẽ kiểm khi đặt");
+eq("pendingVoucherText ẩn khi đã có quote", m.pendingVoucherText("CAVE10", true, true), null);
+eq("pendingVoucherText ẩn khi chưa lỗi (đang tải)", m.pendingVoucherText("CAVE10", false, false), null);
+eq("pendingVoucherText ẩn khi không có mã", m.pendingVoucherText(null, false, true), null);
+
 console.log(`${n - fail}/${n} ca đạt`);
 process.exit(fail ? 1 : 0);

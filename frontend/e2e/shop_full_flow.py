@@ -425,6 +425,70 @@ def error_branches(browser):
         R.ok("[360] bấm Đặt hàng ngay: chưa tạo đơn thì phải có thông báo (không tạo đơn giá gốc)", page.locator("[role=dialog]").count() >= 1, page.url)
     ctx.close()
 
+    # --- GUI-01: chặn mạng ở /api/shop/vouchers/check/ (360 và 1280)
+    # (1) Chặn ngay từ giỏ (chưa áp được mã): tóm tắt hiện 165.000đ = trang thanh toán 165.000đ.
+    # (2) Đã áp mã ở giỏ rồi sang đặt hàng mới mất mạng kiểm mã: khối tóm tắt hiện "Mã X · sẽ kiểm khi đặt", đơn gửi kèm mã và trang thanh toán hiện đúng tổng đã giảm (148.500đ).
+    for idx, width_net in enumerate((360, 1280)):
+        ctx, page, watch = fresh_context(browser, width_net)
+        add_to_cart(page, "CA-THU")
+        page.route("**/api/shop/vouchers/check/", lambda r: r.abort("internetdisconnected"))
+        goto_cart(page)
+        open_code_ui(page)
+        page.locator("input[type=text]:visible").last.fill(V_MAIN)
+        page.get_by_role("button", name="Áp dụng").locator("visible=true").last.click()
+        page.wait_for_timeout(800)
+        R.ok(f"[{width_net}] chặn /vouchers/check/ ở giỏ: báo 'Chưa kiểm được mã'", "chưa kiểm được mã" in page.inner_text("body").lower())
+        if page.locator("[role=dialog]").count():
+            page.keyboard.press("Escape")
+            page.wait_for_timeout(300)
+        page.get_by_role("button", name=re.compile("^Tiếp tục")).click()
+        page.wait_for_url(re.compile(r"/shop/checkout/"))
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(600)
+        summary_no_code = page.locator("section[aria-labelledby='cart-summary-title']").inner_text()
+        R.ok(f"[{width_net}] chặn /vouchers/check/ chưa áp mã: tóm tắt hiện 165.000đ, không dòng chờ kiểm",
+             "165.000đ" in summary_no_code and "sẽ kiểm khi đặt" not in summary_no_code, summary_no_code)
+        phone_no_code = f"090000003{idx}"
+        fill_checkout(page, phone=phone_no_code)
+        page.get_by_role("button", name="Đặt hàng").click()
+        page.wait_for_url(re.compile(r"sepay"), timeout=15000)
+        m_no_code = code_from_gateway_post(__import__("urllib.parse").parse.unquote_plus(page.gateway_posts[0][1] or ""))
+        code_no_code = m_no_code.group(1)
+        goto(page, f"/shop/orders/?code={code_no_code}", 900)
+        pay_no_code = page.inner_text("main")
+        R.ok(f"[{width_net}] chặn /vouchers/check/ chưa áp mã: số tiền tóm tắt (165.000đ) bằng số tiền trang thanh toán",
+             "165.000đ" in pay_no_code, pay_no_code[:300])
+        ctx.close()
+
+        ctx, page, watch = fresh_context(browser, width_net)
+        add_to_cart(page, "CA-THU")
+        goto_cart(page)
+        open_code_ui(page)
+        page.locator("input[type=text]:visible").last.fill(V_MAIN)
+        page.get_by_role("button", name="Áp dụng").locator("visible=true").last.click()
+        page.wait_for_timeout(1200)
+        page.route("**/api/shop/vouchers/check/", lambda r: r.abort("internetdisconnected"))
+        page.get_by_role("button", name=re.compile("^Tiếp tục")).click()
+        page.wait_for_url(re.compile(r"/shop/checkout/"))
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(900)
+        summary_pending = page.locator("section[aria-labelledby='cart-summary-title']").inner_text()
+        R.ok(f"[{width_net}] chặn /vouchers/check/ sau khi đã áp mã: tóm tắt hiện 'Mã {V_MAIN} · sẽ kiểm khi đặt'",
+             f"Mã {V_MAIN} · sẽ kiểm khi đặt" in summary_pending and "165.000đ" in summary_pending, summary_pending)
+        snap(page, "35-checkout-voucher-pending", width_net, "gui-01")
+        phone_pending = f"090000004{idx}"
+        fill_checkout(page, phone=phone_pending)
+        page.get_by_role("button", name="Đặt hàng").click()
+        page.wait_for_url(re.compile(r"sepay"), timeout=15000)
+        m_pending = code_from_gateway_post(__import__("urllib.parse").parse.unquote_plus(page.gateway_posts[0][1] or ""))
+        code_pending = m_pending.group(1)
+        goto(page, f"/shop/orders/?code={code_pending}", 900)
+        pay_pending_text = page.inner_text("main")
+        snap(page, "35b-payment-voucher-applied", width_net, "gui-01")
+        R.ok(f"[{width_net}] đặt đơn khi kiểm mã lỗi mạng: máy chủ vẫn áp mã {V_MAIN}, trang thanh toán hiện 148.500đ",
+             "148.500đ" in pay_pending_text and V_MAIN in pay_pending_text, pay_pending_text[:350])
+        ctx.close()
+
     # --- A6 mất mạng khi tải hàng, rồi Thử lại
     ctx, page, watch = fresh_context(browser, 360)
     page.route("**/api/shop/catalog/", lambda r: r.abort("internetdisconnected"))

@@ -118,3 +118,11 @@ export function voucherCodeToSend(hookCode: string | null, storedCode: string | 
   if (withoutVoucher) return undefined;
   return hookCode ?? storedCode ?? undefined;
 }
+
+/**
+ * Dòng nhỏ ở khối tóm tắt đặt hàng khi kiểm lại mã bị lỗi mạng nhưng mã vẫn được gửi kèm đơn để máy chủ quyết (GUI-01).
+ */
+export function pendingVoucherText(code: string | null, hasQuote: boolean, hasError: boolean): string | null {
+  if (!code || hasQuote || !hasError) return null;
+  return `Mã ${code} · sẽ kiểm khi đặt`;
+}
