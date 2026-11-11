@@ -2,14 +2,15 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  background: var(--surface-2);
 }
 
 .main {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4) var(--space-4);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-5);
 }
 
 .side {
@@ -18,6 +19,10 @@
 
 .onlyMobile {
   display: block;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-xs, none);
 }
 
 @media (min-width: 768px) {
@@ -25,6 +30,7 @@
     flex-direction: row;
     align-items: flex-start;
     gap: var(--space-6);
+    background: transparent;
   }
 
   .main {
@@ -35,7 +41,7 @@
 
   .side {
     display: block;
-    flex: 0 0 340px;
+    flex: 0 0 360px;
     align-self: stretch;
   }
 

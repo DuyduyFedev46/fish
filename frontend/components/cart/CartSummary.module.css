@@ -5,7 +5,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: 14px var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  padding: 12px var(--space-4) calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-subtle, var(--border));
   background: var(--surface);
   box-shadow: var(--shadow-bar);
 }
@@ -30,24 +31,32 @@
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-1) var(--space-3);
   color: var(--ink-2);
   font-size: 14px;
 }
 
+.row dt {
+  min-width: 0;
+}
+
 .row dd {
-  margin: 0;
+  flex: none;
+  margin: 0 0 0 auto;
 }
 
 .discount {
   color: var(--good);
+  font-weight: 600;
 }
 
 .totalRow {
+  align-items: center;
   padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle, var(--border));
   color: var(--ink);
   font-size: 14px;
   font-weight: 600;
@@ -56,15 +65,20 @@
 .note {
   margin: 0;
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.45;
 }
 
 .notice {
   margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--crit-border);
+  border-radius: var(--radius-md);
+  background-color: var(--crit-soft);
   color: var(--crit);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .lines {
@@ -76,20 +90,59 @@
 
 .line {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--border);
-  color: var(--ink-2);
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border-subtle, var(--border));
+  color: var(--ink);
   font-size: 14px;
+}
+
+.line:last-child {
+  border-bottom: 0;
 }
 
 .lineName {
   min-width: 0;
+  font-weight: 500;
+  line-height: 1.4;
 }
 
 .lineQty {
   color: var(--ink-3);
+  font-weight: 400;
+}
+
+.lineUnit {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.voucherNote {
+  padding: 6px 10px;
+  border: 1px solid var(--good-border);
+  border-radius: var(--radius-md);
+  background-color: var(--good-soft);
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.pendingVoucher {
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--accent-border, var(--border));
+  border-radius: var(--radius-md);
+  background-color: var(--surface-tint, var(--accent-soft));
+  color: var(--accent-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .onlyDesktop {
@@ -99,13 +152,15 @@
 @media (min-width: 768px) {
   .summary {
     position: sticky;
-    top: var(--space-6);
+    top: calc(var(--h-header) + var(--space-4));
     bottom: auto;
-    gap: var(--space-3);
-    padding: var(--space-5);
-    border-radius: var(--radius-card);
-    box-shadow: none;
     z-index: auto;
+    gap: var(--space-3);
+    padding: var(--space-5) var(--space-6);
+    border: 1px solid var(--border-subtle, var(--border));
+    border-radius: var(--radius-xl);
+    background: var(--surface);
+    box-shadow: var(--shadow-card, var(--shadow-sm));
   }
 
   .title {
@@ -113,11 +168,15 @@
     width: auto;
     height: auto;
     margin: 0;
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-subtle, var(--border));
     overflow: visible;
     clip: auto;
     white-space: normal;
+    color: var(--ink);
     font-size: 17px;
-    font-weight: 600;
+    font-weight: 700;
+    letter-spacing: -0.015em;
   }
 
   .rows {
@@ -125,32 +184,30 @@
   }
 
   .lines {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: var(--space-1);
+    border-bottom: 1px solid var(--border-subtle, var(--border));
+  }
+
+  .totalRow {
+    margin-top: var(--space-1);
+    padding: var(--space-3) 14px;
+    border: 1px solid var(--accent-border, var(--border));
+    border-radius: var(--radius-lg);
+    background-color: var(--surface-tint, var(--surface-2));
+    font-size: 14.5px;
+  }
+
+  .note {
+    font-size: 13px;
   }
 
   .onlyMobile {
     display: none;
   }
+
   .onlyDesktop {
     display: inline;
   }
-}
-
-.voucherNote {
-  color: var(--ink-2);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.pendingVoucher {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.lineUnit {
-  display: block;
-  color: var(--ink-3);
-  font-size: 13px;
 }

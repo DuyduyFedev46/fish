@@ -1,9 +1,10 @@
 .steps {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: 12px var(--space-4) 14px;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
   background: var(--surface);
   list-style: none;
 }
@@ -19,9 +20,13 @@
 
 .mark {
   display: block;
-  height: 4px;
+  height: 5px;
   border-radius: var(--radius-full);
   background: var(--surface-3);
+  transition:
+    background-color var(--dur-color) ease-out,
+    border-color var(--dur-color) ease-out,
+    box-shadow var(--dur-color) ease-out;
 }
 
 .num {
@@ -29,12 +34,25 @@
 }
 
 .label {
+  overflow: hidden;
   color: var(--ink-3);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.done .mark,
+.todo .mark {
+  background: var(--surface-3);
+}
+
+.done .mark {
+  background: var(--brand-mid, var(--accent));
+}
+
 .current .mark {
-  background: var(--accent);
+  background-color: var(--accent);
+  background-image: var(--brand-gradient, none);
+  box-shadow: 0 2px 6px var(--accent-glow, transparent);
 }
 
 .done .label {
@@ -43,45 +61,52 @@
 
 .current .label {
   color: var(--accent-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 @media (min-width: 768px) {
   .steps {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 0;
-    padding: 0;
-    background: transparent;
+    padding: 6px 14px;
+    border: 1px solid var(--border-subtle, var(--border));
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    box-shadow: var(--shadow-xs, var(--shadow-sm));
   }
 
   .step {
     position: relative;
     flex-direction: row;
     align-items: center;
-    gap: 10px;
-    font-size: 14px;
+    gap: 8px;
+    font-size: 13.5px;
   }
 
   .step + .step {
     margin-left: 12px;
-    padding-left: 60px;
+    padding-left: 44px;
   }
 
-  /* Đường nối 48 x 2 giữa hai chấm */
+  /* Đường nối 32 x 2 giữa hai bước trên máy tính */
   .step + .step::before {
     content: "";
     position: absolute;
     left: 0;
     top: 50%;
-    width: 48px;
+    width: 32px;
     height: 2px;
+    border-radius: var(--radius-full);
     background: var(--surface-3);
+    transform: translateY(-50%);
   }
+
   .step.done + .step::before,
   .step.current + .step::before {
     background: var(--border-strong);
   }
+
   .done + .step.current::before,
   .done + .step.done::before {
     background: var(--accent);
@@ -92,27 +117,38 @@
     flex: none;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
+    width: 26px;
+    height: 26px;
+    border: 1.5px solid var(--border-strong);
     border-radius: var(--radius-full);
+    background: var(--surface-2);
+    box-shadow: none;
   }
 
-  .done .mark,
+  .done .mark {
+    border-color: var(--accent-border, var(--accent));
+    background: var(--surface-tint, var(--accent-soft));
+  }
+
   .current .mark {
     border-color: var(--accent);
-    background: var(--accent);
+    background-color: var(--accent);
+    background-image: var(--brand-gradient, none);
+    box-shadow: 0 2px 8px var(--accent-glow, transparent);
   }
 
   .num {
     display: inline;
     color: var(--ink-3);
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 12.5px;
+    font-weight: 700;
+    line-height: 1;
   }
 
-  .done .num,
+  .done .num {
+    color: var(--accent-text);
+  }
+
   .current .num {
     color: var(--on-accent);
   }
@@ -123,5 +159,11 @@
 
   .done .label {
     color: var(--ink);
+    font-weight: 500;
+  }
+
+  .current .label {
+    color: var(--accent-text);
+    font-weight: 700;
   }
 }

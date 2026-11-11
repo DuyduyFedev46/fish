@@ -2,11 +2,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  width: 100%;
+  gap: var(--space-4);
+  width: calc(100% - 2 * var(--space-4));
   max-width: 480px;
-  margin: var(--space-8) auto;
-  padding: var(--space-6) var(--space-4);
+  margin: var(--space-6) auto var(--space-10);
+  padding: var(--space-8) var(--space-5) var(--space-6);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
   text-align: center;
 }
 
@@ -14,26 +18,35 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+  width: 68px;
+  height: 68px;
+  border: 1px solid var(--crit-border);
+  border-radius: var(--radius-full);
   background: var(--crit-soft);
   color: var(--crit);
 }
 
 .title {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 
 .text {
+  max-width: 42ch;
   margin: 0;
   color: var(--ink-2);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   text-wrap: pretty;
+}
+
+.text :global(.num) {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .actions {
@@ -41,15 +54,28 @@
   flex-direction: column;
   gap: var(--space-2);
   width: 100%;
+  margin-top: var(--space-1);
 }
 
 .note {
-  margin: 0;
-  color: var(--ink-3);
+  width: 100%;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-lg);
+  background-color: var(--surface-warm, var(--surface-2));
+  color: var(--ink-2);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .note a {
   font-weight: 600;
+}
+
+@media (min-width: 768px) {
+  .box {
+    margin-top: var(--space-10);
+    padding: var(--space-8) var(--space-6) var(--space-6);
+  }
 }

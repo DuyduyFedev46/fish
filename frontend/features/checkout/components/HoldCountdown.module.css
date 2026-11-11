@@ -3,19 +3,32 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--accent-border, var(--border));
   border-radius: var(--radius-card);
-  background: var(--surface);
+  background-color: var(--surface-tint, var(--accent-soft));
+  box-shadow: var(--shadow-xs, none);
   text-align: center;
+  transition:
+    background-color var(--dur-color) ease-out,
+    border-color var(--dur-color) ease-out;
+}
+
+.ok {
+  --tone: var(--accent-text);
 }
 
 .warn {
   --tone: var(--warn);
+  border-color: var(--warn);
+  background-color: var(--warn-soft);
 }
 
 .crit {
   --tone: var(--crit);
+  border-color: var(--crit-border);
+  background-color: var(--crit-soft);
 }
 
 .code {
@@ -23,39 +36,59 @@
   color: var(--ink-2);
   font-size: 13px;
   font-weight: 500;
+  line-height: 1.45;
 }
 
 .codeValue {
+  display: inline-block;
+  margin: 0 2px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
   color: var(--ink);
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 .lead {
   margin: 0;
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: 13.5px;
+  font-weight: 500;
 }
 
 .time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: var(--space-1) 0;
+  padding: 6px 18px;
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-lg);
+  background-color: var(--surface);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
   color: var(--tone);
   font-size: 40px;
-  font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
   transition: color var(--dur-color) ease-out;
 }
 
 .track {
   width: 100%;
-  height: 4px;
+  height: 6px;
+  margin-top: var(--space-1);
   overflow: hidden;
+  border: 1px solid var(--border-subtle, var(--border));
   border-radius: var(--radius-full);
-  background: var(--surface-3);
+  background-color: var(--surface);
 }
 
 .bar {
   width: 100%;
-  height: 4px;
+  height: 100%;
   border-radius: var(--radius-full);
   background: var(--tone);
   transform-origin: left center;
@@ -73,8 +106,10 @@
       "lead time"
       "track track";
     align-items: center;
-    gap: 4px var(--space-8);
-    padding: var(--space-6);
+    gap: 6px var(--space-6);
+    padding: var(--space-5) var(--space-6);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-card, var(--shadow-sm));
     text-align: left;
   }
 
@@ -88,6 +123,9 @@
 
   .time {
     grid-area: time;
+    margin: 0;
+    padding: 8px 20px;
+    font-size: 42px;
   }
 
   .track {

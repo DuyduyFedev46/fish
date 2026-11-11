@@ -177,3 +177,23 @@ PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
 PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  design_screens (cụm c — 12 màn + HF): 18 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+
+---
+
+## GUI-05d — Làm đẹp đặt hàng (`/shop/checkout/`), thanh toán, tóm tắt đơn và thanh bước
+
+### Thay đổi chính
+- `frontend/components/cart/{CheckoutSteps,CartSummary}.module.css`, `frontend/features/checkout/components/{CheckoutScreen,AddressField,PaymentChoice,PaymentView,PaymentMethod,HoldCountdown,PendingView,ExpiredView,SoldOutSheet}.module.css`: thanh bước dạng pill bo tròn trên máy tính, đóng thẻ nổi bật khối tổng tiền (`totalRow`) và dòng nhắc mã chờ kiểm (`pendingVoucher`), đồng hồ giữ hàng nằm trong khung số trắng có pill mã đơn, hướng dẫn thanh toán đánh số tự động bằng CSS counter trong các thẻ bước rõ ràng.
+
+### Kết quả lệnh kiểm chứng (GUI-05d)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH · 9/9 script test-*.mjs xanh · check_naming: OK
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  payment_choice: 77 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens (cụm d — 23 màn + HF): 29 đạt, 0 lỗi, 0 bỏ qua
+```

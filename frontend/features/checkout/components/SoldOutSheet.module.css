@@ -1,45 +1,50 @@
 .list {
   display: flex;
   flex-direction: column;
-  margin: 0;
+  gap: var(--space-2);
+  margin: var(--space-1) 0;
   padding: 0;
   list-style: none;
 }
 
 .item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.item:last-child {
-  border-bottom: 0;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-lg);
+  background-color: var(--canvas);
 }
 
 .text {
   display: flex;
+  flex: 1 1 160px;
   flex-direction: column;
   min-width: 0;
-  gap: 2px;
+  gap: 3px;
 }
 
 .name {
+  color: var(--ink);
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.35;
 }
 
 .note {
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 
 .noteGood {
   color: var(--good);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .item > :last-child:not(.text) {

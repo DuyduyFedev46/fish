@@ -1,11 +1,11 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
   width: 100%;
   max-width: 560px;
   margin: 0 auto;
-  padding: var(--space-4) var(--space-4) var(--space-8);
+  padding: var(--space-4) var(--space-4) var(--space-10);
 }
 
 .hero {
@@ -13,9 +13,11 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-6) var(--space-4);
-  border-radius: var(--radius-card);
-  background: var(--surface);
+  padding: var(--space-8) var(--space-5) var(--space-6);
+  border: 1px solid var(--accent-border, var(--border));
+  border-radius: var(--radius-xl);
+  background-color: var(--surface-tint, var(--surface));
+  box-shadow: var(--shadow-card, var(--shadow-sm));
   color: var(--accent-text);
   text-align: center;
 }
@@ -23,65 +25,91 @@
 .title {
   margin: var(--space-2) 0 0;
   color: var(--ink);
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 
 .lead {
+  max-width: 44ch;
   margin: 0;
   color: var(--ink-2);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   text-wrap: pretty;
 }
 
 .code {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin: var(--space-2) 0 0;
+  padding: 6px 12px;
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-full);
+  background-color: var(--surface);
+  box-shadow: var(--shadow-xs, none);
   color: var(--ink-2);
   font-size: 13px;
 }
 
-.code .num {
+.code :global(.num) {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .block {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border-radius: var(--radius-card);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .blockTitle {
   margin: 0;
-  font-size: 15px;
+  color: var(--ink);
+  font-size: 15.5px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .wait {
   margin: 0;
-  color: var(--ink-3);
-  font-size: 12px;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-subtle, var(--border));
+  color: var(--ink-2);
+  font-size: 12.5px;
   font-weight: 500;
 }
 
 .facts {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
   margin: 0;
 }
 
 .facts div {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px dashed var(--border-subtle, var(--border));
   font-size: 14px;
+}
+
+.facts div:first-child {
+  padding-top: 0;
+}
+
+.facts div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .facts dt {
@@ -90,6 +118,7 @@
 
 .facts dd {
   margin: 0;
+  color: var(--ink);
   font-weight: 600;
 }
 
