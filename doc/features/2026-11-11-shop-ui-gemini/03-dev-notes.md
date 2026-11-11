@@ -86,3 +86,33 @@ PASS  general_rules: 132 đạt, 0 lỗi, 0 bỏ qua
 PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  design_screens (A1,B3,DE11): 9 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+
+---
+
+## GUI-04 — Ca E2E giỏ hỏng trong `localStorage` (L5, SHOP-1-01 AC7)
+
+### Thay đổi chính
+- `frontend/e2e/shop_general_rules.py`: thêm 4 phép kiểm ở cả 360 px và 1280 px:
+  - Ghi trực tiếp `cangcaloc_cart_v1` có hai dòng `price: "abc"` và `price: null` vào `localStorage`, mở `/shop/cart/`: kiểm cả văn bản lẫn DOM HTML (đã loại thẻ `<script>/<style>` của Next.js flight payload) không xuất hiện `NaN`, `undefined`, `Infinity`, không lỗi console, `localStorage` tự chuẩn hoá lại `price` thành chuỗi số nguyên hợp lệ, màn giỏ đối chiếu catalog báo `"Giá đã cập nhật"` (`0đ -> 165.000đ / kg`, `0đ -> 235.000đ / kg`).
+  - Ghi lại giỏ hỏng trực tiếp vào `localStorage` rồi mở thẳng `/shop/checkout/`: không `NaN`/`undefined`/`Infinity`, không lỗi console, không hiện dấu gạch ngang `—`.
+- Đã thử làm hỏng tạm `CartContext.tsx` (`price: String(price)`, không commit): cả 4 phép kiểm `GUI-04` lập tức đỏ (`FAIL ... 'price': 'NaN'`), sau đó khôi phục lại `CartContext.tsx` và chạy xanh toàn bộ.
+
+### Kết quả lệnh kiểm chứng (GUI-04)
+```text
+# Khi làm hỏng tạm CartContext.tsx (không commit):
+FAIL GUI-04 [360] /shop/cart/ ... ('price': 'NaN')
+FAIL GUI-04 [360] /shop/checkout/ ... ('price': 'NaN')
+FAIL GUI-04 [1280] /shop/cart/ ... ('price': 'NaN')
+FAIL GUI-04 [1280] /shop/checkout/ ... ('price': 'NaN')
+== general_rules: 132 PASS, 4 FAIL, 0 SKIP
+
+# Sau khi khôi phục CartContext.tsx:
+✓ Generating static pages (12/12)
+check-no-mock: XANH — không thấy seed mock nào trong bản build.
+9/9 script test-*.mjs xanh
+check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
+======== TỔNG KẾT E2E
+PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+```

@@ -28,3 +28,13 @@
 | `tsc`, build tĩnh (`USE_MOCK=0`), toàn bộ `test-*.mjs` xanh | Chạy đủ chuỗi lệnh mục 4 `GEMINI.md` + `check_naming.py` | **PASS** (9/9 bộ test đơn vị xanh, 0 lỗi TS) | — |
 | Giỏ có món hết hàng & món đổi giá (ngoài đường thuận — màn B3 / DE11): vẫn hiện cảnh báo đỏ `"Bỏ món đã hết để đặt hàng."` và chặn sang bước nhận hàng | Dựng giỏ có `TOM-SU-1` hết hàng + `CA-THU` đổi giá trên trình duyệt 360 px và 1280 px, kiểm ảnh chụp thực tế | **PASS** (360 px & 1280 px) | `shots/gui-03/b3-cart-blocked-360.png`, `shots/gui-03/b3-cart-blocked-1280.png` |
 | Hồi quy bất biến | `run_shop_e2e.py --suite general_rules --suite full_flow --suite design_screens` | **PASS** (`general_rules`: 132/132, `full_flow`: 115/115) | — |
+
+
+## GUI-04 — Ca E2E giỏ hỏng trong `localStorage`
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh bằng chứng |
+|---|---|---|---|
+| Ghi giỏ có giá `"abc"` và `null` vào `localStorage`, mở `/shop/cart/` (ngoài đường thuận): không `NaN`/`undefined`/`Infinity`, không lỗi console, tự đối chiếu lại giá catalog | Kịch bản Playwright `shop_general_rules.py` ở 360 px và 1280 px + xem ảnh chụp | **PASS** (360 px & 1280 px) | `shots/gui-04/corrupt-cart-360.png`, `shots/gui-04/corrupt-cart-1280.png` |
+| Ghi giỏ có giá `"abc"` và `null` vào `localStorage`, mở thẳng `/shop/checkout/` (ngoài đường thuận): không `NaN`/`undefined`/`Infinity`, không lỗi console | Kịch bản Playwright `shop_general_rules.py` ở 360 px và 1280 px + xem ảnh chụp | **PASS** (360 px & 1280 px) | `shots/gui-04/corrupt-checkout-360.png`, `shots/gui-04/corrupt-checkout-1280.png` |
+| Thử làm hỏng tạm `CartContext.tsx` (không commit) để thấy ca đỏ | Đổi tạm `parseStoredCart` trả `String(price)` → build → chạy `general_rules` → xác nhận `4 FAIL` → `git checkout -- frontend/components/CartContext.tsx` | **PASS** (Red → Green xác thực) | — |
+| Hồi quy bất biến | `run_shop_e2e.py --suite general_rules --suite full_flow` | **PASS** (`general_rules`: 136/136, `full_flow`: 115/115) | — |
