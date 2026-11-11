@@ -70,11 +70,16 @@
 
 /* ---- brand (header nền accent) ---- */
 .brand {
-  height: var(--h-input);
-  padding: 0 6px 0 var(--space-4);
+  height: var(--h-chip);
+  padding: 0 6px 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-xs, var(--shadow-sm));
+}
+.brand .clear {
+  width: 36px;
+  height: 36px;
+  margin: 0 -2px 0 0;
 }
 .brand:focus-within {
   border-color: var(--accent-border, var(--accent));
@@ -102,22 +107,25 @@
 
 @media (min-width: 768px) {
   .brand {
-    height: var(--h-btn-lg);
-    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5);
+    height: 42px;
+    padding: 3px 4px 3px var(--space-4);
+  }
+  .brand .input {
+    font-size: 14px;
   }
   .brand .submit {
     display: inline-flex;
     flex: none;
     align-items: center;
     justify-content: center;
-    height: 40px;
-    padding: 0 var(--space-5);
+    height: 34px;
+    padding: 0 var(--space-4);
     border: 0;
     border-radius: var(--radius-full);
     background: var(--brand-deep);
     color: var(--on-accent);
     font: inherit;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
     cursor: pointer;
     transition:
@@ -127,9 +135,10 @@
   .brand .submit:active {
     transform: scale(0.97);
   }
-  .clear {
-    width: 40px;
-    height: 40px;
+  .clear,
+  .brand .clear {
+    width: 34px;
+    height: 34px;
     margin: 0;
   }
 }

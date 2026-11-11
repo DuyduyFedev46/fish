@@ -251,8 +251,7 @@
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    padding-top: 18px;
-    padding-bottom: var(--space-6);
+    padding-block: var(--space-4);
   }
 
   .compactInner {

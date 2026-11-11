@@ -91,3 +91,11 @@
 | Góc bếp danh sách & bài viết (`/blog/`) ở 360 px và 1280 px: chip chuyên mục không tràn, thẻ bài viết & thẻ món trong bài đẹp | So trực quan ảnh trước/sau + `content_pages` + `design_screens` (`F6,F7,DO7,DO8`) | **PASS** (360 px & 1280 px) | `shots/gui-05/f-blog-before-360.png` → `shots/gui-05/f-blog-after-360.png`; `shots/gui-05/f-blog-before-1280.png` → `shots/gui-05/f-blog-after-1280.png` |
 | Trang Giới thiệu (`/about/`) và trang 404 (ngoài đường thuận — đường dẫn không tồn tại) ở 360 px và 1280 px | So trực quan ảnh trước/sau + `content_pages` + `design_screens` (`L1,L2,F8,DO9`) | **PASS** (360 px & 1280 px) | `shots/gui-05/f-about-before-360.png` → `shots/gui-05/f-about-after-360.png`; `shots/gui-05/f-about-before-1280.png` → `shots/gui-05/f-about-after-1280.png`; `shots/gui-05/f-404-before-360.png` → `shots/gui-05/f-404-after-360.png`; `shots/gui-05/f-404-before-1280.png` → `shots/gui-05/f-404-after-1280.png` |
 | Hồi quy tổng lực toàn bộ 86 màn thiết kế + múi giờ + bất biến | `run_shop_e2e.py --suite general_rules --suite full_flow --suite content_pages --suite formats_timezones --suite design_screens` | **PASS — APPROVED** (`136 + 115 + 58 + 73 + 91` đạt, `0` lỗi) | — |
+
+
+## GUI-05 (tinh chỉnh theo Mẫu B do PO Duy duyệt)
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh cập nhật |
+|---|---|---|---|
+| Thanh tìm kiếm viên thuốc 42 px (`max-width: 520px` căn giữa) trên máy tính và 40 px trên điện thoại; đệm trên/dưới Header 16 px rõ ràng, không chạm viền kể cả khi mở gợi ý & vòng sáng focus | Xem trực tiếp ảnh Playwright 360 px & 1280 px (`A1, A2, A9, DK1, DK2, DP4`) + chạy `design_screens` (91/91 PASS) | **PASS** (360 px & 1280 px) | `shots/gui-05/a-home-after-1280.png`, `shots/gui-05/a-home-after-360.png`, `shots/gui-05/b-catalog-after-1280.png`, `shots/gui-05/b-catalog-after-360.png` |
+| Bỏ hộp viền bao ngoài khối `"Đang có hàng"` trên trang chủ máy tính; khôi phục đầy đủ đệm trên/dưới của Footer (`.top`, `.legal`, `.reserveNav`) | Xem trực tiếp ảnh Playwright + `footer_consent` (31/31 PASS) + `general_rules` (136/136 PASS) + `full_flow` (115/115 PASS) | **PASS — APPROVED** | `shots/gui-05/a-home-after-1280.png`, `shots/gui-05/a-home-after-360.png` |

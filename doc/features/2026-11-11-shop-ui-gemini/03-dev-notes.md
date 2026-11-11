@@ -248,3 +248,31 @@ PASS  content_pages: 58 đạt, 0 lỗi, 0 bỏ qua
 PASS  formats_timezones: 73 đạt, 0 lỗi, 0 bỏ qua
 PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
 ```
+
+
+---
+
+## GUI-05 (tinh chỉnh theo Mẫu B do PO Duy duyệt) — Tỉ lệ Header, Search & Padding toàn trang
+
+### Vấn đề phát hiện khi duyệt ảnh & hướng PO chốt
+- `.container` trong `frontend/app/globals.css` viết gộp `padding: 0 var(--space-4)` / `padding: 0 var(--space-6)` khiến trong bản build Next.js, nó ghi đè `padding-top: 0; padding-bottom: 0` lên `ShopHeader` (`.mainInner`) và `ShopFooter` (`.top`, `.legal`, `.compactInner`, `.reserveNav`). Cộng với thanh tìm kiếm máy tính cao `48px` không giới hạn bề ngang làm thanh tìm kiếm bị to và dính sát mép trên/dưới.
+- Em đã dựng 3 mẫu HTML đối chiếu, PO Duy chốt **Mẫu B**:
+  - `frontend/app/globals.css`: đổi `.container` sang `padding-inline: var(--space-4)` (điện thoại) và `padding-inline: var(--space-6)` (máy tính) để không bao giờ xoá `padding-top/bottom` của các khối dùng chung `.container`.
+  - `frontend/components/ShopHeader.module.css` + `frontend/components/search/SearchBox.module.css`:
+    - Máy tính (`>= 768px`): dải trên `min-height: 34px`, tầng chính `.mainInner` `padding-block: 16px`, thanh tìm kiếm viên thuốc (`.brand`) cao `42px`, `max-width: 520px` căn giữa (`margin-inline: auto`), chữ `14px`, nút `"Tìm"` cao `34px`; các liên kết `.mainLink` cao `40px`; menu danh mục cao `44px`.
+    - Điện thoại (`< 768px`): H1 `padding: 12px 16px 16px`, `gap: 12px`, ô tìm `.brand` cao `40px` (vẫn giữ `font-size: 16px` cho `<input>` để iOS không tự phóng to), nút xoá `.clear` `36px` nằm gọn trong pill.
+  - `frontend/features/home/components/HomeScreen.module.css`: trên máy tính tăng nhịp đệm trang `padding-top: 28px`, `gap: 28px`, bỏ khung viền bao ngoài khối `"Đang có hàng"` (`.block`) để 5 thẻ sản phẩm nổi trực tiếp trên nền sáng thoáng mắt.
+  - `frontend/components/ShopFooter.module.css`: khôi phục đầy đủ đệm trên/dưới của `.top` (`40px` / `32px`), `.legal` (`16px`) và `.reserveNav` trên điện thoại.
+
+### Kết quả lệnh kiểm chứng sau khi áp Mẫu B
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH · 9/9 script test-*.mjs (337/337 ca) xanh · check_naming: OK
+check_shop_ui_scope.py: OK: 69 file, tất cả nằm trong phạm vi Shop UI.
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  footer_consent: 31 đạt, 0 lỗi, 1 bỏ qua
+PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
+```

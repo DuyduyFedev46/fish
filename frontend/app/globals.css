@@ -202,12 +202,12 @@ textarea {
 .container {
   max-width: var(--container-max);
   margin: 0 auto;
-  padding: 0 var(--space-4);
+  padding-inline: var(--space-4);
 }
 
 @media (min-width: 768px) {
   .container {
-    padding: 0 var(--space-6);
+    padding-inline: var(--space-6);
   }
 }
 
