@@ -72,3 +72,12 @@
 | Màn nhập thông tin nhận hàng (`C1/DK5`) ở 360 px và 1280 px: thanh bước, form, thẻ QR và tóm tắt đơn sắc nét, cuộn đáy không bị thanh dính che | So trực quan ảnh trước/sau + `payment_choice` (77/77 PASS) + `design_screens` (`C1,DK5`) | **PASS** (360 px & 1280 px) | `shots/gui-05/d-checkout-before-360.png` → `shots/gui-05/d-checkout-after-360.png`; `shots/gui-05/d-checkout-before-1280.png` → `shots/gui-05/d-checkout-after-1280.png` |
 | Màn thanh toán & đếm ngược giữ hàng (`D1/DK6`) ở 360 px và 1280 px: khung đồng hồ, 3 bước hướng dẫn và tổng tiền rõ ràng | So trực quan ảnh trước/sau + `design_screens` (`D1,DK6,D3,DE5`) | **PASS** (360 px & 1280 px) | `shots/gui-05/d-payment-before-360.png` → `shots/gui-05/d-payment-after-360.png`; `shots/gui-05/d-payment-before-1280.png` → `shots/gui-05/d-payment-after-1280.png` |
 | Ngoài đường thuận (nhập thiếu/sai `C2/DE3`, hết hàng lúc đặt `C3/DP1`, mất mạng `C4/DP6`, hết giờ giữ `D4/DP2`, shop đóng `C7/DE14`, 429 `C8`, 409 `C9`) | Kịch bản `design_screens` + `payment_choice` + `full_flow` | **PASS** | `shots/gui-05/d-invalid-before-360.png` → `shots/gui-05/d-invalid-after-360.png`; `shots/gui-05/d-invalid-before-1280.png` → `shots/gui-05/d-invalid-after-1280.png` |
+
+
+## GUI-05e — Tra cứu đơn và chi tiết trạng thái đơn (`/shop/orders/`)
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh trước → sau |
+|---|---|---|---|
+| Màn tra cứu đơn (`F1/DE6`) ở 360 px và 1280 px: thẻ form, thông báo không tìm thấy và khối hỗ trợ cân đối, không lộ SĐT lên URL | So trực quan ảnh trước/sau + `design_screens` (`F1,F2,DE6`) + `full_flow` | **PASS** (360 px & 1280 px) | `shots/gui-05/e-lookup-before-360.png` → `shots/gui-05/e-lookup-after-360.png`; `shots/gui-05/e-lookup-before-1280.png` → `shots/gui-05/e-lookup-after-1280.png` |
+| Màn chi tiết đơn sau thanh toán (`E1/DK7`) ở 360 px và 1280 px: pill mã đơn, timeline 5 mốc, biên lai món và `"Tra đơn khác"` rõ ràng, không lộ dữ liệu người nhận | So trực quan ảnh trước/sau + `design_screens` (`E1,DK7,E3,DO1`) + `full_flow` | **PASS** (360 px & 1280 px) | `shots/gui-05/e-order-before-360.png` → `shots/gui-05/e-order-after-360.png`; `shots/gui-05/e-order-before-1280.png` → `shots/gui-05/e-order-after-1280.png` |
+| Ngoài đường thuận (đơn bị huỷ `E2/DO3`, giao không thành công `E4/DO2`, huỷ một phần `E5`) | Kịch bản `design_screens` | **PASS** | `shots/gui-05/e-cancelled-after-360.png`, `shots/gui-05/e-cancelled-after-1280.png` |

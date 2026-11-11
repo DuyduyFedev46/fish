@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   margin: 0;
-  padding: 0;
+  padding: var(--space-1) 0 0;
   list-style: none;
 }
 
@@ -17,7 +17,7 @@
   flex: none;
   flex-direction: column;
   align-items: center;
-  width: 12px;
+  width: 24px;
 }
 
 .dot {
@@ -25,75 +25,97 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 12px;
-  height: 12px;
-  margin-top: 4px;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border: 2px solid var(--border-strong);
   border-radius: 50%;
-  background: var(--border-strong);
+  background: var(--surface-2);
   color: var(--on-accent);
+  transition:
+    background-color var(--dur-swap) var(--ease-out),
+    border-color var(--dur-swap) var(--ease-out),
+    box-shadow var(--dur-swap) var(--ease-out);
 }
 
 .dot svg {
-  display: none;
+  display: block;
 }
 
 .line {
   flex: 1;
   width: 2px;
-  min-height: 18px;
+  min-height: 20px;
+  margin: 4px 0;
+  border-radius: var(--radius-full);
   background: var(--border);
 }
 
 .text {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
-  padding-bottom: var(--space-2);
+  padding-bottom: var(--space-4);
+}
+
+.step:last-child .text {
+  padding-bottom: 0;
 }
 
 .label {
   color: var(--ink-3);
   font-size: 14px;
   font-weight: 500;
+  line-height: 1.4;
 }
 
 .detail {
-  color: var(--ink-3);
-  font-size: 12px;
+  color: var(--ink-2);
+  font-size: 12.5px;
   font-weight: 500;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
 }
 
 .done .dot {
+  border-color: var(--good);
   background: var(--good);
 }
+
 .done .line {
   background: var(--good);
 }
+
 .done .label {
   color: var(--ink);
+  font-weight: 600;
 }
 
 .current .dot {
-  background: transparent;
-  border: 3px solid var(--accent);
+  border: 4px solid var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px var(--accent-glow, var(--accent-soft));
 }
+
 .current .label {
   color: var(--accent-text);
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .failed .dot {
-  width: 16px;
-  height: 16px;
-  margin: 2px 0 0 -2px;
+  border-color: var(--warn);
   background: var(--warn);
-  font-size: 11px;
-  font-weight: 600;
+  box-shadow: 0 0 0 4px var(--warn-soft);
+  font-size: 12px;
+  font-weight: 700;
 }
+
 .failed .label {
   color: var(--warn);
-  font-weight: 600;
+  font-weight: 700;
 }
+
 .failed .detail {
   color: var(--warn);
 }
@@ -107,12 +129,12 @@
   .list {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-2);
   }
 
   .step {
     flex-direction: column;
-    gap: 10px;
-    padding-right: var(--space-2);
+    gap: var(--space-3);
   }
 
   .rail {
@@ -122,13 +144,9 @@
   }
 
   .dot {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
     margin-top: 0;
-  }
-
-  .dot svg {
-    display: block;
   }
 
   .line {
@@ -136,16 +154,7 @@
     width: auto;
     min-height: 0;
     height: 2px;
-  }
-
-  .failed .dot {
-    width: 24px;
-    height: 24px;
-    margin: 0;
-  }
-
-  .current .dot {
-    background: var(--accent-soft);
+    margin: 0 0 0 var(--space-2);
   }
 
   .text {
@@ -157,7 +166,7 @@
 .payment {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -170,8 +179,8 @@
 }
 
 .pBar {
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: var(--radius-full);
   background: var(--surface-3);
 }
 
@@ -184,14 +193,17 @@
 .p_done .pBar {
   background: var(--accent);
 }
+
 .p_done .pLabel {
   color: var(--ink-2);
 }
 
 .p_current .pBar {
   background: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow, var(--accent-soft));
   animation: pulse 1.4s ease-in-out infinite;
 }
+
 .p_current .pLabel {
   color: var(--accent-text);
   font-weight: 600;
@@ -208,6 +220,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .dot {
+    transition: none;
+  }
+
   .p_current .pBar {
     animation: none;
   }

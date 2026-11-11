@@ -197,3 +197,22 @@ PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  payment_choice: 77 đạt, 0 lỗi, 0 bỏ qua
 PASS  design_screens (cụm d — 23 màn + HF): 29 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+
+---
+
+## GUI-05e — Làm đẹp tra cứu đơn và chi tiết trạng thái đơn (`/shop/orders/`)
+
+### Thay đổi chính
+- `frontend/features/checkout/components/{OrderScreen,LookupForm,OrderView,OrderLines,OrderStatusBadge,OrderTimeline,SuccessBanner,CancelNotice}.module.css`: đóng thẻ form tra cứu cân đối (và tự bỏ khung kép khi nhúng làm `"Tra đơn khác"` trong `OrderView`), mã đơn dạng pill sắc nét kèm nút pill `"Sao chép mã đơn"`, nhãn trạng thái dạng viên thuốc có chấm tròn ngữ nghĩa, trục timeline 5 mốc có quầng sáng ở bước hiện tại và bước lỗi, bảng `"Món trong đơn"` kiểu biên lai rõ nét.
+
+### Kết quả lệnh kiểm chứng (GUI-05e)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH · 9/9 script test-*.mjs xanh · check_naming: OK
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens (cụm e — 12 màn + HF): 18 đạt, 0 lỗi, 0 bỏ qua
+```

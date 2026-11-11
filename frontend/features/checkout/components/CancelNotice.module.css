@@ -1,42 +1,53 @@
 .box {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border-radius: var(--radius-card);
-  background: var(--surface);
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-left: 4px solid var(--warn);
+  border-radius: var(--radius-sheet);
+  background: var(--card-gradient, var(--surface));
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .reason {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 0 0 var(--space-2);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--border);
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--surface-warm, var(--surface-2));
 }
 
 .reasonLabel {
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .reasonValue {
+  color: var(--ink);
   font-size: 14px;
   font-weight: 600;
 }
 
 .title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  margin: var(--space-1) 0 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .message {
   margin: 0;
+  color: var(--ink-2);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   text-wrap: pretty;
 }
 
@@ -45,13 +56,23 @@
   color: var(--accent-text);
   font-weight: 600;
   text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--dur-color) ease-out;
 }
 
 .link {
   display: inline-flex;
   align-items: center;
+  align-self: flex-start;
   min-height: 44px;
   font-size: 14px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .message a:hover,
+  .link:hover {
+    color: var(--accent-hover);
+  }
 }
 
 @media (min-width: 768px) {
@@ -61,5 +82,12 @@
 
   .link {
     min-height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message a,
+  .link {
+    transition: none;
   }
 }
