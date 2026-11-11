@@ -399,7 +399,11 @@ def error_branches(browser):
     page.wait_for_timeout(1500)
     dtext = page.locator("[role=dialog]").inner_text() if page.locator("[role=dialog]").count() else ""
     R.ok("[360] mã mất hiệu lực lúc đặt (C6): popup báo + không tạo đơn", page.locator("[role=dialog]").count() == 1 and order_count("0900000006") == cnt, dtext[:300])
+    del_loc = page.locator("[role=dialog] del")
+    R.ok("[360] hộp B8 khi đã có quote: gạch giá giảm 148.500đ rồi hiện tổng 165.000đ",
+         del_loc.count() == 1 and "148.500đ" in del_loc.inner_text() and "165.000đ" in page.locator("[role=dialog] strong").inner_text(), dtext[:300])
     snap(page, "32-c6-voucher-gone", 360, SUB)
+    snap(page, "36-b8-with-quote", 360, "gui-02")
     ctx.close()
 
     # --- B2: bấm "Đặt hàng" ngay sau khi vào form có mã đã áp (FE chưa kiểm lại mã) → đơn vẫn có giảm giá
@@ -487,6 +491,62 @@ def error_branches(browser):
         snap(page, "35b-payment-voucher-applied", width_net, "gui-01")
         R.ok(f"[{width_net}] đặt đơn khi kiểm mã lỗi mạng: máy chủ vẫn áp mã {V_MAIN}, trang thanh toán hiện 148.500đ",
              "148.500đ" in pay_pending_text and V_MAIN in pay_pending_text, pay_pending_text[:350])
+        ctx.close()
+
+    # --- GUI-02: hộp B8 (1280 có quote gạch đúng số; 360 + 1280 chưa từng kiểm được thì ẩn <del>, không gạch trùng số)
+    code_desk_gone = f"GDSK{SUF}"
+    create_voucher(code_desk_gone)
+    ctx, page, watch = fresh_context(browser, 1280)
+    add_to_cart(page, "CA-THU")
+    goto_cart(page)
+    open_code_ui(page)
+    page.locator("input[type=text]:visible").last.fill(code_desk_gone)
+    page.get_by_role("button", name="Áp dụng").locator("visible=true").last.click()
+    page.wait_for_timeout(1000)
+    page.get_by_role("button", name=re.compile("^Tiếp tục")).click()
+    page.wait_for_url(re.compile(r"/shop/checkout/"))
+    page.wait_for_load_state("networkidle")
+    fill_checkout(page, phone="0900000050")
+    page.wait_for_selector(f"text=Mã giảm giá ({code_desk_gone})", timeout=10000)
+    vid_desk = [v for v in api("GET", "/api/catalog/vouchers/?status=running", token=tok)[1]["results"] if v["code"] == code_desk_gone][0]["id"]
+    api("POST", f"/api/catalog/vouchers/{vid_desk}/disable/", {"reason": "OTHER", "note": "e2e"}, token=tok)
+    page.get_by_role("button", name="Đặt hàng").click()
+    page.wait_for_timeout(1500)
+    del_desk = page.locator("[role=dialog] del")
+    R.ok("[1280] hộp B8 khi đã có quote: gạch 148.500đ rồi hiện tổng 165.000đ",
+         del_desk.count() == 1 and "148.500đ" in del_desk.inner_text() and "165.000đ" in page.locator("[role=dialog] strong").inner_text())
+    snap(page, "36-b8-with-quote", 1280, "gui-02")
+    ctx.close()
+
+    for idx_nq, width_nq in enumerate((360, 1280)):
+        code_nq = f"GNQ{idx_nq}{SUF}"
+        create_voucher(code_nq)
+        ctx, page, watch = fresh_context(browser, width_nq)
+        add_to_cart(page, "CA-THU")
+        goto_cart(page)
+        open_code_ui(page)
+        page.locator("input[type=text]:visible").last.fill(code_nq)
+        page.get_by_role("button", name="Áp dụng").locator("visible=true").last.click()
+        page.wait_for_timeout(1000)
+        page.route("**/api/shop/vouchers/check/", lambda r: r.abort("internetdisconnected"))
+        page.get_by_role("button", name=re.compile("^Tiếp tục")).click()
+        page.wait_for_url(re.compile(r"/shop/checkout/"))
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(800)
+        phone_nq = f"090000005{idx_nq + 1}"
+        fill_checkout(page, phone=phone_nq)
+        vid_nq = [v for v in api("GET", "/api/catalog/vouchers/?status=running", token=tok)[1]["results"] if v["code"] == code_nq][0]["id"]
+        api("POST", f"/api/catalog/vouchers/{vid_nq}/disable/", {"reason": "OTHER", "note": "e2e"}, token=tok)
+        page.get_by_role("button", name="Đặt hàng").click()
+        page.wait_for_timeout(1500)
+        dlg_nq = page.locator("[role=dialog]")
+        R.ok(f"[{width_nq}] hộp B8 khi chưa từng kiểm được ở đặt hàng: ẩn <del>, chỉ hiện tổng 165.000đ (không gạch trùng số)",
+             dlg_nq.count() == 1 and dlg_nq.locator("del").count() == 0 and "165.000đ" in dlg_nq.locator("strong").inner_text(),
+             dlg_nq.inner_text() if dlg_nq.count() else "no dialog")
+        snap(page, "36b-b8-without-quote", width_nq, "gui-02")
+        dlg_nq.get_by_role("button", name="Đặt hàng không dùng mã").click()
+        page.wait_for_url(re.compile(r"sepay"), timeout=15000)
+        R.ok(f"[{width_nq}] hộp B8 bấm 'Đặt hàng không dùng mã' → tạo đơn giá gốc thành công", order_count(phone_nq) == 1)
         ctx.close()
 
     # --- A6 mất mạng khi tải hàng, rồi Thử lại

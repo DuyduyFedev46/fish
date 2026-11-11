@@ -126,3 +126,10 @@ export function pendingVoucherText(code: string | null, hasQuote: boolean, hasEr
   if (!code || hasQuote || !hasError) return null;
   return `Mã ${code} · sẽ kiểm khi đặt`;
 }
+
+/**
+ * Hộp B8 (mã hết hiệu lực lúc đặt): chỉ gạch số cũ khi đã từng có giá sau giảm từ máy chủ và số đó khác tổng chưa giảm (GUI-02).
+ */
+export function hasDistinctDiscountedTotal(discountedPrice: string | null | undefined, fullPrice: string): discountedPrice is string {
+  return Boolean(discountedPrice && discountedPrice !== fullPrice);
+}

@@ -79,5 +79,11 @@ eq("pendingVoucherText ẩn khi đã có quote", m.pendingVoucherText("CAVE10", 
 eq("pendingVoucherText ẩn khi chưa lỗi (đang tải)", m.pendingVoucherText("CAVE10", false, false), null);
 eq("pendingVoucherText ẩn khi không có mã", m.pendingVoucherText(null, false, true), null);
 
+// GUI-02: hộp B8 chỉ gạch số cũ khi đã có giá giảm khác tổng chưa giảm
+eq("B8 có giá giảm nhỏ hơn -> hiện số gạch", m.hasDistinctDiscountedTotal("148500", "165000"), true);
+eq("B8 chưa có quote (null) -> ẩn số gạch", m.hasDistinctDiscountedTotal(null, "165000"), false);
+eq("B8 trùng số -> ẩn số gạch", m.hasDistinctDiscountedTotal("165000", "165000"), false);
+eq("B8 chuỗi rỗng -> ẩn số gạch", m.hasDistinctDiscountedTotal("", "165000"), false);
+
 console.log(`${n - fail}/${n} ca đạt`);
 process.exit(fail ? 1 : 0);

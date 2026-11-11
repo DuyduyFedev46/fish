@@ -41,3 +41,25 @@ hex grep: rỗng · transition: all grep: rỗng
 PASS  general_rules: 132 đạt, 0 lỗi, 0 bỏ qua
 PASS  full_flow: 109 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+---
+
+## GUI-02 — Hộp "mã hết hiệu lực" (B8) không gạch trùng số khi chưa có giá máy chủ (L3, BR-DM-19)
+
+### Thay đổi chính
+- `frontend/features/cart/voucherView.ts`: thêm hàm thuần `hasDistinctDiscountedTotal(discountedPrice, fullPrice)`.
+- `frontend/features/checkout/components/CheckoutScreen.tsx`: đổi `voucherGone.discountedPrice` sang `string | null` (`voucher.quote ? voucher.quote.total_after : null`); chỉ render `<del className={s.goneOld}>` khi `hasDistinctDiscountedTotal(...)` là `true`.
+- `frontend/scripts/test-voucher.mjs`: thêm 4 ca đơn vị (Red → Green, `43/43 ca đạt`).
+- `frontend/e2e/shop_full_flow.py`: thêm kiểm chứng 360 px và 1280 px cho cả hai ca hộp B8 (có `quote` → gạch `148.500đ` rồi hiện `165.000đ`; chưa từng kiểm được `quote` → không có `<del>`, chỉ hiện `165.000đ`, bấm `"Đặt hàng không dùng mã"` tạo đơn thành công).
+
+### Kết quả lệnh kiểm chứng (GUI-02)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH — không thấy seed mock nào trong bản build.
+9/9 script test-*.mjs xanh (test-voucher: 43/43 ca đạt)
+check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
+hex grep: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 132 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+```

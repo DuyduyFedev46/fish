@@ -31,7 +31,7 @@ import TextField from "@/components/ui/TextField";
 import { focusSoon } from "@/components/ui/focusSoon";
 import { useVoucher } from "@/features/cart/useVoucher";
 import { clearVoucherCode, readVoucherCode } from "@/features/cart/voucherStorage";
-import { minOrderOf, pendingVoucherText, voucherCodeToSend, voucherMessage } from "@/features/cart/voucherView";
+import { hasDistinctDiscountedTotal, minOrderOf, pendingVoucherText, voucherCodeToSend, voucherMessage } from "@/features/cart/voucherView";
 import { cartFingerprint, clearRequestId, getRequestId, renewRequestId } from "../requestId";
 import { saveLookupToken } from "../lookupToken";
 import { goToMockGateway, redirectToGateway } from "../gateway";
@@ -125,7 +125,7 @@ function CheckoutForm() {
   const [throttledOpen, setThrottledOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
   // B8: mã hết hiệu lực đúng lúc đặt. Hỏi khách, không tự đặt với giá khác giá họ đã thấy.
-  const [voucherGone, setVoucherGone] = useState<{ code: string; fullPrice: string; discountedPrice: string } | null>(null);
+  const [voucherGone, setVoucherGone] = useState<{ code: string; fullPrice: string; discountedPrice: string | null } | null>(null);
 
   const hotline = useMemo(
     () => pickHotline(siteInfo?.seller?.phone, siteInfo?.confirmation_policy?.hotline),
@@ -290,10 +290,11 @@ function CheckoutForm() {
     const code = err.code ?? "";
     if (code === "VOUCHER_INVALID") {
       // Mã hết hiệu lực giữa lúc điền form (B8): hỏi khách. Mã bị bỏ khỏi giỏ để lần sau không gửi lại.
+      // Chưa có quote máy chủ ở bước đặt hàng thì discountedPrice = null để không gạch trùng số tổng (GUI-02).
       setVoucherGone({
         code: voucher.code ?? readVoucherCode() ?? "",
         fullPrice: localTotal,
-        discountedPrice: voucher.quote?.total_after ?? localTotal,
+        discountedPrice: voucher.quote ? voucher.quote.total_after : null,
       });
       voucher.remove();
       // "Giá chưa giảm" lấy từ máy chủ (kiểm không mã); lỗi mạng thì giữ số tạm tính của giỏ đang hiện.
@@ -677,7 +678,12 @@ function CheckoutForm() {
           <p className={s.goneTotal}>
             <span>Tổng tiền hàng</span>
             <span className="num">
-              <del className={s.goneOld}>{formatPriceVnd(voucherGone.discountedPrice)}</del> <strong>{formatPriceVnd(voucherGone.fullPrice)}</strong>
+              {hasDistinctDiscountedTotal(voucherGone.discountedPrice, voucherGone.fullPrice) ? (
+                <>
+                  <del className={s.goneOld}>{formatPriceVnd(voucherGone.discountedPrice)}</del>{" "}
+                </>
+              ) : null}
+              <strong>{formatPriceVnd(voucherGone.fullPrice)}</strong>
             </span>
           </p>
         ) : null}
