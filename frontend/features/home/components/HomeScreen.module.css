@@ -1,6 +1,6 @@
 .page {
-  padding-top: var(--space-3);
-  padding-bottom: var(--space-2);
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-3);
 }
 
 .onlyMobile,
@@ -25,11 +25,14 @@
 .banner {
   position: relative;
   display: flex;
-  min-height: 150px;
-  padding: 18px;
-  border-radius: var(--radius-card);
-  background: var(--brand-deep);
+  min-height: 176px;
+  padding: var(--space-5);
+  border: 1px solid var(--brand-mid);
+  border-radius: var(--radius-sheet);
+  background-color: var(--brand-deep);
+  background-image: var(--brand-gradient);
   color: var(--on-accent);
+  box-shadow: var(--shadow-elevated);
   overflow: hidden;
 }
 
@@ -39,29 +42,38 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 6px;
-  max-width: 210px;
+  gap: var(--space-2);
+  max-width: 236px;
 }
 
 .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--brand-mid);
+  border-radius: var(--radius-full);
+  background-color: var(--brand-deep-hover);
   color: var(--on-brand-muted);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.015em;
 }
 
 .bannerTitle {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
+  color: var(--on-accent);
+  font-size: 21px;
+  font-weight: 700;
   line-height: 1.2;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   outline: none;
 }
 
 .bannerSub {
-  display: none;
   margin: 0;
   color: var(--on-brand-muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .bannerBtn {
@@ -71,15 +83,16 @@
 
 .bannerArt {
   position: absolute;
-  right: -24px;
-  bottom: -28px;
+  right: -20px;
+  bottom: -26px;
   display: flex;
   color: var(--on-accent);
-  opacity: 0.2;
+  opacity: 0.14;
+  pointer-events: none;
 }
 .bannerArt svg {
-  width: 150px;
-  height: 150px;
+  width: 156px;
+  height: 156px;
 }
 
 /* Ảnh nền slide (CMS): phủ khung, hoà vào nền brand-deep để chữ trắng vẫn đủ tương phản. */
@@ -89,7 +102,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.3;
+  opacity: 0.26;
 }
 
 /* Chấm chọn slide: vùng bấm 44 px, chấm nhìn thấy 8 px. */
@@ -115,11 +128,14 @@
   width: 8px;
   height: 8px;
   border-radius: var(--radius-full);
-  background: var(--on-brand-muted);
-  transition: background-color var(--dur-color) ease-out;
+  background-color: var(--on-brand-muted);
+  transition:
+    width var(--dur-swap) var(--ease-out),
+    background-color var(--dur-color) var(--ease-out);
 }
 .dot[aria-current="true"] .dotMark {
-  background: var(--on-accent);
+  width: 18px;
+  background-color: var(--on-accent);
 }
 .dot:focus-visible {
   outline: 2px solid var(--on-accent);
@@ -138,10 +154,12 @@
 }
 
 .categories {
-  margin-top: var(--space-3);
-  padding: 14px var(--space-2) var(--space-2);
-  border-radius: var(--radius-card);
-  background: var(--surface);
+  margin-top: var(--space-4);
+  padding: var(--space-3) 6px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sheet);
+  background-color: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .catGrid {
@@ -155,7 +173,7 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: var(--space-1) 0 var(--space-2);
+  padding: var(--space-2) 0;
 }
 
 .commitments {
@@ -168,27 +186,42 @@
 .commit {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: 10px;
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  color: var(--ink-2);
+  gap: 6px;
+  min-width: 0;
+  padding: var(--space-3) 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background-color: var(--surface);
+  background-image: var(--card-gradient);
+  color: var(--ink);
   font-size: 12px;
   font-weight: 500;
+  box-shadow: var(--shadow-card);
 }
 
 .commitIcon {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-tint);
   color: var(--accent-text);
 }
 
 .commitText {
   display: flex;
   flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .commitTitle {
-  color: var(--ink-2);
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .commitDetail {
@@ -196,7 +229,7 @@
 }
 
 .block {
-  margin-top: var(--space-5);
+  margin-top: var(--space-6);
 }
 
 .blockHead {
@@ -204,35 +237,62 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  padding-bottom: 10px;
+  padding-bottom: var(--space-3);
 }
 
 .blockTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   margin: 0;
-  font-size: 17px;
-  font-weight: 600;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 700;
   line-height: 1.3;
+  letter-spacing: -0.015em;
+}
+
+.blockTitle::before {
+  content: "";
+  flex: none;
+  width: 4px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background-color: var(--accent);
+  background-image: var(--brand-gradient);
 }
 
 .more {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--accent-text);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   text-decoration: none;
+  transition:
+    background-color var(--dur-color) var(--ease-out),
+    border-color var(--dur-color) var(--ease-out),
+    color var(--dur-color) var(--ease-out);
 }
 
 .rail {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   margin: 0 calc(var(--space-4) * -1);
-  padding: 0 var(--space-4) var(--space-1);
+  padding: 2px var(--space-4) var(--space-2);
   overflow-x: auto;
   scrollbar-width: none;
 }
 .rail::-webkit-scrollbar {
   display: none;
+}
+.rail > * {
+  border-color: var(--border-subtle);
+  box-shadow: var(--shadow-xs);
 }
 
 .errorBox {
@@ -245,31 +305,38 @@
 }
 
 .panel {
-  margin-top: var(--space-5);
-  padding: 14px;
-  border-radius: var(--radius-card);
-  background: var(--surface);
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sheet);
+  background-color: var(--surface);
+  background-image: var(--card-gradient);
+  box-shadow: var(--shadow-card);
 }
 
 .comboList {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
+.comboList > li + li {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
 
 /* ---- Góc bếp ---- */
 .kitchen {
-  margin-top: var(--space-5);
+  margin-top: var(--space-6);
 }
 
 .posts {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   margin: 0 calc(var(--space-4) * -1);
-  padding: 0 var(--space-4);
+  padding: 2px var(--space-4) var(--space-2);
   overflow-x: auto;
   list-style: none;
   scrollbar-width: none;
@@ -279,27 +346,34 @@
 }
 .posts > li {
   flex: none;
-  width: 240px;
+  width: 248px;
 }
 
 .post {
   display: flex;
   flex-direction: column;
   height: 100%;
-  border-radius: var(--radius-lg);
-  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background-color: var(--surface);
   color: var(--ink);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
   text-decoration: none;
+  transition:
+    transform var(--dur-swap) var(--ease-out),
+    border-color var(--dur-color) var(--ease-out),
+    box-shadow var(--dur-swap) var(--ease-out);
 }
 
 .postCover {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 110px;
-  background: var(--surface-3);
-  color: var(--ink-3);
+  height: 118px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--surface-tint);
+  color: var(--accent-text);
 }
 .postCover img {
   width: 100%;
@@ -309,21 +383,35 @@
 
 .postBody {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: 10px var(--space-3);
+  gap: 6px;
+  padding: var(--space-3);
 }
 
-.postTag,
+.postTag {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--surface-tint);
+  color: var(--accent-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .postDate {
+  margin-top: auto;
+  padding-top: var(--space-1);
   color: var(--ink-3);
   font-size: 12px;
   font-weight: 500;
 }
 
 .postTitle {
-  font-weight: 500;
-  line-height: 1.35;
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.38;
 }
 
 /* ---- Máy tính ---- */
@@ -340,42 +428,45 @@
   }
 
   .page {
-    padding-top: var(--space-5);
+    padding-top: var(--space-6);
     padding-bottom: var(--space-12);
   }
 
   .hero {
     flex-direction: row;
     flex-wrap: wrap;
+    gap: var(--space-5);
   }
 
   .banner {
     flex: 999 1 560px;
     min-width: 0;
-    min-height: 232px;
-    padding: var(--space-8) 36px;
+    min-height: 252px;
+    padding: var(--space-8) var(--space-10);
     flex-direction: column;
     justify-content: center;
   }
 
   .bannerText {
-    gap: 10px;
-    max-width: 440px;
+    gap: var(--space-3);
+    max-width: 460px;
   }
 
   .eyebrow {
-    font-size: 13px;
+    padding: 4px 12px;
+    font-size: 12.5px;
   }
 
   .bannerTitle {
-    font-size: 34px;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
+    font-size: 36px;
+    line-height: 1.14;
+    letter-spacing: -0.025em;
   }
 
   .bannerSub {
-    display: block;
-    max-width: 420px;
+    max-width: 430px;
+    font-size: 15px;
+    line-height: 1.5;
   }
 
   .bannerBtn {
@@ -383,8 +474,8 @@
   }
 
   .bannerArt {
-    right: -30px;
-    bottom: -70px;
+    right: -28px;
+    bottom: -68px;
   }
   .bannerArt svg {
     width: 300px;
@@ -393,7 +484,7 @@
 
   .sideTiles {
     display: flex;
-    flex: 1 1 280px;
+    flex: 1 1 290px;
     flex-direction: column;
     gap: var(--space-4);
   }
@@ -402,26 +493,31 @@
     display: flex;
     flex: 1;
     align-items: center;
-    gap: 14px;
-    min-height: 108px;
-    padding: var(--space-5) 22px;
-    border-radius: var(--radius-card);
+    gap: var(--space-4);
+    min-height: 116px;
+    padding: var(--space-5) var(--space-6);
+    border-radius: var(--radius-sheet);
     color: var(--ink);
+    box-shadow: var(--shadow-card);
     text-decoration: none;
     transition:
-      transform var(--dur-press) var(--ease-out),
-      border-color var(--dur-color) ease-out;
+      transform var(--dur-swap) var(--ease-out),
+      border-color var(--dur-color) var(--ease-out),
+      box-shadow var(--dur-swap) var(--ease-out);
   }
   .tile:active {
     transform: scale(0.99);
   }
   .tileCombo {
-    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    background-color: var(--surface-tint);
+    background-image: var(--card-gradient);
     color: var(--accent-text);
   }
   .tilePay {
-    border: 1px solid var(--border);
-    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    background-color: var(--surface);
+    background-image: var(--card-gradient);
     color: var(--good);
   }
 
@@ -435,17 +531,20 @@
   .tileEyebrow,
   .tileEyebrowGood {
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.01em;
   }
   .tileTitle {
     color: var(--ink);
     font-size: 17px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.25;
+    letter-spacing: -0.01em;
   }
   .tilePrice {
     color: var(--accent-text);
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
   }
   .tileUnit {
     color: var(--ink-2);
@@ -457,72 +556,95 @@
   }
 
   .data {
-    gap: var(--space-7, 28px);
-    margin-top: 28px;
+    gap: var(--space-8);
+    margin-top: var(--space-6);
   }
 
   .categories {
     margin-top: 0;
-    padding: 18px var(--space-5) 10px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
   }
   .catGrid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--space-3);
   }
 
   .commitments {
-    order: 9;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: var(--space-4) var(--space-8);
     margin-top: 0;
-    padding: 18px var(--space-6);
-    border-radius: var(--radius-card);
-    background: var(--surface);
+    padding: var(--space-5) var(--space-6);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sheet);
+    background-color: var(--surface);
+    background-image: var(--card-gradient);
+    box-shadow: var(--shadow-card);
   }
   .commit {
     flex-direction: row;
     align-items: center;
-    gap: 14px;
+    gap: var(--space-4);
     padding: 0;
+    border: 0;
     border-radius: 0;
     background: transparent;
     font-size: 14px;
+    box-shadow: none;
+  }
+  .commit + .commit {
+    padding-left: var(--space-6);
+    border-left: 1px solid var(--border-subtle);
   }
   .commitIcon {
-    align-items: center;
-    justify-content: center;
     width: 44px;
     height: 44px;
     border-radius: var(--radius-full);
-    background: var(--accent-soft);
+    background-color: var(--surface-tint);
   }
   .commitTitle {
     color: var(--ink);
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
   }
   .commitDetail {
     display: block;
     color: var(--ink-2);
     font-size: 13px;
     font-weight: 400;
+    line-height: 1.45;
   }
 
   .block {
     margin-top: 0;
+    padding: var(--space-6);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sheet);
+    background-color: var(--surface);
+    box-shadow: var(--shadow-card);
   }
   .blockHead {
-    padding-bottom: var(--space-2);
+    padding-bottom: var(--space-4);
   }
   .blockTitle {
-    font-size: 20px;
-    letter-spacing: -0.01em;
+    font-size: 21px;
+    letter-spacing: -0.02em;
+  }
+  .blockTitle::before {
+    height: 22px;
   }
   .more {
-    font-size: 14px;
+    min-height: 36px;
+    border-color: var(--border-subtle);
+    background-color: var(--surface-warm);
+    font-size: 13.5px;
   }
 
   .rail {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(196px, 1fr));
     gap: var(--space-4);
     margin: 0;
     padding: 0;
@@ -543,26 +665,25 @@
   .panel {
     flex: 1 1 440px;
     margin-top: 0;
-    padding: 18px var(--space-5);
-  }
-  .comboList > li {
-    padding: 10px 0;
-    border-top: 1px solid var(--border);
+    padding: var(--space-6);
   }
   .kitchen {
     flex: 999 1 560px;
     min-width: 0;
     margin-top: 0;
-    padding: 18px var(--space-5) var(--space-5);
-    border-radius: var(--radius-card);
-    background: var(--surface);
+    padding: var(--space-6);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sheet);
+    background-color: var(--surface);
+    background-image: var(--card-gradient);
+    box-shadow: var(--shadow-card);
   }
   .kitchenAlone {
     flex: none;
   }
   .posts {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
     gap: var(--space-4);
     margin: 0;
     padding: 0;
@@ -572,11 +693,11 @@
     width: auto;
   }
   .post {
-    border: 1px solid var(--border);
     border-radius: var(--radius-card);
+    box-shadow: var(--shadow-xs);
   }
   .postCover {
-    height: 120px;
+    height: 128px;
   }
   .postBody {
     padding: var(--space-3) 14px 14px;
@@ -584,14 +705,33 @@
 }
 
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  .post:hover,
-  .tilePay:hover {
-    border-color: var(--border-strong);
+  .tile:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-border);
+    box-shadow: var(--shadow-elevated);
+  }
+  .post:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-border);
+    box-shadow: var(--shadow-card);
+  }
+  .more:hover {
+    border-color: var(--accent-border);
+    background-color: var(--surface-tint);
+    color: var(--brand-deep);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile:active {
+  .dotMark,
+  .more,
+  .post,
+  .tile {
+    transition: none;
+  }
+  .tile:hover,
+  .tile:active,
+  .post:hover {
     transform: none;
   }
 }

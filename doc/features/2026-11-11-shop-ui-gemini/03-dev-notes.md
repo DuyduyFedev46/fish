@@ -116,3 +116,25 @@ check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
 PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
 PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+
+---
+
+## GUI-05a — Làm đẹp trang chủ và khung chung (`globals.css`, Header, Footer, BottomNav, ShopFrame, HomeScreen)
+
+### Thay đổi chính
+- `frontend/app/globals.css`: bổ sung 12 biến CSS mở rộng giao diện biển sáng (`--surface-tint`, `--surface-warm`, `--border-subtle`, `--accent-border`, `--accent-glow`, `--brand-mid`, `--brand-gradient`, `--surface-gradient`, `--card-gradient`, `--shadow-xs`, `--shadow-card`, `--shadow-elevated`).
+- `frontend/components/{ShopFrame,LogoSlot,ShopHeader,ShopFooter,BottomNav}.module.css`: chuyển header sang nền `--brand-gradient` phân tầng rõ với dải trên cùng, nút Giỏ hàng dạng pill có viền sáng, thanh `BottomNav` có chỉ báo cạnh trên cho mục đang chọn, chân trang có viền đỉnh nhấn và đóng thẻ nổi bật khối hỗ trợ Hotline/Email.
+- `frontend/features/home/components/HomeScreen.module.css`, `frontend/components/catalog/CategoryTile.module.css`: làm mới hero banner với pill khẩu hiệu, hai thẻ phụ bên phải trên máy tính có viền sắc nét, lưới 6 thẻ danh mục dàn đều toàn khung 1200 px không còn khoảng trống thừa, đưa dải cam kết lên ngay dưới danh mục, đóng khung thẻ sáng đồng bộ cho `"Đang có hàng"`, `"Combo nấu nhanh"`, `"Góc bếp"`.
+
+### Kết quả lệnh kiểm chứng (GUI-05a)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH · 9/9 script test-*.mjs xanh · check_naming: OK
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  footer_consent: 31 đạt, 0 lỗi, 1 bỏ qua
+PASS  design_screens (A1,DK1,HF1,HF2): 10 đạt, 0 lỗi, 0 bỏ qua
+```
