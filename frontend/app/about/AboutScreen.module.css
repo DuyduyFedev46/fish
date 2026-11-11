@@ -9,19 +9,27 @@
 }
 
 .hero {
-  padding: 40px var(--space-4) 48px;
-  background: var(--brand-deep);
+  position: relative;
+  overflow: hidden;
+  padding: 44px var(--space-4) 52px;
+  background-color: var(--brand-deep);
+  background-image: var(
+    --brand-gradient,
+    linear-gradient(135deg, var(--brand-deep-hover) 0%, var(--brand-deep) 100%)
+  );
   color: var(--on-accent);
 }
 
 .badge {
   align-self: flex-start;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border: 1px solid var(--on-brand-muted);
   border-radius: var(--radius-full);
+  background-color: var(--brand-deep-hover);
   color: var(--on-brand-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 /* Cột chữ của hero; thẻ món nổi nằm dưới (điện thoại) hoặc bên phải (máy tính). */
@@ -33,23 +41,30 @@
 }
 
 .heroCard {
-  width: 100%;
-  max-width: 280px;
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-1);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-elevated, var(--shadow-pop));
   color: var(--ink);
 }
 
 .heroTitle {
   max-width: 12ch;
   margin: 0;
-  font-size: 38px;
-  font-weight: 600;
+  font-size: 36px;
+  font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.03em;
+  color: var(--on-accent);
 }
 
 .heroText .text {
   max-width: 560px;
   font-size: 16px;
+  line-height: 1.6;
   color: var(--on-brand-muted);
 }
 
@@ -57,8 +72,8 @@
 .sectionActions {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-top: var(--space-1);
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 
 .section {
@@ -66,12 +81,23 @@
 }
 
 .tinted {
-  background: var(--accent-soft);
+  border-top: 1px solid var(--accent-border, var(--border));
+  border-bottom: 1px solid var(--accent-border, var(--border));
+  background: var(--surface-tint, var(--accent-soft));
+}
+
+.cta {
+  border-top: 1px solid var(--border-subtle, var(--border));
+  background: var(--surface-warm, var(--surface-2));
 }
 
 .cta .inner {
   align-items: center;
   text-align: center;
+}
+
+.cta .text {
+  max-width: 600px;
 }
 
 .cta .sectionActions {
@@ -81,7 +107,7 @@
 .h2 {
   margin: 0;
   font-size: 26px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
   letter-spacing: -0.02em;
   color: var(--ink);
@@ -90,14 +116,20 @@
 .text {
   margin: 0;
   color: var(--ink-2);
-  line-height: 1.55;
+  line-height: 1.65;
 }
 
 .quote {
   margin: 0;
-  padding-left: var(--space-3);
-  border-left: 3px solid var(--border-strong);
-  color: var(--ink-2);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--accent-border, var(--border));
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  background: var(--surface);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .bullets {
@@ -107,6 +139,11 @@
   margin: 0;
   padding-left: 20px;
   color: var(--ink-2);
+  line-height: 1.6;
+}
+
+.bullets li::marker {
+  color: var(--accent-text);
 }
 
 .steps {
@@ -122,31 +159,44 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .step .text strong {
   display: block;
-  margin-bottom: 2px;
+  margin-bottom: var(--space-1);
   font-size: 17px;
+  font-weight: 700;
   color: var(--ink);
 }
 
 .stepNum {
-  font-size: 13px;
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  min-width: 34px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--accent-border, var(--border));
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
   color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .cardLabel {
   align-self: flex-start;
   margin: 0;
-  padding: 3px 10px;
-  border-radius: var(--radius-sm);
+  padding: 4px 12px;
+  border: 1px solid var(--accent-border, var(--border));
+  border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent-text);
   font-size: 13px;
@@ -156,18 +206,23 @@
 .cards {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .cards > li {
-  border-radius: var(--radius-card);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .state {
+  max-width: 640px;
+  margin: 0 auto;
   padding: var(--space-8) var(--space-4);
 }
 
@@ -175,12 +230,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: 40px var(--space-4);
+  max-width: var(--container-max);
+  margin: var(--space-6) auto;
+  padding: var(--space-8) var(--space-5);
 }
 
 @media (min-width: 768px) {
   .hero {
-    padding: 72px var(--space-6);
+    padding: 76px var(--space-6) 80px;
   }
 
   .heroTitle {
@@ -191,11 +248,13 @@
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-8);
+    gap: var(--space-10);
   }
 
   .heroCard {
-    flex: 0 0 260px;
+    flex: 0 0 264px;
+    width: 264px;
+    padding: var(--space-2);
   }
 
   .heroActions,
@@ -209,20 +268,27 @@
   }
 
   .section {
-    padding: 64px var(--space-6);
+    padding: 72px var(--space-6);
+  }
+
+  .inner {
+    gap: var(--space-5);
   }
 
   .h2 {
     font-size: 32px;
+    letter-spacing: -0.025em;
   }
 
   .steps {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-5);
   }
 
   .cards {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
   }
 }

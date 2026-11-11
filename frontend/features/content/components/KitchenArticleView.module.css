@@ -1,14 +1,17 @@
 /* Bài Góc bếp (G2-KitchenArticle, DesktopKitchenArticle). Chỉ token trong app/globals.css. */
 .page {
-  padding: 0 0 var(--space-6);
+  padding: var(--space-4) 0 var(--space-8);
+  background: var(--surface-gradient, var(--canvas));
+  background-color: var(--canvas);
 }
 
 .container {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
   max-width: var(--container-max);
   margin: 0 auto;
+  padding: 0 var(--space-4);
 }
 
 .crumbs {
@@ -18,23 +21,27 @@
 .columns {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-4);
 }
 
 .article {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-5);
   min-width: 0;
   padding-bottom: var(--space-6);
   overflow: hidden;
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .cover {
   width: 100%;
-  height: 220px;
-  background: var(--surface-3);
+  height: 224px;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  background: var(--surface-2);
   object-fit: cover;
 }
 
@@ -42,35 +49,40 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-4) var(--space-4) 0;
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle, var(--border));
 }
 
 .cover + .head {
-  padding-top: 0;
+  padding-top: var(--space-1);
 }
 
 .tag {
   align-self: flex-start;
-  padding: 3px var(--space-2);
-  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  border: 1px solid var(--accent-border, var(--border));
+  border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent-text);
   font-size: 12px;
   font-weight: 600;
   text-decoration: none;
+  transition: background-color var(--dur-color) var(--ease-out);
 }
 
 .title {
   margin: 0;
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .meta {
   font-size: 13px;
-  color: var(--ink-3);
+  font-weight: 500;
+  color: var(--ink-2);
 }
 
 .body {
@@ -80,19 +92,26 @@
 .side {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-4);
   min-width: 0;
 }
 
 .related {
   padding: var(--space-4) var(--space-4) var(--space-2);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .relatedTitle {
-  margin: 0 0 var(--space-1);
+  margin: 0 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle, var(--border));
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 .relatedList {
@@ -102,7 +121,7 @@
 }
 
 .relatedRow {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle, var(--border));
 }
 
 .relatedRow:last-child {
@@ -114,19 +133,23 @@
   align-items: center;
   gap: var(--space-3);
   min-height: 72px;
+  padding: var(--space-2) 0;
   color: var(--ink);
-  font-weight: 500;
+  font-weight: 600;
+  line-height: 1.35;
   text-decoration: none;
+  transition: color var(--dur-color) var(--ease-out);
 }
 
 .relatedThumb {
   display: block;
   flex: none;
-  width: 64px;
-  height: 48px;
+  width: 68px;
+  height: 52px;
   overflow: hidden;
-  border-radius: var(--radius-sm);
-  background: var(--surface-3);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
 }
 
 .relatedImg {
@@ -143,7 +166,7 @@
 
 @media (min-width: 768px) {
   .page {
-    padding: var(--space-6) 0 56px;
+    padding: var(--space-6) 0 var(--space-12);
   }
 
   .container {
@@ -158,7 +181,6 @@
   .article {
     gap: var(--space-6);
     padding-bottom: var(--space-10);
-    border-radius: var(--radius-card);
   }
 
   .cover {
@@ -166,8 +188,12 @@
   }
 
   .head {
-    gap: 10px;
-    padding: var(--space-6) var(--space-10) 0;
+    gap: var(--space-3);
+    padding: var(--space-8) var(--space-10) var(--space-5);
+  }
+
+  .cover + .head {
+    padding-top: var(--space-2);
   }
 
   .body {
@@ -175,19 +201,18 @@
   }
 
   .title {
-    font-size: 30px;
+    font-size: 32px;
     line-height: 1.2;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
   }
 
   .related {
     padding: var(--space-5) var(--space-5) var(--space-2);
-    border-radius: var(--radius-card);
   }
 
   .relatedThumb {
-    width: 72px;
-    height: 54px;
+    width: 76px;
+    height: 56px;
   }
 }
 
@@ -199,13 +224,20 @@
   }
 
   .article {
-    flex: 0 1 720px;
+    flex: 0 1 740px;
   }
 
   .side {
     position: sticky;
-    top: var(--space-4);
-    flex: 1 1 300px;
+    top: calc(var(--h-header) + var(--space-5));
+    flex: 1 1 320px;
     gap: var(--space-5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tag,
+  .relatedLink {
+    transition: none;
   }
 }

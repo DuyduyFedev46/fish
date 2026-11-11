@@ -216,3 +216,35 @@ PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
 PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  design_screens (cụm e — 12 màn + HF): 18 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+
+---
+
+## GUI-05f — Làm đẹp trang nội dung CMS (`/pages/`), Góc bếp (`/blog/`), Giới thiệu (`/about/`) và 404
+
+### Thay đổi chính
+- `frontend/features/content/components/{PageScreen,ArticleBody,ContactView,HowToBuyView,ContentState,KitchenListView,KitchenArticleView,ArticleItems}.module.css`, `frontend/features/site/components/PolicyNav.module.css`, `frontend/app/about/AboutScreen.module.css`, `frontend/app/not-found.module.css`: đóng thẻ điều hướng chính sách kèm viền trái mục đang xem và pill `Đang xem` trên điện thoại, hộp mục lục nền `--surface-tint` viền trái `--accent`, header chuyên mục Góc bếp đóng khung gọn cùng thẻ bài viết có pill chuyên mục, hero `/about/` nền `--brand-gradient` với huy hiệu số bước tròn `01`–`03`, trang 404 đặt trong thẻ căn giữa với biểu tượng tròn có quầng sáng và pill `404`.
+
+### Kết quả lệnh kiểm chứng tổng lực toàn bộ Shop (GUI-05f + toàn bộ 86 màn thiết kế)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: 4 file mock, 23 chuỗi seed, 68 file build (out/) — XANH
+9/9 script test-*.mjs xanh:
+  - test-cart-reconcile: 20/20 đạt
+  - test-catalog-view: 21/21 đạt
+  - test-format: 33/33 đạt
+  - test-home-content: 37/37 đạt
+  - test-order-state: 81/81 đạt
+  - test-phone: 17/17 đạt
+  - test-quantity: 45/45 đạt
+  - test-safe-href: 40/40 đạt
+  - test-voucher: 43/43 ca đạt
+check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 136 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  content_pages: 58 đạt, 0 lỗi, 0 bỏ qua
+PASS  formats_timezones: 73 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
+```

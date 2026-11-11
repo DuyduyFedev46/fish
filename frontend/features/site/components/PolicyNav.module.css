@@ -1,18 +1,21 @@
-/* PolicyNav (COMPONENTS #36 mục 4–6). Chỉ token trong app/globals.css. */
+/* PolicyNav (COMPONENTS 36 mục 4–6). Chỉ token trong app/globals.css. */
 
 /* toc: mục lục trong trang */
 .toc {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent-border, var(--border));
+  border-left: 3px solid var(--accent);
   border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  background: var(--surface-tint, var(--surface-2));
 }
 
 .tocTitle {
-  margin: 0;
-  padding-top: var(--space-1);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink-3);
+  margin: 0 0 var(--space-1);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-2);
 }
 
 .tocList {
@@ -27,6 +30,7 @@
   gap: var(--space-2);
   min-height: 44px;
   color: var(--accent-text);
+  font-weight: 500;
   text-decoration: none;
 }
 
@@ -35,14 +39,15 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   background: var(--surface);
 }
 
 .listTitle {
-  margin: 0 0 var(--space-1);
+  margin: 0 0 var(--space-2);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 .listItems {
@@ -52,7 +57,7 @@
 }
 
 .listRow {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-subtle, var(--border));
 }
 
 .listRow:last-child {
@@ -65,6 +70,7 @@
   justify-content: space-between;
   gap: var(--space-2);
   min-height: 44px;
+  padding: var(--space-1) 0;
   color: var(--accent-text);
   font-weight: 500;
   text-decoration: none;
@@ -77,9 +83,12 @@
 
 .viewing {
   flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent-text);
   font-size: 12px;
-  font-weight: 500;
-  color: var(--ink-3);
+  font-weight: 600;
 }
 
 .arrow {
@@ -88,28 +97,34 @@
   color: var(--ink-3);
 }
 
-/* aside: cột trái dính (máy tính) */
+/* aside: cột trái dính dạng card tinh tế (máy tính) */
 .aside {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--space-4) var(--space-3);
-  border-radius: var(--radius-card);
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .asideTitle {
   margin: 0 0 var(--space-2);
-  padding: 0 var(--space-3);
-  font-size: 15px;
-  font-weight: 600;
+  padding: 0 var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 
 .asideList,
 .asideExtra {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -118,23 +133,29 @@
 .asideExtra {
   margin-top: var(--space-2);
   padding-top: var(--space-2);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle, var(--border));
 }
 
 .asideItem {
   display: flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid transparent;
   border-radius: var(--radius-md);
-  color: var(--ink);
+  color: var(--ink-2);
   font-size: 14px;
   font-weight: 500;
+  line-height: 1.35;
   text-decoration: none;
-  transition: background-color var(--dur-color) var(--ease-out);
+  transition:
+    background-color var(--dur-color) var(--ease-out),
+    color var(--dur-color) var(--ease-out),
+    border-color var(--dur-color) var(--ease-out);
 }
 
 .asideItem[aria-current="page"] {
+  border-left-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent-text);
   font-weight: 600;
@@ -144,9 +165,17 @@
   .tocLink:hover,
   .listLink:hover {
     text-decoration: underline;
+    text-underline-offset: 2px;
   }
 
   .asideItem:not([aria-current="page"]):hover {
     background: var(--surface-2);
+    color: var(--ink);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .asideItem {
+    transition: none;
   }
 }
