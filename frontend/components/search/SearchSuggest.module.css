@@ -1,7 +1,7 @@
 .panel {
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: var(--shadow-pop);
   color: var(--ink);
@@ -11,9 +11,10 @@
 .heading {
   margin: 0;
   padding: var(--space-3) var(--space-4) var(--space-1);
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .list {
@@ -32,21 +33,28 @@
   transition: background-color var(--dur-color) ease-out;
 }
 
+.option + .option {
+  border-top: 1px solid var(--border-subtle, var(--border));
+}
+
 .name {
   flex: 1;
   min-width: 0;
   font-size: 14px;
-  font-weight: 400;
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .match {
-  font-weight: 600;
+  color: var(--accent-text);
+  font-weight: 700;
 }
 
 .price {
   flex: none;
+  color: var(--brand-deep);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .unit {
@@ -60,11 +68,13 @@
   align-items: center;
   min-height: 48px;
   padding: 0 var(--space-4);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle, var(--border));
+  background: var(--surface-tint, var(--surface-2));
   color: var(--accent-text);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--dur-color) ease-out;
 }
 
 .active {
@@ -73,7 +83,7 @@
 
 .recent {
   padding-bottom: var(--space-3);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border-subtle, var(--border));
 }
 
 .recentHead {
@@ -87,12 +97,14 @@
   min-width: 44px;
   min-height: 44px;
   border: 0;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--accent-text);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--dur-color) ease-out;
 }
 
 .chips {
@@ -111,8 +123,13 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .option:hover,
+  .option:hover {
+    background: var(--surface-2);
+  }
   .viewAll:hover {
+    background: var(--accent-soft);
+  }
+  .clear:hover {
     background: var(--surface-2);
   }
 }
@@ -127,5 +144,10 @@
 @media (prefers-reduced-motion: reduce) {
   .panel {
     animation: none;
+  }
+  .option,
+  .viewAll,
+  .clear {
+    transition: none;
   }
 }

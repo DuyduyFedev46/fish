@@ -1,51 +1,66 @@
-/* Cách mua hàng (P3-HowToBuy, DesktopPolicy#cach-mua). Chỉ token trong app/globals.css. */
+/* Cách mua hàng (P3-HowToBuy, DesktopPolicy). Chỉ token trong app/globals.css. */
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-4);
 }
 
 .head {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-1) 0 var(--space-2);
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
+  background: var(--card-gradient, var(--surface));
+  background-color: var(--surface);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
 }
 
 .title {
   margin: 0;
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .lead {
   margin: 0;
   color: var(--ink-2);
+  line-height: 1.6;
 }
 
 .card {
   display: flex;
   flex-direction: column;
-  padding: 6px var(--space-4) var(--space-2);
-  border-radius: var(--radius-card);
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
   color: var(--ink-2);
 }
 
 .card > p {
-  margin: var(--space-2) 0;
+  margin: 0;
+  line-height: 1.65;
 }
 
 .cardTitle {
-  margin: 10px 0 2px;
-  font-size: 17px;
-  font-weight: 600;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--ink);
 }
 
 .steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -55,12 +70,10 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.step:last-child {
-  border-bottom: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent-border, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--surface-tint, var(--surface-2));
 }
 
 .stepNo {
@@ -68,46 +81,58 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-full);
   background: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-glow, var(--accent-soft));
   color: var(--on-accent);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .stepText {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
 .stepTitle {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--ink);
+  line-height: 1.4;
 }
 
 .stepDesc {
   color: var(--ink-2);
+  line-height: 1.55;
 }
 
 .faq {
-  border-bottom: 1px solid var(--border);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  transition:
+    border-color var(--dur-color) var(--ease-out),
+    background-color var(--dur-color) var(--ease-out);
 }
 
-.faq:last-child {
-  border-bottom: 0;
+.faq[open] {
+  border-color: var(--accent-border, var(--border-strong));
+  background: var(--surface-tint, var(--surface));
 }
 
 .question {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-height: 48px;
+  padding: var(--space-2) 0;
   color: var(--ink);
-  font-weight: 500;
+  font-weight: 600;
   list-style: none;
   cursor: pointer;
 }
@@ -124,6 +149,7 @@
 }
 
 .faq[open] .chevron {
+  color: var(--accent-text);
   transform: rotate(180deg);
 }
 
@@ -131,8 +157,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: 0 0 var(--space-3);
+  padding: var(--space-1) 0 var(--space-4);
+  border-top: 1px solid var(--border-subtle, var(--border));
   color: var(--ink-2);
+  line-height: 1.65;
 }
 
 .answer p {
@@ -140,43 +168,43 @@
 }
 
 .cta {
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 @media (min-width: 768px) {
   .wrap {
-    gap: var(--space-4);
+    gap: var(--space-5);
+  }
+
+  .head {
+    padding: var(--space-6) var(--space-8);
   }
 
   .card {
-    padding: var(--space-5) var(--space-8) var(--space-4);
+    gap: var(--space-4);
+    padding: var(--space-6) var(--space-8);
   }
 
   .cardTitle {
-    margin-top: 0;
     font-size: 20px;
-    letter-spacing: -0.01em;
   }
 
   .title {
-    font-size: 24px;
+    font-size: 26px;
   }
 
-  /* Máy tính: 5 bước thành lưới thẻ (DesktopPolicy#cach-mua). */
+  /* Máy tính: các bước mua hàng thành lưới thẻ nổi bật. */
   .steps {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
     gap: var(--space-3);
-    margin-top: var(--space-3);
   }
 
   .step {
     flex-direction: column;
-    gap: var(--space-2);
+    gap: var(--space-3);
     padding: var(--space-4);
-    border-bottom: 0;
     border-radius: var(--radius-card);
-    background: var(--surface-2);
   }
 
   .stepDesc {
@@ -190,6 +218,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .faq,
   .chevron {
     transition: none;
   }

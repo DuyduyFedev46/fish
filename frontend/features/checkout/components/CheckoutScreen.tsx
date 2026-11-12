@@ -31,7 +31,7 @@ import TextField from "@/components/ui/TextField";
 import { focusSoon } from "@/components/ui/focusSoon";
 import { useVoucher } from "@/features/cart/useVoucher";
 import { clearVoucherCode, readVoucherCode } from "@/features/cart/voucherStorage";
-import { minOrderOf, voucherCodeToSend, voucherMessage } from "@/features/cart/voucherView";
+import { hasDistinctDiscountedTotal, minOrderOf, pendingVoucherText, voucherCodeToSend, voucherMessage } from "@/features/cart/voucherView";
 import { cartFingerprint, clearRequestId, getRequestId, renewRequestId } from "../requestId";
 import { saveLookupToken } from "../lookupToken";
 import { goToMockGateway, redirectToGateway } from "../gateway";
@@ -125,7 +125,7 @@ function CheckoutForm() {
   const [throttledOpen, setThrottledOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
   // B8: mã hết hiệu lực đúng lúc đặt. Hỏi khách, không tự đặt với giá khác giá họ đã thấy.
-  const [voucherGone, setVoucherGone] = useState<{ code: string; fullPrice: string; discountedPrice: string } | null>(null);
+  const [voucherGone, setVoucherGone] = useState<{ code: string; fullPrice: string; discountedPrice: string | null } | null>(null);
 
   const hotline = useMemo(
     () => pickHotline(siteInfo?.seller?.phone, siteInfo?.confirmation_policy?.hotline),
@@ -175,13 +175,14 @@ function CheckoutForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.ready]);
 
-  // Mã giảm giá (3b): số giảm và tổng lấy từ máy chủ; thiếu kết quả kiểm thì hiện giá chưa giảm và không gửi mã.
+  // Mã giảm giá (3b, GUI-01): số giảm và tổng lấy từ máy chủ; kiểm lại bị lỗi mạng thì hiện giá chưa giảm kèm nhắc "sẽ kiểm khi đặt" và vẫn gửi mã để máy chủ quyết.
   const voucherItems = useMemo(
     () => cart.lines.map((l) => ({ item_code: l.item_code, qty: qtyToApiString(l.qty) })),
     [cart.lines]
   );
   const voucher = useVoucher(voucherItems, cart.ready);
   const quote = voucher.quote;
+  const pendingVoucher = pendingVoucherText(voucher.code, Boolean(quote), voucher.error !== null);
   const localTotal = String(Math.round(cart.totalAmount));
   const total = quote ? quote.total_after : localTotal;
   const itemCount = cart.lines.length;
@@ -289,10 +290,11 @@ function CheckoutForm() {
     const code = err.code ?? "";
     if (code === "VOUCHER_INVALID") {
       // Mã hết hiệu lực giữa lúc điền form (B8): hỏi khách. Mã bị bỏ khỏi giỏ để lần sau không gửi lại.
+      // Chưa có quote máy chủ ở bước đặt hàng thì discountedPrice = null để không gạch trùng số tổng (GUI-02).
       setVoucherGone({
         code: voucher.code ?? readVoucherCode() ?? "",
         fullPrice: localTotal,
-        discountedPrice: voucher.quote?.total_after ?? localTotal,
+        discountedPrice: voucher.quote ? voucher.quote.total_after : null,
       });
       voucher.remove();
       // "Giá chưa giảm" lấy từ máy chủ (kiểm không mã); lỗi mạng thì giữ số tạm tính của giỏ đang hiện.
@@ -586,6 +588,7 @@ function CheckoutForm() {
               itemCount={itemCount}
               total={total}
               discount={quote && voucher.code ? { code: voucher.code, amount: quote.discount_amount } : undefined}
+              pendingVoucherNote={pendingVoucher}
               title={`Đơn hàng (${itemCount} món)`}
               totalLabel={`${itemCount} món · tổng tiền hàng`}
               lines={summaryLines}
@@ -675,7 +678,12 @@ function CheckoutForm() {
           <p className={s.goneTotal}>
             <span>Tổng tiền hàng</span>
             <span className="num">
-              <del className={s.goneOld}>{formatPriceVnd(voucherGone.discountedPrice)}</del> <strong>{formatPriceVnd(voucherGone.fullPrice)}</strong>
+              {hasDistinctDiscountedTotal(voucherGone.discountedPrice, voucherGone.fullPrice) ? (
+                <>
+                  <del className={s.goneOld}>{formatPriceVnd(voucherGone.discountedPrice)}</del>{" "}
+                </>
+              ) : null}
+              <strong>{formatPriceVnd(voucherGone.fullPrice)}</strong>
             </span>
           </p>
         ) : null}

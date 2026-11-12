@@ -1,5 +1,10 @@
 .card {
-  margin-top: 6px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.detailBox {
+  display: block;
 }
 
 /* ---- trang chi tiết: khối chọn số lượng ---- */
@@ -7,17 +12,24 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--accent-border, var(--border-strong));
+  border-radius: var(--radius-xl);
+  background: var(--surface-tint, var(--surface-2));
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
 }
 
 .selectTitle {
   margin: 0;
+  color: var(--ink);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .presets {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
@@ -39,16 +51,23 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .subtotalValue {
-  color: var(--ink);
-  font-size: 17px;
-  font-weight: 600;
+  color: var(--accent-text);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-/* ---- thanh mua: dính đáy trên điện thoại, nằm trong cột phải trên máy tính ---- */
+/* ---- thanh mua: dính đáy trên điện thoại, nằm trong khung mua trên máy tính ---- */
 .bar {
   position: fixed;
   right: 0;
@@ -56,6 +75,7 @@
   left: 0;
   z-index: var(--z-bottom-bar);
   padding: 10px var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border-subtle, var(--border));
   background: var(--surface);
   box-shadow: var(--shadow-bar);
 }
@@ -74,17 +94,39 @@
 }
 
 @media (min-width: 768px) {
+  .detailBox {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding: var(--space-5);
+    border: 1px solid var(--accent-border, var(--border-strong));
+    border-radius: var(--radius-xl);
+    background: var(--surface-tint, var(--surface-2));
+    box-shadow: var(--shadow-card, var(--shadow-sm));
+  }
+  .select {
+    gap: var(--space-4);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
   .presets {
     gap: var(--space-3);
   }
   .subtotal {
     padding: 14px var(--space-4);
     border-radius: var(--radius-card);
-    background: var(--surface-2);
+    background: var(--surface);
+  }
+  .subtotalValue {
+    font-size: 22px;
   }
   .bar {
     position: static;
     padding: 0;
+    border-top: 0;
     background: transparent;
     box-shadow: none;
   }

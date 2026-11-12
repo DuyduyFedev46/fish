@@ -1,8 +1,8 @@
-/* Liên hệ (P2-Contact, DesktopContact). Không form (UI-RULES §3.3). Chỉ token trong app/globals.css. */
+/* Liên hệ (P2-Contact, DesktopContact). Không form (UI-RULES mục 3.3). Chỉ token trong app/globals.css. */
 .container {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
   max-width: var(--container-max);
   margin: 0 auto;
   padding: 0 var(--space-4);
@@ -11,26 +11,34 @@
 .head {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
+  background: var(--card-gradient, var(--surface));
+  background-color: var(--surface);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
 }
 
 .title {
   margin: 0;
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
+  color: var(--ink);
 }
 
 .lead p {
   margin: 0;
   color: var(--ink-2);
+  line-height: 1.6;
 }
 
 .cards {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -40,11 +48,12 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  min-height: 64px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  min-height: 68px;
+  padding: var(--space-4);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
   color: var(--ink);
   text-decoration: none;
 }
@@ -52,12 +61,13 @@
 .cardLink {
   -webkit-tap-highlight-color: transparent;
   transition:
-    transform var(--dur-press) var(--ease-out),
-    border-color var(--dur-color) var(--ease-out);
+    transform var(--dur-swap) var(--ease-out),
+    border-color var(--dur-color) var(--ease-out),
+    box-shadow var(--dur-swap) var(--ease-out);
 }
 
 .cardLink:active {
-  transform: scale(0.98);
+  transform: scale(0.985);
 }
 
 .icon {
@@ -65,9 +75,10 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-full);
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--accent-border, var(--border));
+  border-radius: var(--radius-lg);
   background: var(--accent-soft);
   color: var(--accent-text);
 }
@@ -76,6 +87,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -87,7 +99,8 @@
 
 .value {
   overflow-wrap: anywhere;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--ink);
 }
 
@@ -104,8 +117,14 @@
 .more {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
   color: var(--ink-2);
+  line-height: 1.65;
 }
 
 .more p,
@@ -115,45 +134,56 @@
 
 .more h2 {
   margin-top: var(--space-2);
-  font-size: 16px;
+  font-size: 17px;
+  font-weight: 700;
   color: var(--ink);
+}
+
+.more h2:first-child {
+  margin-top: 0;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .cardLink:hover {
-    border-color: var(--border-strong);
+    transform: translateY(-2px);
+    border-color: var(--accent-border, var(--border-strong));
+    box-shadow: var(--shadow-elevated, var(--shadow-card-hover));
   }
 }
 
 @media (min-width: 768px) {
   .container {
     gap: var(--space-5);
-    padding: var(--space-4) var(--space-6) var(--space-12);
+    padding: var(--space-2) var(--space-6) var(--space-10);
+  }
+
+  .head {
+    padding: var(--space-6) var(--space-8);
   }
 
   .title {
-    font-size: 24px;
+    font-size: 26px;
   }
 
   .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: var(--space-4);
   }
 
   .card {
     flex-direction: column;
     align-items: flex-start;
+    gap: var(--space-3);
     height: 100%;
     padding: var(--space-5);
-    border-radius: var(--radius-card);
   }
 
   .chevron {
     display: none;
   }
 
-  /* Máy tính: nút hành động trong thẻ (DesktopContact); cả thẻ vẫn là một link. */
+  /* Máy tính: nút hành động trong thẻ; cả thẻ vẫn là một link. */
   .action {
     display: inline-flex;
     align-items: center;
@@ -161,19 +191,31 @@
     min-height: var(--h-btn-sm);
     margin-top: auto;
     padding: 0 var(--space-4);
-    border: 1px solid var(--accent);
+    border: 1px solid var(--accent-border, var(--accent));
     border-radius: var(--radius-full);
+    background: var(--surface-tint, var(--accent-soft));
     color: var(--accent-text);
+    font-size: 13px;
     font-weight: 600;
   }
 
   .actionPrimary {
+    border-color: var(--accent);
     background: var(--accent);
     color: var(--on-accent);
+  }
+
+  .more {
+    padding: var(--space-6) var(--space-8);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cardLink {
+    transition: none;
+  }
+
+  .cardLink:hover,
   .cardLink:active {
     transform: none;
   }

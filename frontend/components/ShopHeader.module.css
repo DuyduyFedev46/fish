@@ -7,27 +7,31 @@
 .h1 {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: var(--space-2) var(--space-4) 14px;
-  background: var(--accent);
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background-color: var(--brand-deep);
+  background-image: var(--brand-gradient);
   color: var(--on-accent);
+  box-shadow: var(--shadow-card);
 }
 
 .h1Row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-2);
   min-height: 44px;
 }
 
 .actions {
   display: flex;
+  flex: none;
   gap: var(--space-1);
 }
 
 .sentinel {
   height: 1px;
-  margin-top: -10px;
+  margin-top: -12px;
 }
 
 /* ---------------- H2 / H3 / H4 ---------------- */
@@ -36,8 +40,9 @@
   align-items: center;
   gap: var(--space-1);
   height: var(--h-header);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-xs);
 }
 
 .stickyBar {
@@ -45,6 +50,7 @@
   top: 0;
   z-index: var(--z-header);
   padding: 0 6px 0 var(--space-4);
+  box-shadow: var(--shadow-card);
 }
 
 .fixedBar {
@@ -64,11 +70,13 @@
 .fixedBarShown {
   transform: translateY(0);
   visibility: visible;
+  box-shadow: var(--shadow-card);
   transition-delay: 0s;
 }
 
 .barLogo {
   margin-right: auto;
+  min-width: 0;
 }
 
 .sub {
@@ -80,8 +88,10 @@
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  color: var(--ink);
   font-size: 15px;
   font-weight: 600;
+  letter-spacing: -0.01em;
   text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -101,9 +111,11 @@
   min-width: 0;
   margin: 0;
   overflow: hidden;
+  color: var(--ink);
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -113,9 +125,13 @@
   flex: none;
   align-items: center;
   gap: var(--space-1);
+  padding: 4px 10px;
+  border: 1px solid var(--good-border);
+  border-radius: var(--radius-full);
+  background-color: var(--good-soft);
   color: var(--good);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* ---------------- Máy tính ---------------- */
@@ -130,10 +146,11 @@
   }
 
   .strip {
-    background: var(--accent);
-    border-bottom: 1px solid var(--accent-hover);
-    color: var(--on-accent);
-    font-size: 13px;
+    background-color: var(--brand-deep-hover);
+    border-bottom: 1px solid var(--brand-mid);
+    color: var(--on-brand-muted);
+    font-size: 12.5px;
+    letter-spacing: 0.005em;
   }
 
   .stripInner {
@@ -142,7 +159,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 0 var(--space-4);
-    min-height: 40px;
+    min-height: 34px;
   }
 
   .stripLinks {
@@ -153,13 +170,15 @@
   .stripLink {
     display: inline-flex;
     align-items: center;
-    height: 32px;
+    height: 28px;
     padding: 0 10px;
-    border-radius: var(--radius-md);
-    color: var(--on-accent);
+    border-radius: var(--radius-full);
+    color: var(--on-brand-muted);
     font-weight: 500;
     text-decoration: none;
-    transition: background-color var(--dur-color) ease-out;
+    transition:
+      background-color var(--dur-color) var(--ease-out),
+      color var(--dur-color) var(--ease-out);
   }
   .stripLink:focus-visible,
   .mainLink:focus-visible {
@@ -171,8 +190,10 @@
     position: sticky;
     top: 0;
     z-index: var(--z-header);
-    background: var(--accent);
+    background-color: var(--brand-deep);
+    background-image: var(--brand-gradient);
     color: var(--on-accent);
+    box-shadow: var(--shadow-card);
   }
 
   .mainInner {
@@ -180,12 +201,13 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 12px 28px;
-    padding-top: 14px;
-    padding-bottom: 14px;
+    padding-block: var(--space-4);
   }
 
   .search {
-    flex: 1 1 320px;
+    flex: 1 1 280px;
+    max-width: 520px;
+    margin-inline: auto;
     min-width: 0;
   }
 
@@ -194,49 +216,57 @@
     flex: none;
     align-items: center;
     gap: var(--space-2);
+    margin-left: auto;
   }
 
   .mainLink {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
-    height: 44px;
-    padding: 0 var(--space-3);
+    height: var(--h-chip);
+    padding: 0 14px;
+    border: 1px solid transparent;
     border-radius: var(--radius-full);
     color: var(--on-accent);
-    font-size: 13px;
+    font-size: 13.5px;
     font-weight: 500;
     text-decoration: none;
     white-space: nowrap;
     transition:
       transform var(--dur-press) var(--ease-out),
-      background-color var(--dur-color) ease-out;
+      background-color var(--dur-color) var(--ease-out),
+      border-color var(--dur-color) var(--ease-out),
+      box-shadow var(--dur-color) var(--ease-out);
   }
   .mainLink:active {
     transform: scale(0.97);
   }
-  .mainLinkCurrent,
-  .cartLink {
-    background: var(--accent-hover);
-  }
   .mainLinkCurrent {
+    border-color: var(--on-brand-muted);
+    background-color: var(--brand-deep-hover);
     font-weight: 600;
   }
   .cartLink {
-    padding: 0 14px;
+    padding: 0 16px;
+    border-color: var(--on-brand-muted);
+    background-color: var(--brand-mid);
+    font-weight: 600;
+    box-shadow: var(--shadow-xs);
   }
 
   .hotline {
     display: flex;
     flex-direction: column;
-    line-height: 1.2;
+    line-height: 1.18;
   }
   .hotlineLabel {
     font-size: 11px;
-    color: var(--on-accent);
+    font-weight: 500;
+    color: var(--on-brand-muted);
   }
   .hotlineNumber {
-    font-weight: 600;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 
   .inlineBadge {
@@ -244,48 +274,54 @@
     height: 20px;
     padding: 0 6px;
     border-radius: var(--radius-full);
-    background: var(--surface);
-    color: var(--accent-text);
+    background-color: var(--surface);
+    color: var(--brand-deep);
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 20px;
     text-align: center;
     animation: badge-in var(--dur-swap) var(--ease-out);
   }
 
   .menu {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-xs);
   }
 
   .menuInner {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    min-height: 48px;
+    gap: 2px;
+    min-height: 44px;
   }
 
   .menuLink {
     display: inline-flex;
     align-items: center;
-    height: 48px;
+    height: 44px;
     padding: 0 14px;
-    color: var(--ink);
+    color: var(--ink-2);
     font-size: 14px;
     font-weight: 500;
     text-decoration: none;
-    box-shadow: inset 0 -2px 0 transparent;
+    box-shadow: inset 0 -2.5px 0 transparent;
     transition:
-      background-color var(--dur-color) ease-out,
-      color var(--dur-color) ease-out;
+      background-color var(--dur-color) var(--ease-out),
+      color var(--dur-color) var(--ease-out),
+      box-shadow var(--dur-color) var(--ease-out);
   }
   .menuLink[aria-current="page"] {
+    background-color: var(--surface-warm);
     color: var(--accent-text);
     font-weight: 600;
-    box-shadow: inset 0 -2px 0 var(--accent);
+    box-shadow: inset 0 -2.5px 0 var(--accent);
   }
   .menuEnd {
     margin-left: auto;
+    color: var(--accent-text);
+    font-weight: 600;
   }
   .menuSkeleton {
     display: inline-flex;
@@ -296,48 +332,72 @@
   /* Rút gọn: Giỏ, Đặt hàng, Thanh toán */
   .compact {
     display: block;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-xs);
   }
   .compactInner {
     display: flex;
     align-items: center;
-    gap: var(--space-6);
+    gap: var(--space-5);
     height: 76px;
   }
   .compactDivider {
     width: 1px;
     height: 28px;
-    background: var(--border);
+    background-color: var(--border-subtle);
   }
   .safe {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    padding: 5px 12px;
+    border: 1px solid var(--good-border);
+    border-radius: var(--radius-full);
+    background-color: var(--good-soft);
     color: var(--good);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
   }
   .help {
     margin-left: auto;
-    color: var(--ink);
-    font-size: 14px;
+    padding: 8px 14px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    background-color: var(--surface-warm);
+    color: var(--ink-2);
+    font-size: 13.5px;
+    font-weight: 500;
     text-decoration: none;
+    transition:
+      border-color var(--dur-color) var(--ease-out),
+      background-color var(--dur-color) var(--ease-out);
   }
   .helpNumber {
     color: var(--accent-text);
-    font-weight: 600;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
   }
 }
 
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  .stripLink:hover,
+  .stripLink:hover {
+    background-color: var(--brand-mid);
+    color: var(--on-accent);
+  }
   .mainLink:hover {
-    background: var(--accent-hover);
+    transform: translateY(-1px);
+    border-color: var(--on-brand-muted);
+    background-color: var(--brand-deep-hover);
+    box-shadow: var(--shadow-card);
   }
   .menuLink:hover {
-    background: var(--accent-soft);
-    color: var(--accent-text);
+    background-color: var(--surface-tint);
+    color: var(--brand-deep);
+  }
+  .help:hover {
+    border-color: var(--accent-border);
+    background-color: var(--surface-tint);
   }
 }
 
@@ -353,9 +413,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fixedBar {
+  .fixedBar,
+  .stripLink,
+  .mainLink,
+  .menuLink,
+  .help {
     transition: none;
   }
+  .mainLink:hover,
   .mainLink:active {
     transform: none;
   }
@@ -368,8 +433,10 @@
 .mobileStrip {
   margin: 0;
   padding: var(--space-2) var(--space-4);
-  background: var(--accent);
-  color: var(--on-accent);
+  background-color: var(--brand-deep);
+  background-image: var(--brand-gradient);
+  border-bottom: 1px solid var(--brand-mid);
+  color: var(--on-brand-muted);
   font-size: 12px;
   font-weight: 500;
   text-align: center;

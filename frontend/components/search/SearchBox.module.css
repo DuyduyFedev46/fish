@@ -5,12 +5,16 @@
   min-width: 0;
   margin: 0;
   background: var(--surface);
+  transition:
+    border-color var(--dur-color) ease-out,
+    box-shadow var(--dur-color) ease-out;
 }
 
 .glass {
   display: inline-flex;
   flex: none;
   color: var(--ink-3);
+  transition: color var(--dur-color) ease-out;
 }
 
 .input {
@@ -25,6 +29,10 @@
   outline: none;
   -webkit-appearance: none;
   appearance: none;
+}
+.input:focus,
+.input:focus-visible {
+  outline: none;
 }
 .input::placeholder {
   color: var(--ink-3);
@@ -50,6 +58,9 @@
   background: transparent;
   color: var(--ink-3);
   cursor: pointer;
+  transition:
+    background-color var(--dur-color) ease-out,
+    color var(--dur-color) ease-out;
 }
 
 /* "Tìm" chỉ hiện ở máy tính; điện thoại gửi bằng Enter */
@@ -59,12 +70,23 @@
 
 /* ---- brand (header nền accent) ---- */
 .brand {
-  height: var(--h-input);
-  padding: 0 6px 0 var(--space-4);
+  height: var(--h-chip);
+  padding: 0 6px 0 14px;
+  border: 1px solid transparent;
   border-radius: var(--radius-full);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
+}
+.brand .clear {
+  width: 36px;
+  height: 36px;
+  margin: 0 -2px 0 0;
 }
 .brand:focus-within {
+  border-color: var(--accent-border, var(--accent));
   box-shadow: 0 0 0 3px var(--on-brand-muted);
+}
+.brand:focus-within .glass {
+  color: var(--accent-text);
 }
 
 /* ---- page (trang danh mục) ---- */
@@ -72,31 +94,38 @@
   height: var(--h-input);
   padding: 0 var(--space-3);
   border: 1px solid var(--border-input);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
 }
 .page:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-glow, var(--accent-soft));
+}
+.page:focus-within .glass {
+  color: var(--accent-text);
 }
 
 @media (min-width: 768px) {
   .brand {
-    height: var(--h-btn-lg);
-    padding: var(--space-1) var(--space-1) var(--space-1) var(--space-5);
+    height: 42px;
+    padding: 3px 4px 3px var(--space-4);
+  }
+  .brand .input {
+    font-size: 14px;
   }
   .brand .submit {
     display: inline-flex;
     flex: none;
     align-items: center;
     justify-content: center;
-    height: 40px;
-    padding: 0 var(--space-5);
+    height: 34px;
+    padding: 0 var(--space-4);
     border: 0;
     border-radius: var(--radius-full);
     background: var(--brand-deep);
     color: var(--on-accent);
     font: inherit;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
     cursor: pointer;
     transition:
@@ -106,9 +135,10 @@
   .brand .submit:active {
     transform: scale(0.97);
   }
-  .clear {
-    width: 40px;
-    height: 40px;
+  .clear,
+  .brand .clear {
+    width: 34px;
+    height: 34px;
     margin: 0;
   }
 }
@@ -117,9 +147,19 @@
   .brand .submit:hover {
     background: var(--brand-deep-hover);
   }
+  .clear:hover {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .form,
+  .glass,
+  .clear,
+  .brand .submit {
+    transition: none;
+  }
   .brand .submit:active {
     transform: none;
   }

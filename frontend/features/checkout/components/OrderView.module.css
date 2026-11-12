@@ -1,11 +1,11 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
   width: 100%;
-  max-width: 720px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: var(--space-3) var(--space-4) var(--space-8);
+  padding: var(--space-4) var(--space-4) var(--space-10);
 }
 
 .head {
@@ -13,65 +13,120 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-1);
+}
+
+.head button {
+  border-color: var(--border-subtle, var(--border));
+  background: var(--surface);
+  color: var(--accent-text);
+  box-shadow: var(--shadow-xs, var(--shadow-sm));
 }
 
 .title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
+}
+
+.title span {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 2px 10px;
+  border: 1px solid var(--accent-border, var(--on-brand-muted));
+  border-radius: var(--radius-md);
+  background: var(--surface-tint, var(--accent-soft));
+  color: var(--brand-deep);
+  font-size: 0.92em;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
 }
 
 .placed {
   margin: calc(var(--space-2) * -1) 0 0;
-  color: var(--ink-3);
+  color: var(--ink-2);
   font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .block {
+  --lookup-padding: 0;
+  --lookup-border: 0;
+  --lookup-radius: 0;
+  --lookup-background: transparent;
+  --lookup-shadow: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
   padding: var(--space-4);
-  border-radius: var(--radius-card);
-  background: var(--surface);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-sheet);
+  background: var(--card-gradient, var(--surface));
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .statusRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-3);
+}
+
+.statusRow:not(:last-child) {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle, var(--border));
 }
 
 .blockTitle {
   flex: none;
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .text {
   margin: 0;
   color: var(--ink-2);
   font-size: 14px;
+  line-height: 1.5;
 }
 
 .actions {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .head button:hover:not(:disabled) {
+    border-color: var(--accent-border, var(--accent));
+    background: var(--accent-soft);
+  }
 }
 
 @media (min-width: 768px) {
   .page {
-    gap: var(--space-4);
-    padding-top: var(--space-6);
+    gap: var(--space-5);
+    padding: var(--space-8) var(--space-6) var(--space-12);
   }
 
   .title {
-    font-size: 24px;
+    font-size: 26px;
   }
 
   .block {

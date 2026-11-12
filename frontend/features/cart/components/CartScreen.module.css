@@ -7,6 +7,8 @@
 .head {
   display: flex;
   flex-direction: column;
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+  background: var(--surface);
 }
 
 .title {
@@ -25,6 +27,11 @@
 .count {
   color: var(--ink-3);
   font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.page > [aria-busy="true"] {
+  padding: var(--space-3) var(--space-4) var(--space-5);
 }
 
 .layout {
@@ -34,7 +41,11 @@
 }
 
 .listCol {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-5);
 }
 
 .summaryCol {
@@ -42,34 +53,51 @@
 }
 
 .list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .banner {
-  padding: var(--space-3) var(--space-4) 0;
+  padding: 0;
 }
 
 .rule {
   margin: 0;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-1) var(--space-1) 0;
   color: var(--ink-3);
   font-size: 13px;
 }
 
 .empty {
-  padding-bottom: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-4) var(--space-10);
+}
+
+.empty > :first-child {
+  margin: 0;
+  padding: var(--space-8) var(--space-5);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
+  background: var(--surface-gradient, var(--surface));
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }
 
 .suggest {
-  padding: var(--space-4);
+  padding: 0;
 }
 
 .suggestTitle {
   margin: 0 0 var(--space-3);
-  font-size: 15px;
-  font-weight: 600;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .suggestGrid {
@@ -91,7 +119,10 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    margin-bottom: var(--space-5);
+    margin-bottom: var(--space-6);
+    padding-bottom: var(--space-5);
+    border-bottom: 1px solid var(--border-subtle, var(--border));
+    background: transparent;
   }
 
   .title {
@@ -102,9 +133,20 @@
     overflow: visible;
     clip: auto;
     white-space: normal;
-    font-size: 24px;
-    font-weight: 600;
-    letter-spacing: -0.015em;
+    color: var(--ink);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .count {
+    font-size: 20px;
+  }
+
+  .page > [aria-busy="true"] {
+    width: 100%;
+    max-width: 780px;
+    padding: 0;
   }
 
   .layout {
@@ -115,23 +157,40 @@
 
   .listCol {
     min-width: 0;
-    overflow: hidden;
-    border-radius: var(--radius-card);
+    gap: var(--space-4);
+    padding: var(--space-5);
+    border: 1px solid var(--border-subtle, var(--border));
+    border-radius: var(--radius-xl);
     background: var(--surface);
+    box-shadow: var(--shadow-card, var(--shadow-sm));
   }
 
   .summaryCol {
     display: block;
-    flex: 0 0 340px;
+    flex: 0 0 352px;
     align-self: stretch;
   }
 
-  .banner {
-    padding: var(--space-4) var(--space-4) 0;
+  .empty {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    gap: var(--space-8);
+    padding: var(--space-2) 0 var(--space-8);
+  }
+
+  .empty > :first-child {
+    padding: var(--space-10) var(--space-8);
+  }
+
+  .suggestTitle {
+    margin-bottom: var(--space-4);
+    font-size: 18px;
   }
 
   .suggestGrid {
-    max-width: 480px;
+    max-width: none;
+    gap: var(--space-5);
   }
 }
 
@@ -150,14 +209,50 @@
 @media (min-width: 768px) {
   .deskNote {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    padding: 0 var(--space-4) var(--space-4);
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-4);
+    margin-top: var(--space-1);
+    padding: var(--space-4) var(--space-5);
+    border: 1px solid var(--accent-border, var(--border));
+    border-radius: var(--radius-card);
+    background: var(--surface-tint, var(--accent-soft));
     color: var(--ink-2);
     font-size: 13px;
+    line-height: 1.5;
   }
 
   .deskNote p {
+    flex: 1 1 260px;
     margin: 0;
+  }
+
+  .deskNote a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--accent-border, var(--border));
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    color: var(--accent-text);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    box-shadow: var(--shadow-xs, none);
+    transition:
+      background-color var(--dur-color) var(--ease-out),
+      border-color var(--dur-color) var(--ease-out),
+      color var(--dur-color) var(--ease-out);
+  }
+}
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .deskNote a:hover {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
   }
 }

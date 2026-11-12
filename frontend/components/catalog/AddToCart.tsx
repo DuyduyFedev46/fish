@@ -147,7 +147,7 @@ function DetailAction({
   const isKg = item.unit === "kg";
 
   return (
-    <>
+    <div className={s.detailBox}>
       <div className={s.select}>
         <h2 id={headingId} className={s.selectTitle}>
           {isKg ? "Chọn số kg" : "Số combo"}
@@ -195,6 +195,6 @@ function DetailAction({
           </Button>
         </div>
       </div>
-    </>
+    </div>
   );
 }

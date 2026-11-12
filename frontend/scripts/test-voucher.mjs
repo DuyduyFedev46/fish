@@ -73,5 +73,17 @@ eq("đặt không dùng mã", m.voucherCodeToSend("CAVE10", "CAVE10", true), und
 // Vân tay dòng: không phụ thuộc thứ tự
 eq("itemsKey", m.itemsKey([{ item_code: "B", qty: "1" }, { item_code: "A", qty: "1.5" }]), m.itemsKey([{ item_code: "A", qty: "1.5" }, { item_code: "B", qty: "1" }]));
 
+// GUI-01: dòng nhắc mã chờ kiểm khi mất mạng lúc kiểm lại ở trang đặt hàng
+eq("pendingVoucherText khi kiểm lỗi mạng", m.pendingVoucherText("CAVE10", false, true), "Mã CAVE10 · sẽ kiểm khi đặt");
+eq("pendingVoucherText ẩn khi đã có quote", m.pendingVoucherText("CAVE10", true, true), null);
+eq("pendingVoucherText ẩn khi chưa lỗi (đang tải)", m.pendingVoucherText("CAVE10", false, false), null);
+eq("pendingVoucherText ẩn khi không có mã", m.pendingVoucherText(null, false, true), null);
+
+// GUI-02: hộp B8 chỉ gạch số cũ khi đã có giá giảm khác tổng chưa giảm
+eq("B8 có giá giảm nhỏ hơn -> hiện số gạch", m.hasDistinctDiscountedTotal("148500", "165000"), true);
+eq("B8 chưa có quote (null) -> ẩn số gạch", m.hasDistinctDiscountedTotal(null, "165000"), false);
+eq("B8 trùng số -> ẩn số gạch", m.hasDistinctDiscountedTotal("165000", "165000"), false);
+eq("B8 chuỗi rỗng -> ẩn số gạch", m.hasDistinctDiscountedTotal("", "165000"), false);
+
 console.log(`${n - fail}/${n} ca đạt`);
 process.exit(fail ? 1 : 0);

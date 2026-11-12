@@ -1,4 +1,7 @@
+/* Trạng thái lỗi và khung xương dùng chung cho /pages/ và /blog/. Chỉ token trong app/globals.css. */
 .wrap {
+  max-width: 640px;
+  margin: 0 auto;
   padding: var(--space-6) 0 var(--space-10);
 }
 
@@ -6,16 +9,18 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 
 .skeleton {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  max-width: 720px;
-  padding: var(--space-4);
-  border-radius: var(--radius-card);
+  max-width: 740px;
+  padding: var(--space-6);
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-xl);
   background: var(--surface);
+  box-shadow: var(--shadow-card, var(--shadow-sm));
 }

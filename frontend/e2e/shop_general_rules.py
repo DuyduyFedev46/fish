@@ -295,6 +295,60 @@ with sync_playwright() as p:
                     if serious:
                         viol_all[r] = serious
                 R.ok("axe-core 360: 0 lỗi serious/critical trên 12 trang chính", not viol_all, json.dumps(viol_all, ensure_ascii=False)[:600])
+
+        # ---------------- GUI-04: giỏ hỏng trong localStorage (giá "abc" và null)
+        corrupt_cart = [
+            {"item_code": "CA-THU", "name": "Cá thu", "unit": "kg", "price": "abc", "qty": 1},
+            {"item_code": "MUC-ONG", "name": "Mực ống", "unit": "kg", "price": None, "qty": 1},
+        ]
+        page.evaluate(set_cart_js, corrupt_cart)
+        goto(page, "/shop/cart/", 900)
+        page.get_by_text("Cá thu").first.wait_for(timeout=10000)
+        snap(page, "corrupt-cart", width, "gui-04")
+        cart_body = page.inner_text("body")
+        cart_html = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", "", page.content(), flags=re.S | re.I)
+        cart_bad_tokens = [
+            token_word for token_word in ("NaN", "undefined", "Infinity")
+            if token_word in cart_body or token_word in cart_html
+        ]
+        cart_stored = json.loads(page.evaluate("localStorage.getItem('cangcaloc_cart_v1') || '[]'"))
+        cart_prices_valid = (
+            len(cart_stored) == 2
+            and all(isinstance(entry.get("price"), str) and entry["price"].isdigit() for entry in cart_stored)
+            and not money_ok(cart_body)
+            and "Giá cũ —" not in cart_body
+        )
+        R.ok(
+            f"GUI-04 [{width}] /shop/cart/ với giỏ hỏng (price='abc', null): không NaN/undefined/Infinity, giá hợp lệ, không lỗi console",
+            "Cá thu" in cart_body and "Mực ống" in cart_body and not cart_bad_tokens and cart_prices_valid
+            and not watch.console_errors() and not watch.errors,
+            (cart_bad_tokens, cart_stored, watch.console_errors()[:2], watch.errors[:2]),
+        )
+
+        page.evaluate(set_cart_js, corrupt_cart)
+        goto(page, "/shop/checkout/", 900)
+        page.locator("#f-name").wait_for(timeout=10000)
+        snap(page, "corrupt-checkout", width, "gui-04")
+        checkout_body = page.inner_text("body")
+        checkout_html = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", "", page.content(), flags=re.S | re.I)
+        checkout_bad_tokens = [
+            token_word for token_word in ("NaN", "undefined", "Infinity")
+            if token_word in checkout_body or token_word in checkout_html
+        ]
+        checkout_stored = json.loads(page.evaluate("localStorage.getItem('cangcaloc_cart_v1') || '[]'"))
+        checkout_prices_valid = (
+            len(checkout_stored) == 2
+            and all(isinstance(entry.get("price"), str) and entry["price"].isdigit() for entry in checkout_stored)
+            and not money_ok(checkout_body)
+            and "× —" not in checkout_body
+            and not re.search(r"Tổng tiền hàng\s+—", checkout_body)
+        )
+        R.ok(
+            f"GUI-04 [{width}] /shop/checkout/ với giỏ hỏng (price='abc', null): không NaN/undefined/Infinity, giá hợp lệ, không lỗi console",
+            "/shop/checkout" in page.url and not checkout_bad_tokens and checkout_prices_valid
+            and not watch.console_errors() and not watch.errors,
+            (page.url, checkout_bad_tokens, checkout_stored, watch.console_errors()[:2], watch.errors[:2]),
+        )
         ctx.close()
     browser.close()
 

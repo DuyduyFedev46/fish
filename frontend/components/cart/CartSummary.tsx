@@ -21,6 +21,8 @@ export interface CartSummaryProps {
   total: Money;
   /** Dòng giảm giá, số lấy từ máy chủ (mã giảm giá, lô 3b). */
   discount?: { code: string; amount: Money };
+  /** Dòng nhỏ báo mã đã áp nhưng chưa kiểm lại được do lỗi mạng ở bước đặt hàng (GUI-01). */
+  pendingVoucherNote?: string | null;
   /**
    * Ô mã giảm giá ở giỏ (3b): `field` nằm ngay dưới "Tạm tính", `note` (điều kiện của mã) nằm dưới dòng "Giảm giá".
    * Chỉ giỏ dùng; đặt hàng và thanh toán chỉ có dòng giảm giá.
@@ -60,6 +62,7 @@ export default function CartSummary({
   subtotal,
   total,
   discount,
+  pendingVoucherNote,
   voucher,
   notice,
   cta,
@@ -118,6 +121,10 @@ export default function CartSummary({
             <dd className="num">−{formatPriceVnd(discount.amount)}</dd>
           </div>
         </dl>
+      ) : pendingVoucherNote ? (
+        <p className={s.pendingVoucher} data-testid="pending-voucher-note">
+          {pendingVoucherNote}
+        </p>
       ) : null}
       {discount && voucher?.note ? <div className={s.voucherNote}>{voucher.note}</div> : null}
       <dl className={s.rows}>

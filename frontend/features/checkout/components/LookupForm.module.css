@@ -2,4 +2,23 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  padding: var(--lookup-padding, var(--space-5));
+  border: var(--lookup-border, 1px solid var(--border-subtle, var(--border)));
+  border-radius: var(--lookup-radius, var(--radius-sheet));
+  background: var(--lookup-background, var(--card-gradient, var(--surface)));
+  box-shadow: var(--lookup-shadow, var(--shadow-card, var(--shadow-card-hover)));
+}
+
+.form a {
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .form {
+    gap: var(--space-5);
+    padding: var(--lookup-padding, var(--space-6));
+  }
 }
