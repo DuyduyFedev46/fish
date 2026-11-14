@@ -633,7 +633,7 @@ QA lô 2–3: mở file xlsx thật do Chủ, Quản lý, NV kho tải trên sta
 | 1 | — | |
 | 1b | — | |
 | 2 | **REVIEW PASS** (APPROVED, 0 Critical/High/Medium, 5 Low) | §13.2 |
-| 3 | **REVIEW FAIL** (REJECTED, 0 Critical/High, 2 Medium, 5 Low) | §13.3 |
+| 3 | **REVIEW PASS** (APPROVED sau khi sửa ở `989e199`; lần đầu `a669ddf` REJECTED vì 2 Medium) | §13.3, mục "Soát lại" |
 
 ### 13.2 Lô 2 (S3, S4) — techlead 14/11
 
@@ -730,6 +730,26 @@ Techlead tự chạy lại:
 | L5 | Low | `erp-console/features/catalog/components/ItemImportScreen.tsx:243-246` | `extractAlreadyAppliedCounts` lấy số đếm nhưng toast T5 dùng câu cố định. Câu này khớp 02a §5, nên số đếm thành thừa (T-10 định dùng số) | Hoặc bỏ biến, chỉ xét `code`. Hoặc dùng `formatImportSuccessToast(counts)`. Nên chọn một cách, tránh code nửa vời |
 
 **Để gộp:** sửa M1 và M2 kèm test. Nên sửa L1 luôn vì chỉ cần thêm một mixin. L2–L5 có thể để lô sau. Sau khi sửa, techlead chỉ soát lại `reader.py`, `plan.py` và test mới. Sau đó QA kiểm các ca ngoài đường thuận ở §11, và CI Postgres phải chạy `test_commit_race`.
+
+#### Soát lại sau khi sửa (commit `989e199`), techlead 14/11
+
+Đã soát `git diff a669ddf..989e199`. Techlead tự chạy lại, không tạo `.env`:
+- `manage.py test apps.catalog.item_files apps.catalog.items apps.catalog.pricing --parallel 1` → Ran 280, OK (skipped=1, là `test_commit_race` chờ CI Postgres).
+- `check_naming.py` → OK.
+- Chạy lại test dò: ô ở `A1048576` → 400 `too_many_rows` sau 0,03 giây (trước là 11,3 giây). Hai ca của M2 ra `hidden`, `will_show_on_shop = 0`. Ba API JSON đều có `Cache-Control: no-store`.
+
+| # | Kết quả |
+|---|---|
+| M1 | **Đã sửa.** Hai `iter_rows` đều có `max_col = len(ALL_COLUMNS) + 8`. Mọi dòng đã quét, kể cả dòng trống, tính vào trần `ITEM_IMPORT_MAX_ROWS × 2 + 10`. Có test thời gian và test kiểm có truyền `max_col` |
+| M2 | **Đã sửa.** Món mới chỉ `will_show` khi giá có `valid_from <= hôm nay`. Món bật lại chỉ `will_show` khi có giá hiệu lực, đã bỏ `or has_visibility_change`. Có 5 test mới cho các ca: giá tương lai, giá từ hôm nay, bật lại không giá, bật lại chỉ có giá tương lai, bật lại có giá hiệu lực |
+| Đổi test cũ | **Đúng theo T-8.** Trong `test_s5_ac1_ac2_ac3_ac14_...`, MUC01 là món mới có giá từ **ngày mai**, còn TOM01 (`item_b`) bật lại mà **chưa có giá nào** trong bảng mặc định (fixture chỉ đặt giá cho `item_a` và combo). Hôm nay cả hai chưa hiện trên Shop, nên `will_show_on_shop = 0` và MUC01 = `hidden` là đúng. Giá trị 2 cũ khẳng định đúng lỗi M2 |
+| L1 | Đã sửa. `NoStoreMixin` cho limits, preview, commit. Có test cả đường lỗi 400/403 |
+| L2 | Đã sửa. `plan.normalize_item_code` là nguồn chuẩn hoá mã duy nhất, dùng cho cả kế hoạch và khoá bước 6. Có bỏ mã rỗng, có test |
+| L4 | Đã sửa. Có test "đơn phát sinh sau xem trước → 409, không ghi ItemPrice hay AuditLog" và test log không chứa dữ liệu file. Dữ liệu trong test là dữ liệu giả |
+| L3, L5 | Còn nợ, không chặn gộp. L3 phải xong trước khi lên production: thêm ca giữ khoá trên CI Postgres |
+| **L6 (mới)** | Low. `reader.py`: `max_col` cố định ở 25 nên tiêu đề lạ nằm ngoài cột 25 bị bỏ qua mà không báo lỗi `unknown_columns`. Ví dụ cột "Gia moi" ở cột AD sẽ bị bỏ qua, ngược với ý S5-AC10. Thực tế ít gặp vì cột thường sát bên phải mẫu. Hướng sửa: đọc riêng dòng tiêu đề không giới hạn cột (chỉ 1 dòng), còn các dòng dữ liệu vẫn dùng `max_col`. Để lô sau |
+
+**Kết luận sau khi soát lại: REVIEW PASS (APPROVED).** Không còn lỗi Critical, High hay Medium. Bước tiếp: QA kiểm các ca ngoài đường thuận ở §11, CI Postgres chạy `test_commit_race`. Ca fail `vouchers` (ngày cài cứng) có sẵn trước lô 3, cần giao sửa riêng.
 
 ## Duy trả lời câu hỏi 🔴 (14/11)
 - **Q-TL-1:** "là 0,5 mọi chỗ luôn, không cần hard". Đổi mặc định `SHOP_MIN_QTY_KG` = 0,5 trong code, **không** đặt env khoá 1 kg trên production. Lần deploy production kế tiếp sẽ bật 0,5 kg; điều phối viên gom S1 + S2 (nội dung) + GUI-08 (chữ Shop) lên cùng đợt khi có thể.
