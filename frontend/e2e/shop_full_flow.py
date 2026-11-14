@@ -81,7 +81,8 @@ def journey(browser, width):
     # 2. Danh mục + lọc nhóm
     goto(page, "/shop/")
     R.ok(f"[{tag}] danh mục: 8 món, 3 mức tồn đủ cả ba (Còn hàng/Sắp hết/Hết hàng)",
-         all(s in page.inner_text("body") for s in ("Sắp hết", "Hết hàng")) and page.locator("text=Thêm 1 kg").count() >= 3)
+         all(s in page.inner_text("body") for s in ("Sắp hết", "Hết hàng"))
+         and page.get_by_role("button", name=re.compile(r"^Thêm (0,5|1)\s*kg")).count() >= 3)
     page.get_by_role("button", name="Cá", exact=True).first.click() if page.get_by_role("button", name="Cá", exact=True).count() else \
         page.get_by_role("link", name="Cá", exact=True).first.click()
     page.wait_for_timeout(600)
@@ -408,7 +409,12 @@ def error_branches(browser):
 
     # --- B2: bấm "Đặt hàng" ngay sau khi vào form có mã đã áp (FE chưa kiểm lại mã) → đơn vẫn có giảm giá
     ctx, page, watch = fresh_context(browser, 360)
-    add_to_cart(page, "CA-THU")
+    page.goto(SHOP + "/shop/orders/")
+    page.wait_for_load_state("networkidle")
+    page.evaluate(
+        "(l)=>localStorage.setItem('cangcaloc_cart_v1', JSON.stringify(l))",
+        [{"item_code": "CA-THU", "name": "Cá thu", "unit": "kg", "price": "165000", "qty": 1}],
+    )
     goto_cart(page)
     open_code_ui(page)
     page.locator("input[type=text]:visible").last.fill(V_MAIN)
@@ -523,6 +529,7 @@ def error_branches(browser):
         create_voucher(code_nq)
         ctx, page, watch = fresh_context(browser, width_nq)
         add_to_cart(page, "CA-THU")
+        page.wait_for_function("() => (localStorage.getItem('cangcaloc_cart_v1') || '').includes('CA-THU')")
         goto_cart(page)
         open_code_ui(page)
         page.locator("input[type=text]:visible").last.fill(code_nq)

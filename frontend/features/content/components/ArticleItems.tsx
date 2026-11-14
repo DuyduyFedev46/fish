@@ -2,7 +2,7 @@
 
 // SHOP-5-05 AC2, AC3: khối "Món dùng trong bài" (màn G2-KitchenArticle · DesktopKitchenArticle), thay ItemCard cũ.
 // Mỗi khối `item_card` của bài = ProductCard `row` (giá theo kg/combo, nhãn tồn 3 mức, không số kg) + AddToCart `card`
-// ("Thêm 1 kg" → bộ tăng giảm, toast "Xem giỏ", máy tính có MiniCart, bước 1 kg bấm trừ thì hỏi bỏ món: như SHOP-2-03 AC3, AC5).
+// ("Thêm 0,5 kg" → bộ tăng giảm, toast "Xem giỏ", máy tính có MiniCart, ở mức tối thiểu bấm trừ thì hỏi bỏ món: như SHOP-2-03 AC3, AC5).
 // Món hết: nút "Liên hệ chúng tôi". Món ngưng bán / không còn trong catalog: ẩn thẻ. Catalog lỗi: ẩn cả khối, bài vẫn đọc được.
 // Nạp catalog đúng 1 lần cho cả bài (SR-23 F7); bài không có thẻ thì không gọi.
 

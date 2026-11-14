@@ -246,7 +246,7 @@ export default function PreviewGallery() {
         <Button
           variant="outline"
           onClick={() =>
-            toast.show({ message: "Đã thêm 1 kg Món mẫu vào giỏ", action: { label: "Xem giỏ", href: "/ui-preview/" } })
+            toast.show({ message: "Đã thêm 0,5 kg Món mẫu vào giỏ", action: { label: "Xem giỏ", href: "/ui-preview/" } })
           }
         >
           Hiện Toast
@@ -257,7 +257,7 @@ export default function PreviewGallery() {
         open={dialog === "confirm"}
         onClose={() => setDialog(null)}
         title="Bỏ Món mẫu khỏi giỏ?"
-        description="Mỗi món mua tối thiểu 1 kg. Bớt nữa sẽ bỏ món này khỏi giỏ."
+        description="Mỗi món mua tối thiểu 0,5 kg. Bớt nữa sẽ bỏ món này khỏi giỏ."
         closeLabel="Đóng, giữ lại Món mẫu"
         actions={
           <>

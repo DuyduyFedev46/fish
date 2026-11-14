@@ -51,10 +51,10 @@ const t = (text, extra = {}) => ({ text, ...extra });
 
 // ---- Banner ----
 const seeded = {
-  blocks: [h2("Mua theo lô tại cảng"), p(t("Hải sản cấp đông, giá theo kg, mua từ 1 kg.")), p(t("Xem hàng đang có", { href: "/shop/" }))],
+  blocks: [h2("Mua theo lô tại cảng"), p(t("Hải sản cấp đông, giá theo kg, mua từ 0,5 kg.")), p(t("Xem hàng đang có", { href: "/shop/" }))],
 };
 eq("banner nạp sẵn", blocks.parseBanner(seeded), [
-  { title: "Mua theo lô tại cảng", subtitle: "Hải sản cấp đông, giá theo kg, mua từ 1 kg.", button: { label: "Xem hàng đang có", href: "/shop/" }, image: null },
+  { title: "Mua theo lô tại cảng", subtitle: "Hải sản cấp đông, giá theo kg, mua từ 0,5 kg.", button: { label: "Xem hàng đang có", href: "/shop/" }, image: null },
 ]);
 eq("banner rỗng", blocks.parseBanner({ blocks: [] }), []);
 eq("banner null", blocks.parseBanner(null), []);

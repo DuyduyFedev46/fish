@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: "%s | Cá Về",
   },
   description:
-    "Hải sản cấp đông theo kg, từ 1 kg: cá, tôm, mực, cua ghẹ và combo nấu nhanh. Thanh toán quét mã QR, giao tận nhà.",
+    "Hải sản cấp đông theo kg, từ 0,5 kg: cá, tôm, mực, cua ghẹ và combo nấu nhanh. Thanh toán quét mã QR, giao tận nhà.",
 };
 
 export default function RootLayout({

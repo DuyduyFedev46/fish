@@ -1,5 +1,5 @@
 /**
- * Luật số lượng của Shop (BR-BH-22): món kg mua tối thiểu `min_qty` (mặc định 1 kg), bước `qty_step`
+ * Luật số lượng của Shop (BR-BH-22): món kg mua tối thiểu `min_qty` (mặc định 0,5 kg), bước `qty_step`
  * (mặc định 0,5 kg); combo tối thiểu 1, bước 1. Giá trị `min_qty`/`qty_step` lấy từ catalog, không hard-code.
  *
  * File thuần TypeScript, không import gì, để `scripts/test-quantity.mjs` chạy được không cần build.
@@ -18,17 +18,18 @@ function fromUnits(units: number): number {
 
 export type QtyRule = { minQty: number; step: number };
 
-/** Đọc `min_qty`, `qty_step` (chuỗi từ API); thiếu hay sai thì dùng 1 và 0,5 cho kg, 1 và 1 cho combo. */
+/** Đọc `min_qty`, `qty_step` (chuỗi từ API); thiếu hay sai thì dùng 0,5 và 0,5 cho kg, 1 và 1 cho combo. */
 export function parseQtyRule(
   minQty: string | number | null | undefined,
   qtyStep: string | number | null | undefined,
   unit: "kg" | "combo" = "kg"
 ): QtyRule {
+  const fallbackMin = unit === "combo" ? 1 : 0.5;
   const fallbackStep = unit === "combo" ? 1 : 0.5;
   const min = Number(minQty);
   const step = Number(qtyStep);
   return {
-    minQty: Number.isFinite(min) && min > 0 ? min : 1,
+    minQty: Number.isFinite(min) && min > 0 ? min : fallbackMin,
     step: Number.isFinite(step) && step > 0 ? step : fallbackStep,
   };
 }
@@ -47,7 +48,7 @@ export function stepUp(qty: number, rule: QtyRule): number {
 
 /**
  * Giảm một bước. Trả `null` khi giảm sẽ xuống dưới mức tối thiểu: màn hình phải mở hộp thoại
- * xác nhận bỏ món, không bao giờ hiện 0,5 kg hay số lẻ ngoài bước (G4).
+ * xác nhận bỏ món, không bao giờ xuống dưới minQty hay số lẻ ngoài bước (G4).
  */
 export function stepDown(qty: number, rule: QtyRule): number | null {
   const next = toUnits(qty) - toUnits(rule.step);

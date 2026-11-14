@@ -74,7 +74,7 @@ type MockSeedItem = {
 };
 
 const MOCK_LOW_STOCK = 3; // khớp mặc định SHOP_LOW_STOCK_KG / SHOP_LOW_STOCK_COMBO ở backend
-const MOCK_MIN_STOCK = 1;
+const MOCK_MIN_STOCK = 0.5;
 
 function stockLevelOf(stock: number): StockLevel {
   if (stock < MOCK_MIN_STOCK) return "out";
@@ -104,7 +104,7 @@ function toWireItem(seed: MockSeedItem): CatalogItem {
     unit: isBundle ? "combo" : "kg",
     price: String(seed.price),
     stock_level: stockLevelOf(seed.mock_stock),
-    min_qty: "1",
+    min_qty: isBundle ? "1" : "0.5",
     qty_step: isBundle ? "1" : "0.5",
     group: seed.group,
     short_note: MOCK_TEXT[seed.item_code]?.short_note ?? "",
@@ -742,9 +742,10 @@ export async function mockCreateOrder(payload: CreateOrderPayload): Promise<Crea
     if (!item) continue;
     const isBundle = item.item_type === "BUNDLE";
     const q = Math.round(Number(line.qty) * 1000);
+    const min = isBundle ? 1000 : 500;
     const step = isBundle ? 1000 : 500;
-    if (!Number.isFinite(q) || q < 1000 || q % step !== 0) {
-      invalid.push({ item_code: item.item_code, min_qty: "1", qty_step: isBundle ? "1" : "0.5" });
+    if (!Number.isFinite(q) || q < min || q % step !== 0) {
+      invalid.push({ item_code: item.item_code, min_qty: isBundle ? "1" : "0.5", qty_step: isBundle ? "1" : "0.5" });
     }
   }
   if (invalid.length > 0) {
@@ -758,7 +759,8 @@ export async function mockCreateOrder(payload: CreateOrderPayload): Promise<Crea
   for (const line of payload.items) {
     const item = MOCK_CATALOG.find((i) => i.item_code === line.item_code);
     const qty = Number(line.qty);
-    if (!item || item.mock_stock < 1) {
+    const minStock = item?.item_type === "BUNDLE" ? 1 : MOCK_MIN_STOCK;
+    if (!item || item.mock_stock < minStock) {
       short.push({ item_code: line.item_code, stock_level: "out" });
       continue;
     }

@@ -32,7 +32,7 @@ export interface ProductCardProps {
   /**
    * rail: thẻ trang chủ, cuộn ngang trên điện thoại, nút "Chọn mua" dẫn sang trang chi tiết (không thêm giỏ).
    * row: một dòng ngang, cả dòng là link, không có nút.
-   * grid: thẻ trong lưới danh mục, nút "Thêm 1 kg" biến thành bộ tăng giảm.
+   * grid: thẻ trong lưới danh mục, nút "Thêm 0,5 kg" biến thành bộ tăng giảm.
    */
   variant?: "grid" | "rail" | "row";
   href: string;

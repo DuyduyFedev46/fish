@@ -48,7 +48,7 @@ export function reconcileCart(entries: ReconcileEntry[], catalog: ReconcileItem[
 
   const lines = entries.map((entry): ReconciledLine => {
     const item = byCode.get(entry.item_code);
-    const rule = item ? parseQtyRule(item.min_qty, item.qty_step, item.unit) : parseQtyRule(1, undefined, entry.unit);
+    const rule = item ? parseQtyRule(item.min_qty, item.qty_step, item.unit) : parseQtyRule(undefined, undefined, entry.unit);
     const qty = isValidQty(entry.qty, rule) ? entry.qty : snapUp(entry.qty, rule);
     const qtyAdjusted = qty !== entry.qty;
     if (qtyAdjusted) adjustedCount += 1;

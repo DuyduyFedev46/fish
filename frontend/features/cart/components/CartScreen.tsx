@@ -43,6 +43,7 @@ export default function CartScreen() {
   const [retrying, setRetrying] = useState(false);
   const [adjustedNotice, setAdjustedNotice] = useState(false);
   const [holdMinutes, setHoldMinutes] = useState<number | null>(null);
+  const [siteMinQtyKg, setSiteMinQtyKg] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [live, setLive] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -69,6 +70,8 @@ export default function CartScreen() {
       .then((info) => {
         const m = info?.policies?.hold_minutes;
         if (active && typeof m === "number" && m > 0) setHoldMinutes(m);
+        const minKg = info?.policies?.min_qty_kg;
+        if (active && typeof minKg === "string" && Number(minKg) > 0) setSiteMinQtyKg(minKg);
       })
       .catch(() => {});
     return () => {
@@ -123,6 +126,12 @@ export default function CartScreen() {
   const itemCount = result.lines.length;
   const available = itemCount - result.outCount;
   const pendingLine = pending ? result.lines.find((l) => l.entry.item_code === pending) : undefined;
+  const minKgLabel = useMemo(() => {
+    const fromCatalog = catalog?.find((i) => i.unit === "kg")?.min_qty;
+    const fromLines = result.lines.find((l) => l.entry.unit === "kg")?.rule.minQty;
+    const raw = Number(fromCatalog ?? siteMinQtyKg ?? fromLines ?? 0.5);
+    return formatQty(Number.isFinite(raw) && raw > 0 ? raw : 0.5);
+  }, [catalog, siteMinQtyKg, result.lines]);
 
   function focusVoucherRemove() {
     const buttons = Array.from(document.querySelectorAll<HTMLElement>("[data-voucher-remove]"));
@@ -223,7 +232,7 @@ export default function CartScreen() {
         <EmptyState
           icon="cart"
           title="Giỏ hàng đang trống"
-          description="Mua tối thiểu 1 kg mỗi món, giá tính theo kg"
+          description={`Mua tối thiểu ${minKgLabel} kg mỗi món, giá tính theo kg`}
           primaryAction={{ label: "Xem hàng đang có", href: "/shop/" }}
           framed={false}
         />
@@ -321,7 +330,7 @@ export default function CartScreen() {
               );
             })}
           </ul>
-          <p className={s.rule}>Mua tối thiểu 1 kg mỗi món.</p>
+          <p className={s.rule}>Mua tối thiểu {minKgLabel} kg mỗi món.</p>
           <div className={s.deskNote}>
             {holdMinutes ? <p>Hàng được giữ {holdMinutes} phút sau khi đặt. Khi còn nằm trong giỏ, hàng chưa được giữ.</p> : null}
             <Link href="/shop/">Mua thêm hàng khác</Link>
