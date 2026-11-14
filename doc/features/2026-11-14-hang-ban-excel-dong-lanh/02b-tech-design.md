@@ -632,8 +632,49 @@ QA lô 2–3: mở file xlsx thật do Chủ, Quản lý, NV kho tải trên sta
 |---|---|---|
 | 1 | — | |
 | 1b | — | |
-| 2 | — | |
+| 2 | **REVIEW PASS** (APPROVED, 0 Critical/High/Medium, 5 Low) | §13.2 |
 | 3 | — | |
+
+### 13.2 Lô 2 (S3, S4) — techlead 14/11
+
+Nhánh `feat/fish66-lo2-gop` (gộp `feat/fish66-lo2-export-be` + `feat/fish66-lo2-export-fe`, tách từ `main` cce9118).
+Techlead tự chạy lại: `manage.py test apps.catalog.item_files apps.catalog.items` → Ran 130, OK; `makemigrations --check --dry-run`
+→ No changes; `python3 scripts/check_naming.py` → OK, không phát sinh mới; kiểm trong venv `openpyxl 3.1.5`, `defusedxml 0.7.1`,
+`openpyxl.xml.DEFUSEDXML=True`, `LXML=False`, `iterparse` lấy từ `defusedxml`.
+
+**Kết luận: REVIEW PASS.** Không có lỗi Critical, High hay Medium.
+
+| Điểm soát | Kết quả |
+|---|---|
+| Rò giá vốn | Đạt. `columns.py` là danh sách tường minh 17 cột. `services.export_items` chỉ đọc `Item`, `ItemGroup` và giá hiệu lực qua `prefetch_current_prices`, không join `Batch`/`PurchaseReceiptLine`. Test `test_s3_ac5_*` tạo lô có giá mua, so tiêu đề tuyệt đối theo vai và quét mọi ô ở cả 2 sheet |
+| Cột giá theo vai | Đạt. `columns_for(with_prices=...)` dựa `catalog.view_itemprice`. NV kho 14 cột ở cả export và mẫu (`test_s3_ac3_*`, `test_s4_ac3_*`) |
+| 403 NV giao, gọi xác nhận, 401 | Đạt. `require_perm(view_item)` trong view, AuditLog không ghi khi 403 hay 400 |
+| Công thức độc | Đạt. Mọi ô chữ (mã, tên, nhóm, 5 ô công khai, sheet Hướng dẫn) đi qua `write_text_cell`: ép `data_type="s"` (ghi shared string, Excel không tính), thêm `quotePrefix` với `= + - @ \t \r \n`, không thêm `'` |
+| defusedxml | Có hiệu lực trong môi trường hiện tại (xem trên). Lô 2 chỉ ghi file nên chưa dùng tới. Lưu ý cho lô 3 ở L5 |
+| CORS | Đạt. Chỉ thêm `CORS_EXPOSE_HEADERS` đúng 2 header. `CORS_ALLOWED_ORIGINS` vẫn đọc env, không có `CORS_ALLOW_ALL_ORIGINS` |
+| AuditLog `export_items` | Đạt. `changes = {"rows", "with_prices"}`, `obj=None`, `note=""`. Không tên món, không bộ lọc (`test_s3_ac12_*`). Thuộc tính file `creator`/`lastModifiedBy` = "Cá Về" |
+| Bộ dò lệnh AI | Đạt. `APIView` + `MultiPartParser`, `discovery._has_json_parser` bỏ qua. `test_no_ai_command.py` dựng lại registry để kiểm |
+| N+1 | Đạt. 1 truy vấn món (kèm nhóm) + 1 truy vấn giá. `assertNumQueries` gián tiếp qua so số truy vấn khi thêm 50 món, cho cả Chủ và NV kho |
+| Contract 02b §3 BE ↔ FE | Khớp: đường dẫn, query `item_group/is_active/item_type/has_image` (`itemListQuery` không gửi `page=1`), `Content-Disposition` dạng `filename="..."`, `X-Row-Count`, 400 `INVALID_FILTER`, 403. `rowCount` chịu được `null` khi thiếu header |
+| `apiDownload` | Đạt. Lỗi thì parse JSON rồi ném `ApiError` qua `raiseHttpError` dùng chung (tách ra từ `apiFetch`, giữ nguyên hành vi 400/409 `details`). 200 thân rỗng thì báo lỗi. Không lưu blob khi lỗi. Có test |
+| `canImport` | Đạt. `IMPORT_PERMS` đúng 4 chuỗi như `columns.IMPORT_PERMS`, `every(has)`, không xét tên nhóm |
+| Nút Nhập | Đang ẩn bằng `IMPORT_PAGE_READY = false` (`ItemFileActions.tsx:25`). Lô 3 bật cùng lúc có route `/catalog/import/` |
+| Icon | `description` (tải) và `swap_vert` (nhập) thay `download`/`upload_file` vì font tập con chưa có. Cả hai có trong `scripts/subset-material-symbols.py`. Chấp nhận, ghi ở 03-dev-notes |
+| Chữ 02a §5 | Khớp L1, L2, L3, T1, T1b, T2, T3, E3, E4, E5 và nhãn menu "Thao tác khác với file". Thêm câu lỗi riêng cho file mẫu, hợp lý |
+| 360 px | `.itemActions` `flex-wrap` + nút `nowrap`; `.lp-tabrow` đã `flex-wrap`, `.lp-actions` co về min-content nên cụm nút xuống dòng, không tràn ngang. QA vẫn chụp xác nhận |
+
+**Ghi chú Low (không chặn gộp, nên xử lý ở lô 3):**
+
+| # | File:dòng | Việc |
+|---|---|---|
+| L1 | `backend/apps/catalog/item_files/api.py:32`, `:45` | `http_method_names` có `"head"`. Django gán `head = get`, nên HEAD vẫn dựng file và ghi một dòng `export_items` mà không ai nhận file. Bỏ `"head"` (giữ `get`, `options`) |
+| L2 | `backend/apps/catalog/item_files/services.py:23-24`, `columns.py:11` | `can_see_prices` và `VIEW_PRICES_PERM` lặp lại `items/serializers.py` `can_view_item_price` / `VIEW_ITEM_PRICE_PERM` (02b §9 ghi dùng `can_view_item_price`). Nên dùng chung một hằng để quyền giá có một nguồn |
+| L3 | `erp-console/shared/lib/http.ts:275` (`apiDownload`, nhánh 200) | Không kiểm `Content-Type`. Nếu một proxy trả 200 HTML thì máy lưu file .xlsx hỏng. Nên kiểm `spreadsheetml` (hoặc `octet-stream`) trước khi trả blob |
+| L4 | `erp-console/features/catalog/components/ItemFileActions.tsx:50`, `:80` | Khi một lượt tải đang chạy, nút còn lại bị khoá (nút Tải file Excel `disabled`) hoặc bị bỏ qua im lặng (mục Tải file mẫu qua `busyRef`). 02a §4 M1 ghi "nút còn lại vẫn dùng được". An toàn hơn ý 02a, chấp nhận được, nhưng mục menu nên hiện khoá (`blockedReason`) thay vì nuốt cú bấm |
+| L5 | `backend/requirements.txt` | defusedxml chỉ có hiệu lực khi openpyxl không dùng lxml. Nếu sau này có gói kéo `lxml` vào, openpyxl tự chuyển sang lxml. Lô 3 `test_reader.py` nên assert thêm `openpyxl.xml.LXML is False` (hoặc đặt `OPENPYXL_LXML=False`) bên cạnh `DEFUSEDXML is True` |
+
+Lưu ý cho lô 3 (không phải lỗi lô 2): `write_text_cell` bỏ ký tự cấm của XML (`ILLEGAL_CHARACTERS_RE`). Món có ký tự điều khiển trong chữ sẽ
+khác DB sau khi tải về, nên vòng "tải về → nhập lại → không có gì mới" (S6-AC13) cần so sau khi bỏ cùng bộ ký tự đó, hoặc chấp nhận đổi.
 
 ## Duy trả lời câu hỏi 🔴 (14/11)
 - **Q-TL-1:** "là 0,5 mọi chỗ luôn, không cần hard". Đổi mặc định `SHOP_MIN_QTY_KG` = 0,5 trong code, **không** đặt env khoá 1 kg trên production. Lần deploy production kế tiếp sẽ bật 0,5 kg; điều phối viên gom S1 + S2 (nội dung) + GUI-08 (chữ Shop) lên cùng đợt khi có thể.
