@@ -75,3 +75,13 @@ export function reconcileCart(entries: ReconcileEntry[], catalog: ReconcileItem[
 
   return { lines, adjustedCount, outCount, priceChangedCount, subtotal };
 }
+
+/**
+ * GUI-12: số lượng làm tròn chỉ được ghi vào giỏ đã lưu khi đã có catalog thật (`catalogReady`).
+ * Chưa có catalog (đang tải hoặc lỗi mạng) thì giỏ giữ nguyên, kẻo ghi đè theo luật dự phòng.
+ * Trả danh sách [mã món, số lượng mới], hoặc null khi không có gì để ghi.
+ */
+export function qtyFixesToPersist(result: Reconciled, catalogReady: boolean): [string, number][] | null {
+  if (!catalogReady || result.adjustedCount === 0) return null;
+  return result.lines.map((l) => [l.entry.item_code, l.qty]);
+}

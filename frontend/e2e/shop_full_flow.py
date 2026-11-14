@@ -601,10 +601,76 @@ def error_branches(browser):
         be2.terminate()
 
 
+def cart_qtys(page):
+    raw = page.evaluate("() => localStorage.getItem('cangcaloc_cart_v1')") or "[]"
+    return {e["item_code"]: e["qty"] for e in json.loads(raw)}
+
+
+def delay_catalog(page, seconds):
+    """Làm chậm GET /api/shop/catalog/ (GUI-12)."""
+    import time
+
+    def slow(route):
+        time.sleep(seconds)
+        route.continue_()
+    page.route("**/api/shop/catalog/**", slow)
+
+
+def quantity_kept_while_catalog_loads(browser):
+    """GUI-12 (BR-BH-22): chọn 0,5 kg thì giỏ, đặt hàng và tải lại đều giữ 0,5 kg; catalog chậm hay lỗi không đổi số lượng."""
+    price = {i["item_code"]: i for i in api("GET", "/api/shop/catalog/")[1]["items"]}["CA-THU"]
+    half = f"{round(float(price['price']) * 0.5):,}".replace(",", ".") + "đ"
+    for width in (360, 1280):
+        ctx, page, watch = fresh_context(browser, width)
+        add_to_cart(page, "CA-THU")  # số lượng mặc định = mức tối thiểu 0,5 kg
+        R.ok(f"[{width}] GUI-12 thêm 0,5 kg vào giỏ: localStorage qty 0,5", cart_qtys(page).get("CA-THU") == 0.5, cart_qtys(page))
+        delay_catalog(page, 3)
+        page.goto(SHOP + "/shop/cart/")
+        page.wait_for_selector("text=Tóm tắt đơn", timeout=15000)
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(400)
+        R.ok(f"[{width}] GUI-12 catalog chậm 3 giây, mở giỏ xong vẫn 0,5 kg trong giỏ đã lưu", cart_qtys(page).get("CA-THU") == 0.5, cart_qtys(page))
+        main_text = page.inner_text("main")
+        R.ok(f"[{width}] GUI-12 giỏ hiện tạm tính = 0,5 × giá ({half})", half in main_text, main_text[:300])
+        R.ok(f"[{width}] GUI-12 giỏ không báo 'Số lượng đã chỉnh'", "Số lượng đã chỉnh" not in main_text)
+        page.get_by_role("button", name=re.compile(r"^Tiếp tục")).first.click()
+        page.wait_for_url("**/shop/checkout/**")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(400)
+        R.ok(f"[{width}] GUI-12 trang đặt hàng vẫn 0,5 kg và tổng {half}", cart_qtys(page).get("CA-THU") == 0.5 and half in (page.text_content("main") or ""), cart_qtys(page))
+        page.reload()
+        page.wait_for_load_state("networkidle")
+        R.ok(f"[{width}] GUI-12 tải lại trang vẫn 0,5 kg", cart_qtys(page).get("CA-THU") == 0.5, cart_qtys(page))
+        ctx.close()
+    # catalog lỗi mạng: không tự đổi số lượng (giỏ cũ lẻ 0,3 kg vẫn nguyên)
+    ctx, page, watch = fresh_context(browser, 360)
+    goto(page, "/shop/")
+    page.evaluate("""() => localStorage.setItem('cangcaloc_cart_v1', JSON.stringify([
+        {item_code: 'CA-THU', name: 'Cá thu', unit: 'kg', price: '165000', qty: 0.3}]))""")
+    page.route("**/api/shop/catalog/**", lambda route: route.abort())
+    page.goto(SHOP + "/shop/cart/")
+    page.wait_for_selector("text=Chưa cập nhật được giá", timeout=15000)
+    page.wait_for_timeout(600)
+    snap(page, "gui12-catalog-error", 360, "gui-12")
+    R.ok("[360] GUI-12 catalog lỗi mạng: số lượng giỏ đã lưu không tự đổi (0,3 giữ nguyên)", cart_qtys(page).get("CA-THU") == 0.3, cart_qtys(page))
+    ctx.close()
+    # giỏ cũ 0,3 kg, catalog tải được (min_qty 0,5): làm tròn lên 0,5 và báo
+    ctx, page, watch = fresh_context(browser, 360)
+    goto(page, "/shop/")
+    page.evaluate("""() => localStorage.setItem('cangcaloc_cart_v1', JSON.stringify([
+        {item_code: 'CA-THU', name: 'Cá thu', unit: 'kg', price: '165000', qty: 0.3}]))""")
+    goto_cart(page)
+    page.wait_for_timeout(600)
+    R.ok("[360] GUI-12 giỏ cũ 0,3 kg + catalog min 0,5: làm tròn lên 0,5 kg và báo", cart_qtys(page).get("CA-THU") == 0.5
+         and "Số lượng đã chỉnh theo mức bán" in page.inner_text("main"), (cart_qtys(page), page.inner_text("main")[:200]))
+    ctx.close()
+
+
 def main():
     create_voucher(V_MAIN)
     with sync_playwright() as p:
         browser = p.chromium.launch()
+        quantity_kept_while_catalog_loads(browser)  # GUI-12
         code360 = journey(browser, 360)
         code1280 = journey(browser, 1280)
         lookup_from_other_session(browser, code360, 360)

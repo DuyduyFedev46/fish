@@ -25,7 +25,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useCart } from "@/components/CartContext";
 import { itemHref, toCardItem } from "@/features/catalog/cardItem";
 import { groupIconOf } from "@/features/catalog/groupIcon";
-import { reconcileCart } from "../reconcile";
+import { qtyFixesToPersist, reconcileCart } from "../reconcile";
 import { useVoucher } from "../useVoucher";
 import { describeTermsFull, minOrderOf } from "../voucherView";
 import s from "./CartScreen.module.css";
@@ -85,12 +85,15 @@ export default function CartScreen() {
   );
 
   // Số lượng lẻ từ Shop cũ: làm tròn lên mức hợp lệ, ghi lại và báo (AC6). Không tự xoá món.
+  // GUI-12: chỉ ghi khi đã có catalog thật; đang tải hoặc lỗi mạng thì giữ nguyên giỏ đã lưu.
   useEffect(() => {
-    if (!cart.ready || result.adjustedCount === 0) return;
-    const fixed = new Map(result.lines.map((l) => [l.entry.item_code, l.qty]));
+    if (!cart.ready) return;
+    const fixes = qtyFixesToPersist(result, loadState === "ready");
+    if (!fixes) return;
+    const fixed = new Map(fixes);
     cart.updateEntries((prev) => prev.map((e) => ({ ...e, qty: fixed.get(e.item_code) ?? e.qty })));
     setAdjustedNotice(true);
-  }, [cart.ready, result, cart]);
+  }, [cart.ready, result, cart, loadState]);
 
   // Sau khi bỏ một dòng: tiêu điểm về tên dòng kế tiếp, hết dòng thì về tiêu đề.
   useEffect(() => {
