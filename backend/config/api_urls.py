@@ -32,6 +32,7 @@ from apps.common.guidance.api import GuidanceView
 from apps.content.site.api import SiteInfoView
 import apps.sales.orders.next_steps  # noqa: F401 - đăng ký guidance provider cho order
 from apps.catalog.images.api import ItemImageDetailView
+from apps.catalog.item_files.api import ItemExportTemplateView, ItemExportView
 from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemViewSet
 from apps.catalog.items.shop_api import ShopCatalogView, ShopItemDetailView
 from apps.catalog.pricing.api import ItemPriceViewSet, PriceListViewSet, PricingRuleViewSet
@@ -127,6 +128,10 @@ urlpatterns = [
     path("public/content/footer-links/", PublicFooterLinksView.as_view(), name="public-content-footer-links"),
     # Thông tin công khai cho Shop web (CS-10, GL-01, GL-04)
     path("public/site-info/", SiteInfoView.as_view(), name="public-site-info"),
+
+    # FISH-66 S3/S4: tải file Excel mặt hàng. Khai TRƯỚC include(router.urls) để router không bắt "export" làm pk.
+    path("catalog/items/export/", ItemExportView.as_view(), name="catalog-items-export"),
+    path("catalog/items/export-template/", ItemExportTemplateView.as_view(), name="catalog-items-export-template"),
 
     # Ma trận phân quyền (B4): khai trước include(router.urls) để StaffViewSet không bắt pk="groups".
     path("staff/groups/", GroupListView.as_view(), name="staff-groups"),

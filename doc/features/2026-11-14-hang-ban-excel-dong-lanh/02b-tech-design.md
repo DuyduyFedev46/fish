@@ -630,10 +630,111 @@ QA lô 2–3: mở file xlsx thật do Chủ, Quản lý, NV kho tải trên sta
 
 | Lô | Kết luận | Ghi chú |
 |---|---|---|
-| 1 | — | |
-| 1b | — | |
-| 2 | — | |
+| 1 | **REVIEW PASS** (14/11, nhánh `feat/fish66-lo1-gop` đến `f4b7d66`) | Không Critical, High hay Medium. Điều kiện gộp: AC11 phải chạy xanh trên CI Postgres. Còn 4 lỗi Low, xem dưới. |
+| 1b | **REVIEW PASS** (14/11) | Không lỗi. Còn chờ dán kết quả script S2-AC3 trên staging, và Duy duyệt bản production (S2-AC6). |
+| 2 | **REVIEW PASS** (APPROVED, 0 Critical/High/Medium, 5 Low) | §13.2 |
 | 3 | — | |
+
+### 13.1 Lô 1 + 1b: kết quả soát (techlead 14/11)
+
+```mermaid
+flowchart LR
+  A["Đọc diff 16 file"] --> B["Chạy lại test liên quan"]
+  B --> C["Thử đặt tham số 1 kg: test mới phải đỏ"]
+  C --> D{"Có lỗi chặn?"}
+  D -- "không" --> E["Đạt, chờ test đua trên máy chủ thật"]
+```
+
+**Đúng thiết kế §8.1 và §8.2.**
+- `settings.py:361` mặc định `"0.5"`, vẫn đọc env và dùng `Decimal`. Theo Q-TL-1 thì production không đặt env.
+- `load_shop_content.py:153` và `site/services.py:73` bỏ giá trị dự phòng 1.
+- `InvalidQtyError` dựng `detail` từ tham số. Câu không chứa mã BR, giữ nguyên `code` và `lines`.
+- `stock_level`, `qty_rule` và `validate_line_qty` không đổi.
+- Không có migration (`makemigrations --check` sạch). Không đụng `frontend/` hay `apps/catalog/items/services.py`.
+
+**Giá vốn và dữ liệu cá nhân.**
+- Câu lỗi mới chỉ có hai tham số công khai (mức tối thiểu, bước) và câu combo cố định.
+- Không có số kg tồn, mã lô hay dữ liệu khách.
+- `test_s1_ac12` (cả `sales` lẫn `catalog`) quét phản hồi để tìm giá mua, mã lô, `qty_reserved` và SĐT, tên, địa chỉ giả.
+
+**BR-BH-22/23 (đuôi lô).**
+- Tồn 0,4 kg ra `out`, tồn đúng 0,5 kg ra `low`.
+- Tồn 0,5 kg: đặt 0,5 kg thành công, đặt 1 kg nhận `OUT_OF_STOCK`.
+- Đơn combo 0,5 vẫn bị chặn. Combo giữ `min_qty` = `qty_step` = "1".
+
+**Giỏ, đơn cũ và giữ chỗ.**
+- Giỏ cũ luôn là bội 0,5 và từ 1 kg trở lên, nên vẫn hợp lệ với mức mới.
+- Đơn cũ không bị chạm (AC13 kiểm tổng tiền và dòng đơn cũ, `qty_reserved` cộng dồn 1,5).
+- Giữ chỗ và FEFO không đổi code. AC1 kiểm phân bổ 0,5 kg vào đúng lô.
+
+**Các `override_settings` 1 kg không che lỗi.**
+- Mỗi chỗ ép 1 kg đều có ca chạy theo mặc định 0,5 trong `test_shop_min_qty.py` (sales, catalog) và `LoadShopContentMinQtyTextTests`.
+- Hai ca `0.5` đổi thành `0.25` (`test_shop_create_error_order.py:83`, `test_shop_order_create.py:101`) vẫn giữ ý "số lượng sai".
+- Đã thử đặt `SHOP_MIN_QTY_KG=1` rồi chạy hai file `test_shop_min_qty` cùng `test_load_shop_content`: 12 ca đỏ đúng lý do. Test mới bắt được việc lùi mặc định.
+
+**Commit `f4b7d66` (voucher).** Ca đổi ngày sang 2099 hợp lý. Ý test giữ nguyên: đổi giờ +07:00 ra UTC và trạng thái `scheduled`. Không làm yếu test.
+
+**Kiểm chứng techlead chạy trong worktree:**
+- `manage.py test apps.sales.orders apps.catalog.items apps.content apps.catalog.vouchers`: Ran 842, OK (skipped=10).
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK.
+
+**Điều kiện trước khi gộp `main`:**
+- `test_s1_ac11_two_parallel_half_kg_orders_on_half_kg_stock_exactly_one_wins` (`test_shop_create_race.py:87`) chỉ chạy trên Postgres.
+- Trên SQLite ca này bị bỏ qua, nên chưa ai thấy nó chạy. Phải thấy nó xanh trên CI Postgres cloud (`.github/workflows/backend-tests.yml`).
+
+**Low (không chặn, gom sửa khi tiện):**
+- L1 `backend/apps/sales/orders/shop_errors.py:24`: `_vn_kg` là bản thứ ba của cùng một hàm định dạng kg kiểu Việt. Hai bản kia là `_format_kg` ở `load_shop_content.py:76` và `_kg_text` ở `site/services.py:33` (bản này ra dấu chấm). Nên gom về một helper chung, ví dụ trong `apps/sales/utils.py` cạnh `kg_str`.
+- L2 `backend/apps/sales/orders/shop_errors.py:44`: `InvalidQtyError.default_detail` không còn được dùng, vì `__init__` luôn truyền `detail`. Đây là code chết, nên bỏ.
+- L3 `backend/apps/sales/orders/tests/test_shop_create.py:94`: kiểm `detail` bị nới từ so khớp nguyên câu xuống `startswith`. Lớp này đã ép 1 kg, nên so được nguyên câu "Món theo kg đặt từ 1 kg, mỗi lần thêm 0,5 kg. Combo đặt số nguyên từ 1." AC3 ở file mới đã bù phần lớn.
+- L4 `backend/apps/content/tests/test_load_shop_content.py:412`: `override_settings(SHOP_MIN_QTY_KG="1")` truyền chuỗi, còn mọi chỗ khác truyền `Decimal`. Chạy đúng vì `_format_kg` nhận cả chuỗi, nhưng nên thống nhất.
+
+**Ghi nhận ngoài phạm vi (không phải lỗi lô này):**
+- `load_shop_content.py:154` và `site/services.py:74` còn giá trị dự phòng cho `SHOP_QTY_STEP_KG`.
+- `frontend/lib/quantity.ts:21`, `frontend/lib/mock.ts:107,747`, `frontend/features/content/mock.ts` và `PreviewGallery.tsx:260` còn số 1 kg. Phần này thuộc GUI-08 (Gemini, nhánh `gemini/shop-ui`).
+- Bản build thật lấy `min_qty` từ API nên vẫn đúng. Câu cố định trong `PreviewGallery` chỉ có ở `/ui-preview/`.
+- S1-AC13 chỉ được kiểm ở mức DB, chưa kiểm màn ERP và báo cáo. Chấp nhận được vì lô này không đổi code đơn hay báo cáo.
+
+### 13.2 Lô 2 (S3, S4) — techlead 14/11
+
+Nhánh `feat/fish66-lo2-gop` (gộp `feat/fish66-lo2-export-be` + `feat/fish66-lo2-export-fe`, tách từ `main` cce9118).
+Techlead tự chạy lại: `manage.py test apps.catalog.item_files apps.catalog.items` → Ran 130, OK; `makemigrations --check --dry-run`
+→ No changes; `python3 scripts/check_naming.py` → OK, không phát sinh mới; kiểm trong venv `openpyxl 3.1.5`, `defusedxml 0.7.1`,
+`openpyxl.xml.DEFUSEDXML=True`, `LXML=False`, `iterparse` lấy từ `defusedxml`.
+
+**Kết luận: REVIEW PASS.** Không có lỗi Critical, High hay Medium.
+
+| Điểm soát | Kết quả |
+|---|---|
+| Rò giá vốn | Đạt. `columns.py` là danh sách tường minh 17 cột. `services.export_items` chỉ đọc `Item`, `ItemGroup` và giá hiệu lực qua `prefetch_current_prices`, không join `Batch`/`PurchaseReceiptLine`. Test `test_s3_ac5_*` tạo lô có giá mua, so tiêu đề tuyệt đối theo vai và quét mọi ô ở cả 2 sheet |
+| Cột giá theo vai | Đạt. `columns_for(with_prices=...)` dựa `catalog.view_itemprice`. NV kho 14 cột ở cả export và mẫu (`test_s3_ac3_*`, `test_s4_ac3_*`) |
+| 403 NV giao, gọi xác nhận, 401 | Đạt. `require_perm(view_item)` trong view, AuditLog không ghi khi 403 hay 400 |
+| Công thức độc | Đạt. Mọi ô chữ (mã, tên, nhóm, 5 ô công khai, sheet Hướng dẫn) đi qua `write_text_cell`: ép `data_type="s"` (ghi shared string, Excel không tính), thêm `quotePrefix` với `= + - @ \t \r \n`, không thêm `'` |
+| defusedxml | Có hiệu lực trong môi trường hiện tại (xem trên). Lô 2 chỉ ghi file nên chưa dùng tới. Lưu ý cho lô 3 ở L5 |
+| CORS | Đạt. Chỉ thêm `CORS_EXPOSE_HEADERS` đúng 2 header. `CORS_ALLOWED_ORIGINS` vẫn đọc env, không có `CORS_ALLOW_ALL_ORIGINS` |
+| AuditLog `export_items` | Đạt. `changes = {"rows", "with_prices"}`, `obj=None`, `note=""`. Không tên món, không bộ lọc (`test_s3_ac12_*`). Thuộc tính file `creator`/`lastModifiedBy` = "Cá Về" |
+| Bộ dò lệnh AI | Đạt. `APIView` + `MultiPartParser`, `discovery._has_json_parser` bỏ qua. `test_no_ai_command.py` dựng lại registry để kiểm |
+| N+1 | Đạt. 1 truy vấn món (kèm nhóm) + 1 truy vấn giá. `assertNumQueries` gián tiếp qua so số truy vấn khi thêm 50 món, cho cả Chủ và NV kho |
+| Contract 02b §3 BE ↔ FE | Khớp: đường dẫn, query `item_group/is_active/item_type/has_image` (`itemListQuery` không gửi `page=1`), `Content-Disposition` dạng `filename="..."`, `X-Row-Count`, 400 `INVALID_FILTER`, 403. `rowCount` chịu được `null` khi thiếu header |
+| `apiDownload` | Đạt. Lỗi thì parse JSON rồi ném `ApiError` qua `raiseHttpError` dùng chung (tách ra từ `apiFetch`, giữ nguyên hành vi 400/409 `details`). 200 thân rỗng thì báo lỗi. Không lưu blob khi lỗi. Có test |
+| `canImport` | Đạt. `IMPORT_PERMS` đúng 4 chuỗi như `columns.IMPORT_PERMS`, `every(has)`, không xét tên nhóm |
+| Nút Nhập | Đang ẩn bằng `IMPORT_PAGE_READY = false` (`ItemFileActions.tsx:25`). Lô 3 bật cùng lúc có route `/catalog/import/` |
+| Icon | `description` (tải) và `swap_vert` (nhập) thay `download`/`upload_file` vì font tập con chưa có. Cả hai có trong `scripts/subset-material-symbols.py`. Chấp nhận, ghi ở 03-dev-notes |
+| Chữ 02a §5 | Khớp L1, L2, L3, T1, T1b, T2, T3, E3, E4, E5 và nhãn menu "Thao tác khác với file". Thêm câu lỗi riêng cho file mẫu, hợp lý |
+| 360 px | `.itemActions` `flex-wrap` + nút `nowrap`; `.lp-tabrow` đã `flex-wrap`, `.lp-actions` co về min-content nên cụm nút xuống dòng, không tràn ngang. QA vẫn chụp xác nhận |
+
+**Ghi chú Low (không chặn gộp, nên xử lý ở lô 3):**
+
+| # | File:dòng | Việc |
+|---|---|---|
+| L1 | `backend/apps/catalog/item_files/api.py:32`, `:45` | `http_method_names` có `"head"`. Django gán `head = get`, nên HEAD vẫn dựng file và ghi một dòng `export_items` mà không ai nhận file. Bỏ `"head"` (giữ `get`, `options`) |
+| L2 | `backend/apps/catalog/item_files/services.py:23-24`, `columns.py:11` | `can_see_prices` và `VIEW_PRICES_PERM` lặp lại `items/serializers.py` `can_view_item_price` / `VIEW_ITEM_PRICE_PERM` (02b §9 ghi dùng `can_view_item_price`). Nên dùng chung một hằng để quyền giá có một nguồn |
+| L3 | `erp-console/shared/lib/http.ts:275` (`apiDownload`, nhánh 200) | Không kiểm `Content-Type`. Nếu một proxy trả 200 HTML thì máy lưu file .xlsx hỏng. Nên kiểm `spreadsheetml` (hoặc `octet-stream`) trước khi trả blob |
+| L4 | `erp-console/features/catalog/components/ItemFileActions.tsx:50`, `:80` | Khi một lượt tải đang chạy, nút còn lại bị khoá (nút Tải file Excel `disabled`) hoặc bị bỏ qua im lặng (mục Tải file mẫu qua `busyRef`). 02a §4 M1 ghi "nút còn lại vẫn dùng được". An toàn hơn ý 02a, chấp nhận được, nhưng mục menu nên hiện khoá (`blockedReason`) thay vì nuốt cú bấm |
+| L5 | `backend/requirements.txt` | defusedxml chỉ có hiệu lực khi openpyxl không dùng lxml. Nếu sau này có gói kéo `lxml` vào, openpyxl tự chuyển sang lxml. Lô 3 `test_reader.py` nên assert thêm `openpyxl.xml.LXML is False` (hoặc đặt `OPENPYXL_LXML=False`) bên cạnh `DEFUSEDXML is True` |
+
+Lưu ý cho lô 3 (không phải lỗi lô 2): `write_text_cell` bỏ ký tự cấm của XML (`ILLEGAL_CHARACTERS_RE`). Món có ký tự điều khiển trong chữ sẽ
+khác DB sau khi tải về, nên vòng "tải về → nhập lại → không có gì mới" (S6-AC13) cần so sau khi bỏ cùng bộ ký tự đó, hoặc chấp nhận đổi.
 
 ## Duy trả lời câu hỏi 🔴 (14/11)
 - **Q-TL-1:** "là 0,5 mọi chỗ luôn, không cần hard". Đổi mặc định `SHOP_MIN_QTY_KG` = 0,5 trong code, **không** đặt env khoá 1 kg trên production. Lần deploy production kế tiếp sẽ bật 0,5 kg; điều phối viên gom S1 + S2 (nội dung) + GUI-08 (chữ Shop) lên cùng đợt khi có thể.

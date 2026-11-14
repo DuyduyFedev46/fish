@@ -98,7 +98,7 @@ class CreateContractTests(ShopCreateBase):
         self.assertEqual(again.json()["order_code"], first.json()["order_code"])
 
     def test_s3_01_ac2_failed_first_attempt_does_not_burn_the_request_id(self):
-        bad = self.post([("MUC-ONG", "0.5")], client_request_id=REQUEST_ID)
+        bad = self.post([("MUC-ONG", "0.25")], client_request_id=REQUEST_ID)
         self.assertEqual(bad.status_code, 400)
         self.assertEqual(SalesOrder.objects.count(), 0)
         ok = self.post([("MUC-ONG", "1")], client_request_id=REQUEST_ID)

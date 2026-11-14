@@ -50,3 +50,25 @@ def choice_param(params, name, choices):
     if raw not in set(choices):
         raise _invalid(f"Tham số {name} có giá trị không hợp lệ.")
     return raw
+
+
+def apply_item_filters(qs, params):
+    """
+    Bốn bộ lọc danh sách mặt hàng (R14): `item_group=<id>`, `is_active=1|0`, `item_type=SIMPLE|BUNDLE`, `has_image=1|0`.
+    Rỗng = không lọc; sai → 400 INVALID_FILTER. Dùng chung cho danh sách và tải file Excel (FISH-66 S3-AC6).
+    """
+    from apps.catalog.models import Item
+
+    group = id_param(params, "item_group")
+    if group is not None:
+        qs = qs.filter(item_group_id=group)
+    is_active = bool_param(params, "is_active")
+    if is_active is not None:
+        qs = qs.filter(is_active=is_active)
+    has_image = bool_param(params, "has_image")  # A2-AC16; sai giá trị → 400 như các bộ lọc khác (L5)
+    if has_image is not None:
+        qs = qs.filter(image__isnull=not has_image)
+    item_type = choice_param(params, "item_type", Item.ItemType.values)
+    if item_type is not None:
+        qs = qs.filter(item_type=item_type)
+    return qs

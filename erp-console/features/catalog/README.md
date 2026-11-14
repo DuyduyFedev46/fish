@@ -45,3 +45,12 @@ Màn riêng `/vouchers/` (danh sách), `/vouchers/new/`, `/vouchers/edit/?id=`. 
 - `voucherMock.ts`: mock đúng 02b §3.9 (chỉ chạy khi `NEXT_PUBLIC_USE_MOCK=1`), gọi từ `mock.ts`; `window.__caveMock.resetCatalog()` đưa mã về seed.
 - `components/VoucherList`, `VoucherForm` (tạo và sửa), `VoucherDisableDialog` (bắt chọn lý do), `VoucherRedemptions` (chỉ mã đơn, số giảm, giờ, trạng thái, không có thông tin khách).
 - Mã và kiểu giảm không đổi sau khi tạo; từ `starts_at` chỉ sửa được theo hướng có lợi cho khách (BR-DM-22). Không có nút xoá.
+
+## Tải và nhập file Excel mặt hàng (FISH-66)
+
+Hồ sơ: `doc/features/2026-11-14-hang-ban-excel-dong-lanh/` (02a, 02b §3 và §10). Lô 2 mới có phần tải (S3, S4); phần nhập (S5, S6) làm ở lô 3.
+
+- Endpoint: `GET /api/catalog/items/export/?item_group=&is_active=&item_type=&has_image=` và `GET /api/catalog/items/export-template/`. Trả file .xlsx, tên lấy từ `Content-Disposition`, số món từ `X-Row-Count`. Số cột do BE quyết theo quyền (Chủ, Quản lý 17 cột; NV kho 14 cột, không có giá bán).
+- `itemFilesApi.ts` (`exportItems`, `exportTemplate`), `itemFilesTypes.ts`, `itemFilesMock.ts` (dữ liệu giả; `window.__caveMock.itemFiles("ok" | "fail" | "forbidden")`). Hàm tải chung `apiDownload` ở `shared/lib/http.ts`, lưu file bằng `saveBlob` ở `shared/lib/download.ts`.
+- `components/ItemFileActions.tsx`: nút "Tải file Excel" và menu "…" có "Tải file mẫu" cho ai có `catalog.view_item`. Nút "Nhập từ Excel" chỉ hiện khi `ability.canImport` (đủ 4 quyền `IMPORT_PERMS`) và khi trang `/catalog/import/` có (cờ `IMPORT_PAGE_READY`, bật ở lô 3).
+- FE không đọc hay ghi xlsx. File chỉ đi qua blob tạm, không vào URL hay storage. Test ở `itemFilesDownload.test.ts`.

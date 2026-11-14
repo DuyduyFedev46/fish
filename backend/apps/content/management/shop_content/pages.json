@@ -53,7 +53,7 @@
     {
       "slug": "gioi-thieu",
       "title": "Giới thiệu Cá Về",
-      "excerpt": "Cá Về mua hải sản theo từng lô tại cảng, bán hàng cấp đông theo kg từ {min_qty_kg} kg và giao tận nhà bạn ở Phan Thiết.",
+      "excerpt": "Cá Về mua hải sản theo từng lô tại cảng, bán hàng cấp đông theo kg, mua từ {min_qty_kg} kg, giao tận nhà bạn ở Phan Thiết.",
       "seo_title": "Giới thiệu Cá Về — Từ cảng về bếp nhà bạn",
       "seo_description": "Cá Về mua hải sản theo từng lô tại cảng, bán hàng cấp đông theo kg và giao tận nhà ở Phan Thiết. Xem cách chúng tôi mua, bảo quản và giao hàng.",
       "page_role": null,

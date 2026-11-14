@@ -175,6 +175,8 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 CORS_ALLOWED_ORIGINS = [
     o.strip() for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o.strip()
 ]
+# FISH-66 T-2: ERP (khác miền với API) cần đọc tên file và số món từ response tải file Excel.
+CORS_EXPOSE_HEADERS = ["Content-Disposition", "X-Row-Count"]
 # Domain được tin cho form POST/Admin qua HTTPS (Cloud Run *.run.app).
 CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
@@ -358,7 +360,7 @@ PRIVACY_CONSENT_REQUIRED = privacy_consent_required(TESTING, DEBUG, os.environ)
 # --- Shop làm lại 2026-10 (doc/features/2026-10-06-shop-giao-dien-moi/02b §2.3) -----------
 # Khai một lần ở lô 1 cho cả đợt; lô sau chỉ đọc. Tham số nghiệp vụ không hard-code (bất biến 7).
 # Số lượng đặt và mức tồn hiển thị (BR-BH-22, BR-BH-23, V-01).
-SHOP_MIN_QTY_KG = Decimal(os.getenv("SHOP_MIN_QTY_KG", "1"))
+SHOP_MIN_QTY_KG = Decimal(os.getenv("SHOP_MIN_QTY_KG", "0.5"))
 SHOP_QTY_STEP_KG = Decimal(os.getenv("SHOP_QTY_STEP_KG", "0.5"))
 SHOP_LOW_STOCK_KG = Decimal(os.getenv("SHOP_LOW_STOCK_KG", "3"))
 SHOP_LOW_STOCK_COMBO = int(os.getenv("SHOP_LOW_STOCK_COMBO", "3"))
@@ -383,6 +385,10 @@ SELLER_WEBSITE_NOTICE_IMAGE = os.getenv("SELLER_WEBSITE_NOTICE_IMAGE", "")
 SHOP_CONFIRM_CALL_NOTICE = _bool("SHOP_CONFIRM_CALL_NOTICE", "0")
 SHOP_CONFIRM_CALL_HOURS = os.getenv("SHOP_CONFIRM_CALL_HOURS", "7:00–20:00")
 
-
-
-
+# --- FISH-66 (doc/features/2026-11-14-hang-ban-excel-dong-lanh/02b §6.2): tải/nhập file Excel mặt hàng ---
+ITEM_IMPORT_MAX_ROWS = int(os.getenv("ITEM_IMPORT_MAX_ROWS", "1000"))
+ITEM_IMPORT_MAX_BYTES = int(os.getenv("ITEM_IMPORT_MAX_BYTES", str(2 * 1024 * 1024)))
+ITEM_IMPORT_MAX_UNPACKED_BYTES = int(os.getenv("ITEM_IMPORT_MAX_UNPACKED_BYTES", str(25 * 1024 * 1024)))
+ITEM_IMPORT_PREVIEW_TTL_MINUTES = int(os.getenv("ITEM_IMPORT_PREVIEW_TTL_MINUTES", "30"))
+ITEM_IMPORT_PRICE_ALERT_PERCENT = int(os.getenv("ITEM_IMPORT_PRICE_ALERT_PERCENT", "30"))
+ITEM_IMPORT_PRICE_ZERO_FACTOR = int(os.getenv("ITEM_IMPORT_PRICE_ZERO_FACTOR", "5"))
