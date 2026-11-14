@@ -113,3 +113,7 @@
 .voucherSub { display: block; margin-top: 2px; font-size: var(--text-xs); }
 .statusInline { display: none; margin-top: var(--space-1); }
 @container lt-list (max-width: 799px) { .statusInline { display: block; } }
+
+/* FISH-66 S3, S4: cụm nút tab Mặt hàng (tải file, thêm) xuống dòng gọn trên điện thoại, chữ nút không bị bẻ. */
+.itemActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); max-width: 100%; }
+.itemActions :global(.btn) { white-space: nowrap; }

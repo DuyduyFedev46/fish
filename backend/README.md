@@ -42,6 +42,7 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 | Miền (app) | Module | Quy trình | Endpoint chính (`/api/…`) |
 |---|---|---|---|
 | `catalog` | `items/` | P-01 | `catalog/items/`, `catalog/item-groups/`, `catalog/bundle-lines/`; Shop `shop/catalog/` |
+| | `item_files/` | P-01 | `catalog/items/export/`, `catalog/items/export-template/` (FISH-66 S3, S4; nhập file ở lô 3) |
 | | `pricing/` | P-01 | `catalog/price-lists/`, `catalog/item-prices/`, `catalog/pricing-rules/` |
 | `purchasing` | `receipts/` | P-02 | `purchasing/suppliers/`, `purchasing/receipts/` (+ `submit`) |
 | | `invoices/` | P-02 | `purchasing/invoices/` |
