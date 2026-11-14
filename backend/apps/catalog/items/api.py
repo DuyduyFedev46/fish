@@ -8,7 +8,7 @@ from apps.catalog.pricing.services import prefetch_current_prices
 from apps.common.api import BusinessModelPermissions
 from apps.common.audit import record_audit
 
-from .filters import bool_param, choice_param, id_param
+from .filters import apply_item_filters
 from .serializers import BundleLineSerializer, ItemGroupSerializer, ItemSerializer, can_view_item_price
 
 
@@ -53,20 +53,7 @@ class ItemViewSet(viewsets.ModelViewSet):
 
     def filter_list(self, qs):
         """R14: `item_group=<id>`, `is_active=1|0`, `item_type=SIMPLE|BUNDLE`, `has_image=1|0`. Rỗng = không lọc; sai → 400 INVALID_FILTER."""
-        params = self.request.query_params
-        group = id_param(params, "item_group")
-        if group is not None:
-            qs = qs.filter(item_group_id=group)
-        is_active = bool_param(params, "is_active")
-        if is_active is not None:
-            qs = qs.filter(is_active=is_active)
-        has_image = bool_param(params, "has_image")  # A2-AC16; sai giá trị → 400 như các bộ lọc khác (L5)
-        if has_image is not None:
-            qs = qs.filter(image__isnull=not has_image)
-        item_type = choice_param(params, "item_type", Item.ItemType.values)
-        if item_type is not None:
-            qs = qs.filter(item_type=item_type)
-        return qs
+        return apply_item_filters(qs, self.request.query_params)
 
 
 class BundleLineViewSet(viewsets.ModelViewSet):
