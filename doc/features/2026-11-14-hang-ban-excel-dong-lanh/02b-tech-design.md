@@ -630,10 +630,70 @@ QA lô 2–3: mở file xlsx thật do Chủ, Quản lý, NV kho tải trên sta
 
 | Lô | Kết luận | Ghi chú |
 |---|---|---|
-| 1 | — | |
-| 1b | — | |
+| 1 | **REVIEW PASS** (14/11, nhánh `feat/fish66-lo1-gop` đến `f4b7d66`) | Không Critical, High hay Medium. Điều kiện gộp: AC11 phải chạy xanh trên CI Postgres. Còn 4 lỗi Low, xem dưới. |
+| 1b | **REVIEW PASS** (14/11) | Không lỗi. Còn chờ dán kết quả script S2-AC3 trên staging, và Duy duyệt bản production (S2-AC6). |
 | 2 | — | |
 | 3 | — | |
+
+### 13.1 Lô 1 + 1b: kết quả soát (techlead 14/11)
+
+```mermaid
+flowchart LR
+  A["Đọc diff 16 file"] --> B["Chạy lại test liên quan"]
+  B --> C["Thử đặt tham số 1 kg: test mới phải đỏ"]
+  C --> D{"Có lỗi chặn?"}
+  D -- "không" --> E["Đạt, chờ test đua trên máy chủ thật"]
+```
+
+**Đúng thiết kế §8.1 và §8.2.**
+- `settings.py:361` mặc định `"0.5"`, vẫn đọc env và dùng `Decimal`. Theo Q-TL-1 thì production không đặt env.
+- `load_shop_content.py:153` và `site/services.py:73` bỏ giá trị dự phòng 1.
+- `InvalidQtyError` dựng `detail` từ tham số. Câu không chứa mã BR, giữ nguyên `code` và `lines`.
+- `stock_level`, `qty_rule` và `validate_line_qty` không đổi.
+- Không có migration (`makemigrations --check` sạch). Không đụng `frontend/` hay `apps/catalog/items/services.py`.
+
+**Giá vốn và dữ liệu cá nhân.**
+- Câu lỗi mới chỉ có hai tham số công khai (mức tối thiểu, bước) và câu combo cố định.
+- Không có số kg tồn, mã lô hay dữ liệu khách.
+- `test_s1_ac12` (cả `sales` lẫn `catalog`) quét phản hồi để tìm giá mua, mã lô, `qty_reserved` và SĐT, tên, địa chỉ giả.
+
+**BR-BH-22/23 (đuôi lô).**
+- Tồn 0,4 kg ra `out`, tồn đúng 0,5 kg ra `low`.
+- Tồn 0,5 kg: đặt 0,5 kg thành công, đặt 1 kg nhận `OUT_OF_STOCK`.
+- Đơn combo 0,5 vẫn bị chặn. Combo giữ `min_qty` = `qty_step` = "1".
+
+**Giỏ, đơn cũ và giữ chỗ.**
+- Giỏ cũ luôn là bội 0,5 và từ 1 kg trở lên, nên vẫn hợp lệ với mức mới.
+- Đơn cũ không bị chạm (AC13 kiểm tổng tiền và dòng đơn cũ, `qty_reserved` cộng dồn 1,5).
+- Giữ chỗ và FEFO không đổi code. AC1 kiểm phân bổ 0,5 kg vào đúng lô.
+
+**Các `override_settings` 1 kg không che lỗi.**
+- Mỗi chỗ ép 1 kg đều có ca chạy theo mặc định 0,5 trong `test_shop_min_qty.py` (sales, catalog) và `LoadShopContentMinQtyTextTests`.
+- Hai ca `0.5` đổi thành `0.25` (`test_shop_create_error_order.py:83`, `test_shop_order_create.py:101`) vẫn giữ ý "số lượng sai".
+- Đã thử đặt `SHOP_MIN_QTY_KG=1` rồi chạy hai file `test_shop_min_qty` cùng `test_load_shop_content`: 12 ca đỏ đúng lý do. Test mới bắt được việc lùi mặc định.
+
+**Commit `f4b7d66` (voucher).** Ca đổi ngày sang 2099 hợp lý. Ý test giữ nguyên: đổi giờ +07:00 ra UTC và trạng thái `scheduled`. Không làm yếu test.
+
+**Kiểm chứng techlead chạy trong worktree:**
+- `manage.py test apps.sales.orders apps.catalog.items apps.content apps.catalog.vouchers`: Ran 842, OK (skipped=10).
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK.
+
+**Điều kiện trước khi gộp `main`:**
+- `test_s1_ac11_two_parallel_half_kg_orders_on_half_kg_stock_exactly_one_wins` (`test_shop_create_race.py:87`) chỉ chạy trên Postgres.
+- Trên SQLite ca này bị bỏ qua, nên chưa ai thấy nó chạy. Phải thấy nó xanh trên CI Postgres cloud (`.github/workflows/backend-tests.yml`).
+
+**Low (không chặn, gom sửa khi tiện):**
+- L1 `backend/apps/sales/orders/shop_errors.py:24`: `_vn_kg` là bản thứ ba của cùng một hàm định dạng kg kiểu Việt. Hai bản kia là `_format_kg` ở `load_shop_content.py:76` và `_kg_text` ở `site/services.py:33` (bản này ra dấu chấm). Nên gom về một helper chung, ví dụ trong `apps/sales/utils.py` cạnh `kg_str`.
+- L2 `backend/apps/sales/orders/shop_errors.py:44`: `InvalidQtyError.default_detail` không còn được dùng, vì `__init__` luôn truyền `detail`. Đây là code chết, nên bỏ.
+- L3 `backend/apps/sales/orders/tests/test_shop_create.py:94`: kiểm `detail` bị nới từ so khớp nguyên câu xuống `startswith`. Lớp này đã ép 1 kg, nên so được nguyên câu "Món theo kg đặt từ 1 kg, mỗi lần thêm 0,5 kg. Combo đặt số nguyên từ 1." AC3 ở file mới đã bù phần lớn.
+- L4 `backend/apps/content/tests/test_load_shop_content.py:412`: `override_settings(SHOP_MIN_QTY_KG="1")` truyền chuỗi, còn mọi chỗ khác truyền `Decimal`. Chạy đúng vì `_format_kg` nhận cả chuỗi, nhưng nên thống nhất.
+
+**Ghi nhận ngoài phạm vi (không phải lỗi lô này):**
+- `load_shop_content.py:154` và `site/services.py:74` còn giá trị dự phòng cho `SHOP_QTY_STEP_KG`.
+- `frontend/lib/quantity.ts:21`, `frontend/lib/mock.ts:107,747`, `frontend/features/content/mock.ts` và `PreviewGallery.tsx:260` còn số 1 kg. Phần này thuộc GUI-08 (Gemini, nhánh `gemini/shop-ui`).
+- Bản build thật lấy `min_qty` từ API nên vẫn đúng. Câu cố định trong `PreviewGallery` chỉ có ở `/ui-preview/`.
+- S1-AC13 chỉ được kiểm ở mức DB, chưa kiểm màn ERP và báo cáo. Chấp nhận được vì lô này không đổi code đơn hay báo cáo.
 
 ## Duy trả lời câu hỏi 🔴 (14/11)
 - **Q-TL-1:** "là 0,5 mọi chỗ luôn, không cần hard". Đổi mặc định `SHOP_MIN_QTY_KG` = 0,5 trong code, **không** đặt env khoá 1 kg trên production. Lần deploy production kế tiếp sẽ bật 0,5 kg; điều phối viên gom S1 + S2 (nội dung) + GUI-08 (chữ Shop) lên cùng đợt khi có thể.
