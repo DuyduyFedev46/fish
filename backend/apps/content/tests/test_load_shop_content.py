@@ -7,6 +7,7 @@ import re
 import shutil
 import tempfile
 from datetime import timedelta
+from decimal import Decimal
 from pathlib import Path
 
 from django.contrib.auth.models import Group, User
@@ -503,3 +504,87 @@ class LoadShopContentPolicyTextTests(LoadShopContentBase):
                 self.assertIn("chờ legal-vn duyệt", log.note, e.slug)
             else:
                 self.assertNotIn("legal-vn", log.note, e.slug)
+
+
+class LoadShopContentMinQtyTextTests(LoadShopContentBase):
+    """FISH-66 S2 (02b §8.2, BR-BH-22, bất biến 7): mọi câu về mức mua tối thiểu trong nội dung nạp sẵn đi theo
+    tham số `SHOP_MIN_QTY_KG`, không viết cứng số kg. Các trang có câu này: Cách mua hàng, Điều kiện giao dịch chung,
+    Giới thiệu, Banner trang chủ."""
+
+    # Trang có câu về mức mua tối thiểu, kèm vị trí phải có câu đó (S2-AC1).
+    MIN_QTY_PAGES = {
+        "cach-mua-hang": ("excerpt", "seo_description", "body"),
+        "dieu-khoan": ("body",),
+        "gioi-thieu": ("excerpt",),
+        "home-banner": ("excerpt", "body"),
+    }
+    # Câu nói về mức tối thiểu: "từ N kg", "tối thiểu N kg", "ít nhất N kg". Không bắt "thêm từng 0,5 kg" (bước).
+    MIN_QTY_PHRASE = re.compile(r"(?:từ|tối thiểu|ít nhất)\s+(\d+(?:[.,]\d+)?)\s*kg", re.IGNORECASE)
+    # Số kg viết cứng trong file nguồn (phải đi qua {min_qty_kg} hoặc {qty_step_kg}).
+    LITERAL_KG = re.compile(r"\d+(?:[.,]\d+)?\s*(?:kg|ký|kí|ki-lô|kilô)(?!\w)", re.IGNORECASE)
+
+    def field_text(self, entry, field):
+        if field == "body":
+            return json.dumps(entry.body, ensure_ascii=False)
+        return getattr(entry, field)
+
+    def all_text(self, entry):
+        return " ".join(
+            [entry.title, entry.excerpt, entry.seo_title, entry.seo_description, json.dumps(entry.body, ensure_ascii=False)]
+        )
+
+    def assert_min_qty_text(self, expected):
+        for slug, fields in self.MIN_QTY_PAGES.items():
+            entry = Entry.objects.get(slug=slug)
+            for field in fields:
+                self.assertIn(f"từ {expected} kg", self.field_text(entry, field), f"{slug}.{field}")
+        for entry in Entry.objects.all():
+            text = self.all_text(entry)
+            self.assertNotIn("{min_qty_kg}", text, entry.slug)
+            self.assertNotIn("{qty_step_kg}", text, entry.slug)
+            for number in self.MIN_QTY_PHRASE.findall(text):
+                self.assertEqual(number, expected, f"{entry.slug}: mức tối thiểu ghi {number} kg")
+
+    @override_settings(SHOP_MIN_QTY_KG=Decimal("0.5"), SHOP_QTY_STEP_KG=Decimal("0.5"))
+    def test_s2_ac1_min_qty_half_kg_written_vietnamese_style(self):
+        """S2-AC1 (BR-BH-22): tham số 0,5 -> các trang ghi "từ 0,5 kg" (dấu phẩy), không còn "từ 1 kg" về mức mua."""
+        self.run_cmd("--publish")
+        self.assert_min_qty_text("0,5")
+        for entry in Entry.objects.all():
+            self.assertNotIn("0.5 kg", self.all_text(entry), entry.slug)
+        public = APIClient().get("/api/public/content/entries/cach-mua-hang/").json()
+        self.assertIn("từ 0,5 kg", public["excerpt"])
+        self.assertIn("Mỗi món từ 0,5 kg, thêm từng 0,5 kg.", json.dumps(public["body"], ensure_ascii=False))
+
+    @override_settings(SHOP_MIN_QTY_KG=Decimal("1"), SHOP_QTY_STEP_KG=Decimal("0.5"))
+    def test_s2_ac4_min_qty_follows_setting_when_one_kg(self):
+        """S2-AC4 (bất biến 7): môi trường chưa bật 0,5 (tham số 1) -> chữ ghi "từ 1 kg", không viết cứng 0,5."""
+        self.run_cmd("--publish")
+        self.assert_min_qty_text("1")
+
+    def test_s2_source_files_have_no_hard_coded_kg(self):
+        """S2 (bất biến 7): file nguồn không viết cứng số kg; mức tối thiểu và bước đi qua {min_qty_kg}, {qty_step_kg}."""
+        for name in ("categories.json", "pages.json", "posts.json"):
+            data = json.loads((SOURCE_DIR / name).read_text(encoding="utf-8"))
+            for text in _all_strings(data):
+                self.assertIsNone(self.LITERAL_KG.search(text), f"{name}: {text}")
+
+    def test_s2_ac2_rerun_after_param_change_keeps_owner_edit(self):
+        """S2-AC2: trang Cách mua đã nạp (1 kg), Lộc sửa một đoạn khác; đổi tham số 0,5 rồi chạy lại lệnh nạp
+        -> bỏ qua trang đó, giữ nguyên chữ Lộc sửa. Vì vậy nội dung staging/production phải sửa tay ở màn Nội dung ERP."""
+        with override_settings(SHOP_MIN_QTY_KG=Decimal("1")):
+            self.run_cmd()
+        owner = User.objects.create_user("owner_two", password="x")
+        owner.groups.add(Group.objects.get(name=roles.OWNER))
+        owner = User.objects.get(pk=owner.pk)
+        page = Entry.objects.get(slug="cach-mua-hang")
+        edited_body = {"type": "doc", "blocks": [{"type": "paragraph", "children": [{"text": "Đoạn Lộc sửa."}]}]}
+        save_draft(entry=page, data={"body": edited_body}, actor=owner)
+
+        with override_settings(SHOP_MIN_QTY_KG=Decimal("0.5")):
+            out = self.run_cmd()
+        page.refresh_from_db()
+        self.assertIn("bỏ qua: đã sửa", out)
+        self.assertIn("cach-mua-hang", out)
+        self.assertEqual(page.body["blocks"][0]["children"][0]["text"], "Đoạn Lộc sửa.")
+        self.assertIn("từ 1 kg", page.excerpt)  # trang bị bỏ qua giữ nguyên, kể cả tóm tắt
