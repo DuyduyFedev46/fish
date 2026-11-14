@@ -21,10 +21,11 @@ import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { filterItems } from "../api";
 import { asActiveFilter, asTypeFilter, priceCell, shelfLifeText } from "../catalogModel";
 import { CATALOG_MSG as M } from "../messages";
-import { catalogAbility } from "../permissions";
+import { CATALOG_PERM, catalogAbility } from "../permissions";
 import { EMPTY_ITEM_PARAMS, type CatalogItem, type ItemListParams } from "../types";
 import { useCatalogList } from "../useCatalogList";
 import { useGroupOptions } from "../useCatalogOptions";
+import { ItemFileActions } from "./ItemFileActions";
 import { ItemThumb } from "./ItemThumb";
 import s from "../catalog.module.css";
 
@@ -47,6 +48,7 @@ const TYPE_OPTIONS = [
 export function ItemListTab({ tabs }: { tabs: React.ReactNode }) {
   const { me } = useAuth();
   const ability = catalogAbility(me?.permissions ?? []);
+  const canExport = (me?.permissions ?? []).includes(CATALOG_PERM.viewItem);
   const [q, setQ] = useState("");
   const [params, setParams] = useState<ItemListParams>(EMPTY_ITEM_PARAMS);
   const list = useCatalogList(params, !!me);
@@ -102,18 +104,21 @@ export function ItemListTab({ tabs }: { tabs: React.ReactNode }) {
       id="catalog-panel"
       tabs={tabs}
       actions={
-        ability.addItem ? (
-          <>
-            <Link href="/catalog/new/?type=BUNDLE" className="btn">
-              <Icon name="add" />
-              <span>{M.addBundle}</span>
-            </Link>
-            <Link href="/catalog/new/" className="btn primary">
-              <Icon name="add" />
-              <span>{M.addItem}</span>
-            </Link>
-          </>
-        ) : undefined
+        <div className={s.itemActions}>
+          {canExport && <ItemFileActions params={params} hasSearchText={q.trim() !== ""} canImport={ability.canImport} />}
+          {ability.addItem && (
+            <>
+              <Link href="/catalog/new/?type=BUNDLE" className="btn">
+                <Icon name="add" />
+                <span>{M.addBundle}</span>
+              </Link>
+              <Link href="/catalog/new/" className="btn primary">
+                <Icon name="add" />
+                <span>{M.addItem}</span>
+              </Link>
+            </>
+          )}
+        </div>
       }
       asOf={list.asOf}
       onRetry={() => void list.reload()}
