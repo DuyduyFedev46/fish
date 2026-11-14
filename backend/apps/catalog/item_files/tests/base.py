@@ -1,10 +1,13 @@
-"""Dữ liệu nền cho test tải file mặt hàng (FISH-66 S3, S4). Mọi dữ liệu là giả."""
+"""Dữ liệu nền cho test tải và nhập file mặt hàng (FISH-66 S3–S6). Mọi dữ liệu là giả."""
 import datetime
-import io
 from decimal import Decimal
+import io
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 import openpyxl
 
+from apps.catalog.item_files.columns import columns_for
+from apps.catalog.item_files.workbook import build_items_workbook
 from apps.catalog.items.tests.api_base import CatalogApiBase, today
 from apps.catalog.models import ItemPrice
 from apps.common.tests.fixtures import client_for, make_batch
@@ -13,6 +16,9 @@ from apps.purchasing.models import Supplier
 
 EXPORT_URL = "/api/catalog/items/export/"
 TEMPLATE_URL = "/api/catalog/items/export-template/"
+LIMITS_URL = "/api/catalog/items/import/limits/"
+PREVIEW_URL = "/api/catalog/items/import/preview/"
+COMMIT_URL = "/api/catalog/items/import/commit/"
 
 HEADERS_NO_PRICE = [
     "Mã hàng", "Tên", "Nhóm hàng", "Loại", "Đơn vị", "Đang kinh doanh", "Hạn dùng mặc định (ngày)",
@@ -48,3 +54,25 @@ class ItemFilesBase(CatalogApiBase):
 
     def get(self, user, url=EXPORT_URL, **params):
         return self.client_as(user).get(url, params, HTTP_ORIGIN="http://localhost:3001")
+
+    def make_xlsx_file(self, rows, *, with_prices=True, name="hang-ban.xlsx"):
+        content = build_items_workbook(columns_for(with_prices=with_prices), rows)
+        return SimpleUploadedFile(
+            name,
+            content,
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+    def post_preview(self, user, uploaded_file):
+        if uploaded_file is not None and hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0)
+        data = {"file": uploaded_file} if uploaded_file is not None else {}
+        return self.client_as(user).post(PREVIEW_URL, data, format="multipart")
+
+    def post_commit(self, user, uploaded_file, preview_token):
+        if uploaded_file is not None and hasattr(uploaded_file, "seek"):
+            uploaded_file.seek(0)
+        data = {"preview_token": preview_token}
+        if uploaded_file is not None:
+            data["file"] = uploaded_file
+        return self.client_as(user).post(COMMIT_URL, data, format="multipart")

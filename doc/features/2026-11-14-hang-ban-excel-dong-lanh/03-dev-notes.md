@@ -141,3 +141,69 @@ Chạy Playwright trên bản build mock (`NEXT_PUBLIC_USE_MOCK=1`), đều PASS
 - Lô 3: trang `/catalog/import/`, bật `IMPORT_PAGE_READY`, thêm `getImportLimits`, `previewImport`, `commitImport`.
 - Chưa chụp riêng vai Quản lý (đã kiểm bằng script, không có ảnh); chưa kiểm dark mode.
 - Chưa nối BE thật (BE lô 2 làm song song); cần thử lại khi hai bên gộp, nhất là CORS expose headers.
+
+
+---
+
+# FISH-66: ghi chú dev, Lô 3 (S5 xem trước thay đổi, S6 xác nhận nhập file Excel)
+
+> gemini/fish66-lo3 · 14/11/2026 · Nguồn: `02-stories.md` S5, S6; `02a-ux-spec.md` §3–§7; `02b-tech-design.md` §3.4–§11; `02c-giao-viec-gemini.md`.
+
+## 1. Backend — file đã sửa / thêm
+
+| File | Việc |
+|---|---|
+| `backend/apps/catalog/pricing/services.py` | Tách `check_new_price(*, item, price_list, rate, valid_from, valid_upto=None, today=None)` từ `set_item_price`; `set_item_price` gọi lại hàm này, hành vi cũ giữ nguyên 100%. |
+| `backend/apps/catalog/items/serializers.py` | Áp dụng `validate_item_public_text("Tên mặt hàng", value)` vào `ItemSerializer.validate_name` (chốt `Q-TL-2 = A`, đồng nhất kiểm chữ công khai giữa form ERP và nhập Excel). `VIEW_ITEM_PRICE_PERM` giữ một nguồn duy nhất và export sang `item_files.columns` (L2). |
+| `backend/apps/catalog/item_files/columns.py` | Thêm `IMPORT_PERMS` (`catalog.add_item`, `catalog.change_item`, `catalog.add_itemprice`, `catalog.change_itemprice`), `READONLY_HEADERS`, ánh xạ tiêu đề cột, import `VIEW_ITEM_PRICE_PERM` từ `items.serializers` (L2). |
+| `backend/apps/catalog/item_files/workbook.py` | Sửa B2 của QA Lô 2: sheet `"Hướng dẫn"` của bản 14 cột (`with_prices=False`, NV kho) không còn 2 dòng nhắc cột giá bán. |
+| `backend/apps/catalog/item_files/reader.py` (mới) | Đọc và kiểm vỏ file `.xlsx`: kiểm kích thước `ITEM_IMPORT_MAX_BYTES`, magic ZIP `PK\x03\x04`, quét ZIP bomb (tổng giải nén > `ITEM_IMPORT_MAX_UNZIPPED_BYTES` hoặc tỉ lệ nén > 100), dùng `defusedxml` chặn XXE/DTD trước khi gọi `openpyxl.load_workbook(..., data_only=True)`, chọn sheet `"Hàng bán"` hoặc sheet đầu, khớp bộ 17 cột bắt buộc, bỏ dòng ví dụ `VD-001` không phân biệt hoa thường (S4-AC2), chặn quá `ITEM_IMPORT_MAX_ROWS`, giữ thông tin ô công thức thiếu giá trị cache. |
+| `backend/apps/catalog/item_files/plan.py` (mới) | Kiểm từng ô theo dòng, gom đủ lỗi theo thứ tự dòng tăng dần (`IMPORT_INVALID_ROWS`, cắt ở `ITEM_IMPORT_MAX_ERRORS`), dựng kế hoạch nhập (`ImportPlan`), gắn cờ `check_zeros` (gấp/kém ≥ 8 lần), `large_change` (|Chênh %| ≥ 50%), `backdated` (`valid_from < hôm nay VN`), tính `shop_state` thực tế (có xét lô `ACTIVE` còn hạn dùng và còn `qty_available - qty_reserved > 0`), gộp cảnh báo cột chỉ đọc (`warnings`), tính `plan_digest` SHA-256 chuẩn hoá trên toàn bộ kế hoạch + snapshot trạng thái hiện tại của các món liên quan. |
+| `backend/apps/catalog/item_files/token.py` (mới) | Ký và xác minh `preview_token` bằng `django.core.signing` (`salt="catalog.item_files.import"`), kiểm `uid`, `sha256` của bytes file, `plan_digest` và hạn `ITEM_IMPORT_PREVIEW_TTL_SECONDS`. |
+| `backend/apps/catalog/item_files/services.py` | Thêm `get_import_limits()`, `preview_import()`, `commit_import()`. Khoá `select_for_update()` theo thứ tự `PriceList` → `ItemGroup` → `Item` (`order_by("id")`), dựng lại kế hoạch trong transaction để đối chiếu `plan_digest` (`409 IMPORT_DATA_CHANGED` / `409 IMPORT_ALREADY_APPLIED`), ghi trong 1 `transaction.atomic()`, gọi `set_item_price(..., actor=user, audit_note="Nhập từ file Excel")` và ghi `AuditLog` tổng `import_items`. Không ghi `AuditLog` ở bước `preview`. |
+| `backend/apps/catalog/item_files/api.py` | Thêm `ItemImportLimitsView`, `ItemImportPreviewView`, `ItemImportCommitView` (`MultiPartParser`), quyền `HasImportItemsPermissions` (đủ 4 quyền `IMPORT_PERMS`), `http_method_names` tường minh (`["get", "options"]` / `["post", "options"]`, sửa L1/B1 cho cả `export` và `export-template`). |
+| `backend/config/api_urls.py` | Thêm 3 đường dẫn `catalog/items/import/limits/`, `catalog/items/import/preview/`, `catalog/items/import/commit/` trước `router.urls`. |
+| `backend/apps/catalog/item_files/README.md` | Cập nhật tài liệu module cho cả tải và nhập file Excel. |
+| `backend/apps/catalog/item_files/tests/test_{limits,preview,commit,commit_race,security}.py` | Bộ test đơn vị + API cho S5, S6, bảo mật file, khoá tranh chấp, không rò giá vốn/dữ liệu cá nhân, không đụng `Batch`. |
+| `backend/apps/catalog/items/tests/test_item_public_text.py` | Thêm test kiểm `name` chặn SĐT, từ khoá giá vốn/lô/nguồn nội bộ và giữ nguyên tên cá hợp lệ (`Q-TL-2 = A`). |
+
+## 2. ERP Console (`erp-console/`) — file đã sửa / thêm
+
+| File | Việc |
+|---|---|
+| `erp-console/shared/lib/http.ts` | Sửa L3 trong `apiDownload`: kiểm `Content-Type` của response 2xx khi có `expectedContentType` (nếu cổng trả nhầm `text/html` thì ném `ApiError` thay vì lưu trang HTML mang đuôi `.xlsx`). |
+| `erp-console/features/catalog/components/ItemFileActions.tsx` | Bật `IMPORT_PAGE_READY = true` để hiện nút `"Nhập từ Excel"` khi `canImport === true`; sửa L4/B3 truyền `blockedReason: busy !== null ? M.fileBusy : undefined` cho mục `"Tải file mẫu"`. |
+| `erp-console/features/catalog/itemFilesTypes.ts` | Thêm kiểu dữ liệu cho `ImportLimits`, `ImportPreviewResponse`, `ImportRowErrorsDetails`, `ImportCommitResponse` và các hằng mã lỗi `IMPORT_*`. |
+| `erp-console/features/catalog/itemFilesApi.ts` | Thêm `getImportLimits`, `previewImport`, `commitImport` qua `apiFetch` (`FormData`), truyền `expectedContentType` cho `exportItems`/`exportTemplate`. |
+| `erp-console/features/catalog/itemFilesMock.ts` | Thêm mock cho `limits`, `preview`, `commit` hỗ trợ các chế độ kiểm thử. |
+| `erp-console/features/catalog/itemFilesModel.ts` (mới) | Hàm thuần tách 4 phần xem trước (`splitPreviewSections`), sắp bảng giá (`sortPriceRows`), đếm cờ giá (`countPriceFlags`), định dạng chênh lệch/phần trăm/ngày áp dụng/tiêu đề hộp xác nhận/toast, gộp cảnh báo cột chỉ đọc (`groupReadonlyWarnings`), bóc lỗi dòng (`extractRowErrors`). |
+| `erp-console/features/catalog/components/{ItemImportScreen,ImportPreview,ImportErrors,ImportConfirmModal}.tsx` (mới) | Màn `/catalog/import/` đủ luồng M2 (chọn file + quy tắc đọc file + giới hạn từ API), M3 (dải số tổng + cảnh báo W1 + 4 bảng Đổi giá / Ẩn hiện / Món mới / Món sửa + trạng thái rỗng N1), M4 (bảng lỗi theo dòng sắp tăng dần), M5 (hộp xác nhận nhập có danh sách tối đa 5 dòng cờ giá + checkbox xác nhận bắt buộc + focus mặc định vào `"Quay lại xem"`), M6 (toast kết quả + điều hướng về `/catalog/?tab=items`), banner W2/W3 kèm nút `"Xem trước lại"` gửi lại đúng `File` trong state. |
+| `erp-console/app/(console)/catalog/import/page.tsx` (mới) | Route tĩnh `/catalog/import/`. |
+| `erp-console/features/catalog/{messages.ts,catalog.module.css,README.md}` | Thêm chuỗi `ITEM_IMPORT_MSG`, CSS bố cục full-width vùng `.content` và bảng xem trước, cập nhật README. |
+| `erp-console/features/catalog/{itemFiles.test.ts,itemFilesDownload.test.ts}` | Thêm 10 test đơn vị cho `itemFilesModel` và test L3 (`Content-Type` sai trong `apiDownload`). |
+
+## 3. Kiểm chứng Lô 3 (output thật, 14/11/2026)
+
+1. Backend catalog tests & migration check:
+   ```text
+   $ cd backend && .venv/bin/python manage.py test apps.catalog.item_files apps.catalog.items apps.catalog.pricing --parallel 1 && .venv/bin/python manage.py makemigrations --check --dry-run
+   Ran 269 tests in 13.976s
+   OK (skipped=1)
+   No changes detected
+   ```
+2. Toàn bộ suite backend (`manage.py test --parallel 1`):
+   - `4030/4031` test đạt (17 skipped); 1 test cũ đỏ sẵn trên `main` (`test_s3b_01_ac1_create_stores_utc_times_and_audits` do mốc ngày cố định trong test voucher cũ, giống ghi nhận ở Lô 2).
+3. ERP Console (`tsc`, `vitest`, `next build`):
+   ```text
+   $ cd erp-console && npx tsc --noEmit && npm test && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build
+   Test Files  116 passed (116)
+        Tests  1386 passed (1386)
+   ✓ Compiled successfully
+   ✓ Generating static pages (66/66)
+   Route (app): ├ ○ /catalog/import  15.6 kB  137 kB
+   ```
+4. Kiểm đặt tên:
+   ```text
+   $ python3 scripts/check_naming.py
+   check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
+   ```

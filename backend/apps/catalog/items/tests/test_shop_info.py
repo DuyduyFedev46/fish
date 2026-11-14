@@ -154,6 +154,20 @@ class ItemShopInfoTests(ShopInfoBase):
         payload["spec"] = "Khúc 300 g"
         self.assertEqual(self.send(self.owner, "post", ITEMS, payload).status_code, 201)
 
+    def test_fish66_q_tl_2_item_name_rejects_public_text_violations_on_create_and_change(self):
+        for bad_name in ("Cá thu nhà cung cấp Hải Long", "Cá thu 250k", "Cá thu 0900000001", "Cá CA01-261010-A1B2C"):
+            res = self.patch_item(self.owner, {"name": bad_name})
+            self.assertEqual(res.status_code, 400, bad_name)
+            self.assertIn("name", res.json(), bad_name)
+            create_res = self.send(
+                self.owner, "post", ITEMS, {"code": "MUC99", "name": bad_name, "item_group": self.group_fish.pk}
+            )
+            self.assertEqual(create_res.status_code, 400, bad_name)
+        # Dữ liệu cũ chưa đổi tên vẫn cho sửa trường khác
+        Item.objects.filter(pk=self.item_a.pk).update(name="Cá thu 250k")
+        res = self.patch_item(self.owner, {"name": "Cá thu 250k", "spec": "Khúc 300 g"})
+        self.assertEqual(res.status_code, 200, res.content)
+
 
 class ItemGroupSlugTests(CatalogApiBase):
     def setUp(self):

@@ -109,3 +109,27 @@ Trùng L4 của techlead. Chưa tái hiện riêng; giữ ghi nhận.
 - Playwright (Python): đăng nhập 6 vai, tải danh sách/mẫu, lọc, bấm đúp, dừng máy chủ, mất quyền, 360 px; openpyxl `python -I` đọc từng file.
 - curl: token từng vai (có giới hạn tần suất đăng nhập, phải chờ giữa các lần), CORS, preflight, bộ lọc, HEAD, POST.
 - Đã dọn: tắt máy chủ `:8010`/`:3010` của QA, xoá `backend/db.sqlite3`. Không sửa code sản phẩm, không commit.
+
+
+---
+
+# Tự QA — Hàng bán Excel (FISH-66) · Lô 3 (S5 xem trước thay đổi, S6 xác nhận nhập) · 14/11/2026
+
+## Kết luận: ĐẠT — S5 và S6 chạy thật trên máy chủ Django + bản build tĩnh ERP Console, kiểm trên trình duyệt bằng Playwright ở 1280 px và 360 px.
+
+Môi trường tự QA:
+- Django local `:8012` (SQLite tạm qua `DATABASE_URL`, `DJANGO_DEBUG=1`, `CORS_ALLOWED_ORIGINS=http://localhost:3012`).
+- ERP Console build tĩnh với `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8012`, phục vụ ở `:3012`.
+- Ảnh chụp lưu tại `doc/features/2026-11-14-hang-ban-excel-dong-lanh/shots/lo3/` (thư mục `shots/` nằm trong `.gitignore`).
+
+## Kết quả kiểm trên trình duyệt (Playwright)
+
+| Màn / Tiêu chí | Cách kiểm | Kết quả | Ảnh chụp (1280 px & 360 px) |
+|---|---|---|---|
+| Phân quyền Quản lý (`quan_ly`) | Đăng nhập `quan_ly`, mở `/catalog/?tab=items` và `/catalog/import/` | Thấy nút `Tải file Excel`, **không** thấy nút `Nhập từ Excel`; vào thẳng `/catalog/import/` hiện màn chặn quyền `NoPermission`; API trả `403`. | `shots/lo3/lo3-quan-ly-m1-1280.png`, `shots/lo3/lo3-quan-ly-forbidden-1280.png` |
+| M1 — Thanh nút tab Mặt hàng (`chu_vua`) | Đăng nhập `chu_vua`, mở `/catalog/?tab=items` ở 1280 px và 360 px | Hiện đủ `[Tải file Excel] [Nhập từ Excel] [⋯] [+ Thêm combo] [+ Thêm mặt hàng]`. | `shots/lo3/lo3-m1-1280.png`, `shots/lo3/lo3-m1-360.png` |
+| M2 — Trang chọn file (`/catalog/import/`) | Bấm `Nhập từ Excel` từ M1 | Hiện vùng chọn/kéo thả file `.xlsx`, 2 nút tải danh sách hiện có & tải file mẫu, khối `Cách hệ thống đọc file` hiển thị đúng giới hạn `1.000 dòng, 2 MB` từ `GET /api/catalog/items/import/limits/`. | `shots/lo3/lo3-m2-1280.png`, `shots/lo3/lo3-m2-360.png` |
+| M4 — Bảng lỗi theo dòng (`IMPORT_INVALID_ROWS`) | Chọn file `error_import.xlsx` có giá âm `-50000`, SĐT `0901234567` trong Ghi chú ngắn, món mới thiếu Tên và Nhóm lạ | Hiện hộp báo đỏ `File có 5 lỗi ở 2 dòng. Chưa ghi gì.` kèm bảng lỗi sắp theo số dòng tăng dần (`Dòng`, `Mã hàng`, `Cột`, `Cách sửa`); không có nút `Xác nhận nhập`. | `shots/lo3/lo3-m4-errors-1280.png`, `shots/lo3/lo3-m4-errors-360.png` |
+| M3 — Xem trước thay đổi (`preview`) | Chọn file `valid_import.xlsx` (đổi giá `CA-01` từ `250.000 đ` → `25.000 đ`, bật kinh doanh `CA-02`, thêm món mới `CA-03` giá `320.000 đ`, sửa cột chỉ đọc `Loại`) | Hiện đúng thứ tự: Dải số tổng (`Đổi giá: 2`, `Món mới: 1`, `Món sửa: 1`, `Đổi ẩn/hiện: 1`, `Sẽ hiện trên Shop: 2`, `Giữ xem trước đến`) → Cảnh báo vàng W1 cho cột chỉ đọc `Loại` → Phần 1 `Đổi giá (2)` (mặc định sắp theo \|Chênh %\| giảm dần, dòng `CA-01` có vạch đỏ trái + chip `Kiểm lại số 0` & `Chênh lớn`) → Phần 2 `Ẩn/hiện trên Shop (1)` → Phần 3 `Món mới (1)` → Phần 4 `Món sửa (1)`. | `shots/lo3/lo3-m3-preview-1280.png`, `shots/lo3/lo3-m3-preview-360.png` |
+| M5 — Hộp Xác nhận nhập (`ImportConfirmModal`) | Bấm `Xác nhận nhập` ở thanh đáy M3 | Mở hộp thoại xác nhận, liệt kê dòng giá cần kiểm (`CA-01`), nút `Xác nhận nhập 2 giá mới` bị khoá cho tới khi đánh dấu ô `Tôi đã kiểm 1 giá cần xem`. | `shots/lo3/lo3-m5-confirm-1280.png`, `shots/lo3/lo3-m5-confirm-360.png` |
+| M6 — Ghi thành công & điều hướng | Đánh dấu ô xác nhận rồi bấm `Xác nhận nhập 2 giá mới` | Ghi thành công (`POST /api/catalog/items/import/commit/` → 200), điều hướng về `/catalog/?tab=items`, hiện toast `Đã nhập: 1 món mới, 1 món sửa, 2 giá mới.`, danh sách mặt hàng có thêm `CA-03`. Không có lỗi `pageerror`. | `shots/lo3/lo3-m6-done-1280.png`, `shots/lo3/lo3-m6-done-360.png` |

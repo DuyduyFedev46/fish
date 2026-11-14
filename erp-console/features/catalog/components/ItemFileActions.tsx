@@ -21,8 +21,7 @@ import type { ItemListParams } from "../types";
 // Icon dùng những tên đã có trong tập con font (public/fonts/ms): `download`/`upload_file` chưa có, thêm vào
 // scripts/subset-material-symbols.py nếu muốn đổi.
 
-/** Trang nhập file (lô 3) chưa có: giữ nút Nhập ẩn tới khi route `/catalog/import/` sẵn sàng. */
-const IMPORT_PAGE_READY = false;
+const IMPORT_PAGE_READY = true;
 
 type Props = {
   /** Bộ lọc phía máy chủ đang chọn (nhóm, trạng thái, ảnh, loại). */
@@ -71,6 +70,7 @@ export function ItemFileActions({ params, hasSearchText, canImport }: Props) {
     {
       key: "template",
       label: busy === "template" ? M.fileBusy : M.fileTemplate,
+      blockedReason: busy !== null ? M.fileBusy : undefined,
       onSelect: () => void run("template"),
     },
   ];
