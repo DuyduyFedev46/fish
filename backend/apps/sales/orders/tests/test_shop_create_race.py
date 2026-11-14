@@ -113,7 +113,7 @@ class ShopCreateRaceTests(PostgresRaceFixtureMixin, TransactionTestCase):
                 self.assertEqual(sorted(outcomes), ["OUT_OF_STOCK", "ok"])
                 batch.refresh_from_db()
                 self.assertEqual(batch.qty_reserved, Decimal("0.5"))
-                self.assertLessEqual(batch.qty_reserved, batch.qty)
+                self.assertLessEqual(batch.qty_reserved, batch.qty_available)
                 Batch.objects.filter(pk=batch.pk).update(status=Batch.Status.CLOSED)
 
     def test_s2_02_waiter_after_lock_wait_gets_out_of_stock_not_500(self):
