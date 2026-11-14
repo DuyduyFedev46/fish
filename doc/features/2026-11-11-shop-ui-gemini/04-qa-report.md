@@ -149,3 +149,64 @@
 |---|---|---|---|
 | Trang chủ không còn chữ `"Tiền về đủ là đơn tự xác nhận"` và `"Chuyển khoản quét mã QR"` ở khối bên cạnh banner; thẻ `"Combo nấu nhanh"` tự cân chiều cao 252 px ngang bằng hero banner trên máy tính (1280 px), không cuộn ngang ở 360 px & 1280 px | Kịch bản Playwright `shop_general_rules.py` + `shop_design_screens.py` (`A1`, `DK1`) + xem ảnh chụp 360 px & 1280 px | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-11/home-no-pay-tile-360.png`, `shots/gui-11/home-no-pay-tile-1280.png` |
 | Không ảnh hưởng thông tin thanh toán ở trang đặt hàng (`/shop/checkout/`), trang thanh toán (`/shop/orders/?code=…`) và trang chính sách | Chạy trọn bộ `general_rules` (`170/170 PASS`), `full_flow` (`115/115 PASS`), `design_screens` (`91/91 PASS`) | **PASS — APPROVED** | — |
+
+
+---
+
+# QA đội Claude 14/11 — nhánh `feat/shop-gui12-13` (HEAD a867277)
+
+## Kết luận: APPROVED — không có lỗi chặn ở sản phẩm; hai ca `full_flow` fail là do cổng 8000 bị một backend cũ chiếm, không phải lỗi Shop
+
+Chạy trên cổng riêng (BE 8020, Shop 3020, ERP 3120, BE phụ 8061) bằng bản vá cổng tạm (đã hoàn lại, không commit). Ảnh/DB chỉ dùng dữ liệu giả.
+
+## 1. Hai ca `full_flow` fail (ưu tiên 1)
+
+| Câu hỏi | Kết luận | Bằng chứng |
+|---|---|---|
+| (a) `origin/main` (8d227e4) | Hai ca **pass** ở 360 và 1280 (`payment_choice` 77/77; `full_flow` 113 đạt, 2 lỗi khác: ca "danh mục: 8 món, 3 mức tồn", không liên quan tiền) | `run-main-pf1.log` |
+| (b) Commit của Gemini gây ra? | **Không.** Trên nhánh, hai ca pass 360 + 1280 ở 4 lần chạy khác nhau (kể cả sau `payment_choice`), bấm đúp đúng 1 đơn, IPN 2 lần đúng 1 hoá đơn. Không cần bisect | `run-gui-full3/pf2/f6.log` |
+| (c) Nguyên nhân | **Môi trường.** Tiến trình `manage.py runserver 8000` (pid 49393, bắt đầu 22:21, cwd = `wt-gui12/backend`, DB `/private/tmp/e2ewd/e2e.sqlite3`) vẫn sống từ lần chạy trước. Runner không bind được cổng 8000 nhưng `wait_http` vẫn thấy "BE" lên, nên Shop gọi backend cũ (DB khác) còn `order_count()`/`manage_shell` đọc DB mới | Tái hiện có chủ đích: dựng BE cũ chiếm cổng 8020 rồi chạy runner → đúng hai FAIL `<(1, 1, 1)>` và `đúng 1 hoá đơn sau 2 lần IPN <0>` (`run-gui-stale.log`). Bỏ BE cũ → cả hai pass |
+
+Tiền: payload `POST /api/shop/orders/` ở 360 (catalog chậm 3 s) và 1280: `items:[{item_code:"CA-THU", qty:"0.5"}]` → 201, `total_amount` = `subtotal` = 82500 (= 0,5 × 165.000), dòng `qty "0.5"`, `amount 82500`. Không có 2 đơn khi bấm đúp, không có 2 hoá đơn khi IPN lặp.
+
+Khuyến nghị (Low, không chặn): (1) người giữ pid 49393 nên tắt nó; (2) runner nên thoát nếu cổng đã bị chiếm trước khi chạy `runserver`.
+
+## 2. Tiêu chí GUI-06..13
+
+| Việc | Kết quả | Bằng chứng |
+|---|---|---|
+| GUI-06 nút Zalo | ✅ | `general_rules` 168/0: ẩn khi không có `seller.zalo`; aria-label, href zalo.me, `_blank`, `noopener`, ≥44px; bàn phím; không che Thêm vào giỏ/giỏ/đặt hàng; ẩn ở checkout; 360 + 1280 |
+| GUI-07 ảnh danh mục | ✅ | `general_rules` GUI-07 360/1280 (img lazy + alt, khung SVG khi thiếu/lỗi ảnh); `design_screens` 91/0 |
+| GUI-08 mức 0,5 kg | ✅ | `grep -rn "1 kg"` app/components/features/lib: chỉ còn 1 comment "1 kg × giá" (không nói mức tối thiểu); e2e "Thêm 0,5 kg", giỏ "Mua tối thiểu 0,5 kg", hộp bỏ món; `test-cart-reconcile` có ca `min_qty` "1" giữ 1 kg. Metadata SEO "từ 0,5 kg" |
+| GUI-09 ảnh minh hoạ | ✅ có hạn chế | 6 ảnh + 3 banner có ở checkout chính (cạnh ngắn ≥1200 px, ≤6 MB), xem tay TOM-SU-1 (tôm sú) và GHE-XANH (ghẹ xanh) đúng loài; `nguon-anh.md` có đủ nguồn/tác giả/giấy phép. Link giấy phép chưa kiểm online. **`.gitignore` có `*.jpg` nên ảnh không nằm trong git** (chỉ `nguon-anh.md`): chỉ tồn tại trên máy, cần chép sang kho lưu khác trước khi IT tải lên CMS |
+| GUI-10 banner | ✅ | `general_rules`/`design_screens`: CMS 404, slide không ảnh, slide có ảnh, đúng 1 h1, 360 + 1280 |
+| GUI-11 gỡ ô QR | ✅ | e2e GUI-11 360/1280 pass; `grep tilePay|tiền về đủ` trong `features/home`: không còn; chữ ở checkout/CMS giữ nguyên (đúng phạm vi) |
+| GUI-12 giữ 0,5 kg | ✅ | `full_flow` (run f6, 135/135): thêm 0,5, catalog chậm 3 s, tạm tính 82.500đ, đặt hàng 0,5 kg, tải lại 0,5, catalog lỗi mạng giữ 0,3, giỏ 0,3 + min 0,5 → 0,5 và báo; payload POST đúng (mục 1). `test-cart-reconcile` 29/29 |
+| GUI-13 nhãn giao | ✅ | `full_flow`: giỏ trống không nhãn; giỏ có hàng đúng nguyên câu "Giao trong 2 giờ kể từ lúc đặt hàng nếu cách vựa dưới 15 km · Từ 15 km trở lên: trong 4 giờ", chữ thật, không cuộn ngang; hằng số duy nhất `features/cart/deliveryEta.ts` |
+
+Đỏ trước, xanh sau của GUI-12 (chạy lại trên mã cũ 781da2d): `test-cart-reconcile` đỏ (`qtyFixesToPersist is not a function`); e2e "catalog lỗi mạng giữ 0,3" **đỏ** trên bản cũ (giỏ bị ghi thành 0,5), xanh trên bản mới. Lưu ý (Low): ca "catalog chậm 3 s" **không đỏ** trên 781da2d vì GUI-08 đã đổi luật dự phòng sang 0,5; ca đó chỉ là bảo vệ hồi quy, lỗi gốc "1 kg" do fallback cũ đã hết từ GUI-08.
+
+## 3. Hồi quy và build
+
+| Bộ | Kết quả (lần xanh) |
+|---|---|
+| `general_rules` | 168 đạt, 0 lỗi, 1 bỏ qua |
+| `full_flow` | 135 đạt, 0 lỗi (gồm 429 thật, quét dữ liệu cá nhân, console sạch, không cuộn ngang 360/1280, không request bên thứ ba) |
+| `design_screens` | 91 đạt, 0 lỗi, 4 bỏ qua |
+| `content_pages` | 58 đạt, 0 lỗi |
+| `payment_choice` | 77 đạt, 0 lỗi |
+| `footer_consent` | 31 đạt, 0 lỗi, 1 bỏ qua |
+| `erp_flow` | 41 đạt, 0 lỗi |
+| `formats_timezones` | 73 đạt, 0 lỗi |
+| `npx tsc --noEmit` | exit 0 |
+| `scripts/test-*.mjs` (9 file) | tất cả đạt |
+| `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://example.invalid npm run build` + `node scripts/check-no-mock.mjs` | build hoàn tất; check-no-mock XANH (65 file build) |
+
+Chập chờn của runner (Medium về quy trình, không chặn): máy tải 4–6 cùng lúc có QA khác, nhiều lần chạy bị timeout 30 s ở **một ca khác nhau mỗi lần** (đợi tải trang đầu ở 1280, link chân trang, popup A4/A9, BE phụ khởi động quá 20 s, cổng 8021 bị tiến trình khác chiếm). Mỗi ca đều có ít nhất một lần pass đầy đủ; GUI-12 chạy riêng 4/4 lần xanh. Không thấy lỗi lặp lại ở một ca nghiệp vụ nào. Đề nghị CI tăng timeout/chạy 1 worker.
+
+## 4. Lỗi theo mức
+- Critical/High/Medium sản phẩm: **không có**.
+- Low: ảnh GUI-09 bị `.gitignore` (mất nếu hỏng máy); runner không phát hiện cổng bị chiếm; ca e2e "catalog chậm" không đỏ trên bản cũ.
+
+## Lệnh đã chạy
+`python3 frontend/e2e/run_shop_e2e.py --skip-build [--suite …]` (nhiều lần, cổng riêng); `npx tsc --noEmit`; `node scripts/test-*.mjs`; build USE_MOCK=0 + `check-no-mock.mjs`; script tạm trong scratchpad (payload POST, tái hiện BE cũ chiếm cổng, bản cũ 781da2d).
