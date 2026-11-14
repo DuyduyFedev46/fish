@@ -7,7 +7,9 @@ flowchart TD
   V2 --> V3["Dọn code thừa ở giỏ"]
   V3 --> V4["Thêm ca giỏ hỏng"]
   V4 --> V5["Tự làm đẹp layout từng trang"]
-  V5 --> D{"Duy xem ảnh trước và sau, ưng chưa?"}
+  V5 --> V6["Nút chat Zalo nổi"]
+  V6 --> V7["Ảnh cho từng mục danh mục"]
+  V7 --> D{"Duy xem ảnh trước và sau, ưng chưa?"}
   D -- "chưa" --> V5
   D -- "ưng" --> R["Đội Claude soát nhánh rồi gộp"]
 ```
@@ -30,8 +32,11 @@ flowchart TD
 | ☑ | GUI-03 | **Dọn state chết ở giỏ** (L4). Xoá `const [, setBlocked]` và hai chỗ gọi `setBlocked` trong `CartScreen.tsx`. Sửa thụt lề `hotline={hotline}` ở `CatalogScreen.tsx:204` và `ItemDetailScreen.tsx:98` | `frontend/features/cart/components/CartScreen.tsx`, `frontend/features/catalog/components/{CatalogScreen,ItemDetailScreen}.tsx` | `tsc`, build, toàn bộ `test-*.mjs` xanh; giỏ có món hết vẫn chặn đặt như màn B3 (ảnh) | `general_rules` | `7b1efb3` |
 | ☑ | GUI-04 | **Ca e2e giỏ hỏng trong localStorage** (L5). Thêm 1 ca vào `shop_general_rules.py`: ghi giỏ có giá `"abc"` và `null` vào localStorage rồi mở `/shop/cart/` và trang đặt hàng → không thấy `NaN`, `undefined`, `Infinity` ở trang, không lỗi console | `frontend/e2e/shop_general_rules.py` | Ca mới chạy và PASS; thử làm hỏng tạm `CartContext.tsx` (không commit) để thấy ca đỏ | `general_rules` | `396358c` |
 | ☑ | GUI-05 | **Làm đẹp layout toàn Shop, bạn tự sáng tạo** (`GEMINI.md` mục 2). Làm lần lượt từng cụm, mỗi cụm một commit: (a) trang chủ, (b) danh mục + chi tiết món, (c) giỏ, (d) đặt hàng + thanh toán, (e) tra đơn, (f) trang nội dung, Góc bếp, giới thiệu, 404 | `frontend/app/**`, `frontend/components/**`, `frontend/features/**`, `frontend/app/globals.css` | Mỗi cụm có ảnh **trước và sau** ở 360 + 1280 trong `shots/gui-05/`. Đủ thông tin và chức năng như cũ, e2e vẫn xanh | `design_screens` + bộ của cụm (`content_pages` cho cụm f) | `d02fb6e`, `d28ed32`, `c871e00`, `53325ac`, `19924e7`, `51f7b64`, `badbf57` |
+| ☐ | GUI-06 | **Nút chat Zalo nổi trên mọi trang Shop** (feedback của Lộc, sheet FIX WEB dòng 7, Duy giao 14/11). Thêm một nút tròn "Nhắn Zalo" nổi ở góc dưới phải, bấm mở `zaloUrl` lấy từ `useHotline()` (site-info `seller.zalo`, đã có sẵn) ở tab mới. Không có `zaloUrl` thì ẩn nút. Trên điện thoại nút nằm trên thanh điều hướng dưới, không che nút "Thêm vào giỏ"/"Đặt hàng". Ẩn ở trang đặt hàng/thanh toán nếu che nút chính | `frontend/components/**` (component mới + gắn vào layout Shop), `frontend/app/globals.css` | Có `aria-label`, bấm được bằng bàn phím, mở đúng `https://zalo.me/…`, `rel="noopener"`. Ca: site-info không có Zalo → không có nút. Ảnh 360 + 1280 ở trang chủ, chi tiết món, giỏ | `general_rules` + ca mới | |
+| ☐ | GUI-07 | **Ảnh cho các mục danh mục: combo, hàng đông lạnh…** (sheet FIX WEB dòng 8). Khối danh mục ở trang chủ và đầu trang danh mục hiện ảnh đại diện cho từng mục, lấy từ ảnh món đã có trong API (`image` của món đầu tiên có ảnh trong mục). Mục chưa có món nào có ảnh thì dùng khung thay thế đẹp vẽ bằng CSS/SVG nội bộ, không tải ảnh ngoài. Không đổi API. Ảnh thật do Lộc tải lên ERP | `frontend/features/home/**`, `frontend/features/catalog/**` | Ảnh không méo, có `alt`, lazy-load, không giật layout (đặt sẵn tỉ lệ khung). Ca: mục không có ảnh, mạng lỗi ảnh (`onError`) → khung thay thế. Ảnh 360 + 1280 | `design_screens` | |
 
 ## Không giao cho Gemini (lý do)
+- Feedback Lộc 14/11 dòng 2–5 (bán 0,5 kg, đồ đông lạnh, nhập/xuất Excel hàng bán): đụng quy tắc bán, backend và ERP, đội Claude làm. Dòng 6 "UI" chưa rõ, chờ hỏi Lộc.
 - L2 đơn giá ở trang thanh toán suy từ thành tiền: cần backend trả thêm khoá, đổi contract 02b.
 - L6 test throttle ở backend, nâng `next` 15 / `npm audit`: ngoài phạm vi, nâng major cần Duy quyết.
 - Google Maps (cần key), câu chữ chính sách và hỏi Lộc (`doc/ops/hoi-loc.md`): việc của Duy và `mkt-brand`/`legal-vn`.
