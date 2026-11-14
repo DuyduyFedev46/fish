@@ -28,7 +28,7 @@ flowchart TD
   C7 -- "xác nhận" --> C9["Lưu, ghi nhật ký; không đụng tồn kho và lô"]
 ```
 
-> BA · 14/11/2026 · Trạng thái: **CHỜ DUYỆT**
+> BA · 14/11/2026 · Trạng thái: **ĐÃ DUYỆT** (Duy 14/11)
 
 ## 1. Yêu cầu gốc
 
@@ -350,3 +350,11 @@ flowchart LR
 | 4 | Nhập file hàng bán (ERP): xem trước, xác nhận, nhật ký | ĐẦY ĐỦ (cùng hồ sơ này) | Lát 3, Q-02b, Q-03 | Rủi ro cao nhất (đổi giá hàng loạt). Cần techlead review kỹ phần giá và test đua bấm hai lần |
 
 Lát 1 có thể chạy luồng NHANH ngay, không chờ PO. Lát 3 và 4 qua PO viết story sau khi Duy trả lời Q-11, Q-02b và Q-03.
+
+
+## Duy trả lời điểm dừng 1 (14/11)
+- **Q-01 đồ đông lạnh:** hiểu lầm. Hàng đã là hải sản cấp đông; gốc vấn đề là Shop thiếu nhóm hàng nên khó phân biệt. Lát 2 thành việc vận hành: tách nhóm hàng trong ERP (không code). Không lật BR-DM-01, Q-04/Q-05 bỏ.
+- **Q-11:** A, danh sách mặt hàng (không cột tồn).
+- **Q-02b:** A, mã có thì sửa, mã mới thì tạo, món không có trong file giữ nguyên.
+- **Q-03:** A, có dòng lỗi thì không ghi dòng nào, báo lỗi theo số dòng.
+- Các mặc định 🟡 còn lại giữ như BA đề xuất. Q-16: chữ "1 kg" ở `frontend/` đã giao Gemini (GUI-08).
