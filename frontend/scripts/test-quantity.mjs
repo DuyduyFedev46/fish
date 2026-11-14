@@ -36,42 +36,54 @@ function eq(name, fn, want) {
 }
 
 const kg = mod.parseQtyRule("1", "0.5", "kg");
+const kg05 = mod.parseQtyRule("0.5", "0.5", "kg");
 const combo = mod.parseQtyRule("1", "1", "combo");
 
 // --- đọc luật từ API ---
-eq("parseQtyRule kg", kg, { minQty: 1, step: 0.5 });
+eq("parseQtyRule kg (min 1)", kg, { minQty: 1, step: 0.5 });
+eq("parseQtyRule kg (min 0,5)", kg05, { minQty: 0.5, step: 0.5 });
 eq("parseQtyRule combo", combo, { minQty: 1, step: 1 });
-eq("parseQtyRule thiếu -> mặc định kg", mod.parseQtyRule(undefined, null), { minQty: 1, step: 0.5 });
+eq("parseQtyRule thiếu -> mặc định kg (0,5)", mod.parseQtyRule(undefined, null), { minQty: 0.5, step: 0.5 });
 eq("parseQtyRule thiếu -> mặc định combo", mod.parseQtyRule("", "", "combo"), { minQty: 1, step: 1 });
-eq("parseQtyRule rác", mod.parseQtyRule("abc", "-1"), { minQty: 1, step: 0.5 });
+eq("parseQtyRule rác -> mặc định kg (0,5)", mod.parseQtyRule("abc", "-1"), { minQty: 0.5, step: 0.5 });
 
 // --- G4: số lượng hợp lệ ---
 for (const q of [1, 1.5, 2, 2.5, 10])
-  eq(`isValidQty kg ${q}`, () => mod.isValidQty(q, kg), true);
+  eq(`isValidQty kg (min 1) ${q}`, () => mod.isValidQty(q, kg), true);
 for (const q of [0, 0.5, 0.3, 1.25, 1.1, -1, NaN])
-  eq(`isValidQty kg ${q} không hợp lệ`, () => mod.isValidQty(q, kg), false);
+  eq(`isValidQty kg (min 1) ${q} không hợp lệ`, () => mod.isValidQty(q, kg), false);
+for (const q of [0.5, 1, 1.5, 2, 2.5, 10])
+  eq(`isValidQty kg (min 0,5) ${q}`, () => mod.isValidQty(q, kg05), true);
+for (const q of [0, 0.3, 0.75, 1.25, 1.1, -0.5, NaN])
+  eq(`isValidQty kg (min 0,5) ${q} không hợp lệ`, () => mod.isValidQty(q, kg05), false);
 for (const q of [1, 2, 3]) eq(`isValidQty combo ${q}`, () => mod.isValidQty(q, combo), true);
 for (const q of [0, 1.5, 0.5, 2.5]) eq(`isValidQty combo ${q} không hợp lệ`, () => mod.isValidQty(q, combo), false);
 
 // --- tăng / giảm theo bước ---
+eq("stepUp 0,5 -> 1 (min 0,5)", () => mod.stepUp(0.5, kg05), 1);
 eq("stepUp 1 -> 1,5", () => mod.stepUp(1, kg), 1.5);
 eq("stepUp 1,5 -> 2", () => mod.stepUp(1.5, kg), 2);
 eq("stepUp combo 1 -> 2", () => mod.stepUp(1, combo), 2);
 eq("stepDown 2 -> 1,5", () => mod.stepDown(2, kg), 1.5);
 eq("stepDown 1,5 -> 1", () => mod.stepDown(1.5, kg), 1);
-eq("stepDown 1 kg -> null (mở hộp thoại bỏ món, không về 0,5)", () => mod.stepDown(1, kg), null);
+eq("stepDown 1 -> 0,5 (min 0,5)", () => mod.stepDown(1, kg05), 0.5);
+eq("stepDown 0,5 kg (min 0,5) -> null (mở hộp thoại bỏ món)", () => mod.stepDown(0.5, kg05), null);
+eq("stepDown 1 kg (min 1) -> null (mở hộp thoại bỏ món)", () => mod.stepDown(1, kg), null);
 eq("stepDown 1 combo -> null", () => mod.stepDown(1, combo), null);
 eq("stepDown combo 3 -> 2", () => mod.stepDown(3, combo), 2);
 // 0,1 + 0,2 kiểu số thực không được lệch
 eq("stepUp không sinh số lẻ thừa", () => mod.stepUp(0.3, { minQty: 0.1, step: 0.1 }), 0.4);
 
 // --- làm tròn lên (giỏ cũ có số lẻ) ---
-eq("snapUp 0,3 -> 1", () => mod.snapUp(0.3, kg), 1);
+eq("snapUp 0,3 -> 0,5 (min 0,5)", () => mod.snapUp(0.3, kg05), 0.5);
+eq("snapUp 0,5 giữ nguyên (min 0,5)", () => mod.snapUp(0.5, kg05), 0.5);
+eq("snapUp 0,3 -> 1 (min 1)", () => mod.snapUp(0.3, kg), 1);
 eq("snapUp 1,1 -> 1,5", () => mod.snapUp(1.1, kg), 1.5);
 eq("snapUp 1,5 giữ nguyên", () => mod.snapUp(1.5, kg), 1.5);
 eq("snapUp 2,01 -> 2,5", () => mod.snapUp(2.01, kg), 2.5);
 eq("snapUp combo 1,2 -> 2", () => mod.snapUp(1.2, combo), 2);
-eq("snapUp NaN -> tối thiểu", () => mod.snapUp(NaN, kg), 1);
+eq("snapUp NaN -> tối thiểu (min 0,5)", () => mod.snapUp(NaN, kg05), 0.5);
+eq("snapUp NaN -> tối thiểu (min 1)", () => mod.snapUp(NaN, kg), 1);
 
 // --- chuỗi gửi máy chủ / hiển thị ---
 eq("qtyToApiString 1", () => mod.qtyToApiString(1), "1");

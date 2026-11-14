@@ -48,7 +48,7 @@ export function reconcileCart(entries: ReconcileEntry[], catalog: ReconcileItem[
 
   const lines = entries.map((entry): ReconciledLine => {
     const item = byCode.get(entry.item_code);
-    const rule = item ? parseQtyRule(item.min_qty, item.qty_step, item.unit) : parseQtyRule(1, undefined, entry.unit);
+    const rule = item ? parseQtyRule(item.min_qty, item.qty_step, item.unit) : parseQtyRule(undefined, undefined, entry.unit);
     const qty = isValidQty(entry.qty, rule) ? entry.qty : snapUp(entry.qty, rule);
     const qtyAdjusted = qty !== entry.qty;
     if (qtyAdjusted) adjustedCount += 1;
@@ -74,4 +74,14 @@ export function reconcileCart(entries: ReconcileEntry[], catalog: ReconcileItem[
   });
 
   return { lines, adjustedCount, outCount, priceChangedCount, subtotal };
+}
+
+/**
+ * GUI-12: số lượng làm tròn chỉ được ghi vào giỏ đã lưu khi đã có catalog thật (`catalogReady`).
+ * Chưa có catalog (đang tải hoặc lỗi mạng) thì giỏ giữ nguyên, kẻo ghi đè theo luật dự phòng.
+ * Trả danh sách [mã món, số lượng mới], hoặc null khi không có gì để ghi.
+ */
+export function qtyFixesToPersist(result: Reconciled, catalogReady: boolean): [string, number][] | null {
+  if (!catalogReady || result.adjustedCount === 0) return null;
+  return result.lines.map((l) => [l.entry.item_code, l.qty]);
 }

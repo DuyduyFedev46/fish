@@ -25,7 +25,7 @@ export interface QtyStepperProps {
   onChange: (next: number) => void;
   /** Bắt buộc khi mode="cart": container mở hộp thoại xác nhận bỏ món, không xoá ngay. */
   onRequestRemove?: () => void;
-  /** id của dòng "Tối thiểu 1 kg": nút trừ tắt trỏ tới đó để người dùng trình đọc nghe lý do. */
+  /** id của dòng "Tối thiểu 0,5 kg": nút trừ tắt trỏ tới đó để người dùng trình đọc nghe lý do. */
   describedBy?: string;
   className?: string;
 }

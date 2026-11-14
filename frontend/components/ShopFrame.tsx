@@ -12,6 +12,7 @@ import { loadHomeBanner } from "@/features/home/homeContent";
 import BottomNav, { type BottomNavTab } from "./BottomNav";
 import ShopFooter, { type FooterLinkEntry } from "./ShopFooter";
 import ShopHeader, { type NavGroup } from "./ShopHeader";
+import ZaloFloatingButton from "./ZaloFloatingButton";
 import { groupHref } from "./shopLinks";
 import { useCart } from "./CartContext";
 import s from "./ShopFrame.module.css";
@@ -110,6 +111,7 @@ export default function ShopFrame({
   const seller = info?.seller;
   // Ưu tiên số của người bán, rồi mới tới số trong cấu hình xác nhận đơn (02b §6.5).
   const hotline = pickHotline(seller?.phone, info?.confirmation_policy?.hotline);
+  const zaloUrl = zaloUrlOf(seller?.zalo);
 
   const introText =
     bannerStrip === undefined ? "" : bannerStrip === null ? fallbackStripText(info?.policies?.min_qty_kg) : bannerStrip;
@@ -172,7 +174,7 @@ export default function ShopFrame({
           email: seller?.email,
         }}
         hotline={hotline}
-        zaloUrl={zaloUrlOf(seller?.zalo)}
+        zaloUrl={zaloUrl}
         policyLinks={policyLinks}
         noticeUrl={seller?.website_notice_url?.trim() || undefined}
         noticeImage={seller?.website_notice_image?.trim() || undefined}
@@ -180,6 +182,7 @@ export default function ShopFrame({
         reserveBottomNav={bottomNav}
       />
       {bottomNav ? <BottomNav current={tab} cartCount={lineCount} /> : null}
+      <ZaloFloatingButton zaloUrl={zaloUrl ?? ""} hidden={header === "checkout"} />
     </div>
   );
 }

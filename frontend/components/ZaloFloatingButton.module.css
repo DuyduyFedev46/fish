@@ -1,0 +1,130 @@
+.fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--zalo-cart-offset, var(--space-4)) + env(safe-area-inset-bottom));
+  z-index: var(--z-bottom-bar);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 2px solid var(--on-accent);
+  border-radius: var(--radius-full);
+  background-color: var(--zalo-bg);
+  color: var(--on-accent);
+  box-shadow: var(--zalo-shadow);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-swap) var(--ease-out),
+    background-color var(--dur-color) var(--ease-out),
+    box-shadow var(--dur-swap) var(--ease-out);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+.fab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+/* Điện thoại: nổi phía trên thanh điều hướng dưới */
+:global(body[data-bottom-nav]) .fab {
+  bottom: calc(var(--h-bottom-nav) + var(--space-3) + env(safe-area-inset-bottom));
+}
+
+/* Trang chi tiết món: nổi phía trên thanh mua dính đáy */
+:global(body[data-buy-bar]) .fab {
+  bottom: calc(var(--h-buy-bar) + var(--space-4) + env(safe-area-inset-bottom));
+}
+
+/* Trang danh mục có CartBar: nổi phía trên cả BottomNav và CartBar */
+:global(body[data-cart-bar]) .fab {
+  bottom: calc(var(--h-bottom-nav) + 68px + var(--space-3) + env(safe-area-inset-bottom));
+}
+
+.icon {
+  display: block;
+  flex: none;
+  width: 28px;
+  height: 28px;
+}
+
+.tooltip {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .fab,
+  :global(body[data-bottom-nav]) .fab,
+  :global(body[data-buy-bar]) .fab,
+  :global(body[data-cart-bar]) .fab {
+    right: var(--space-6);
+    bottom: var(--space-6);
+    width: 54px;
+    height: 54px;
+  }
+
+  .icon {
+    width: 31px;
+    height: 31px;
+  }
+
+  .tooltip {
+    position: absolute;
+    right: calc(100% + 10px);
+    top: 50%;
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 var(--space-3);
+    border: 1px solid var(--border-subtle, var(--border));
+    border-radius: var(--radius-full);
+    background-color: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-card);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translate(4px, -50%);
+    transition:
+      opacity var(--dur-color) var(--ease-out),
+      transform var(--dur-swap) var(--ease-out);
+  }
+
+  .fab:focus-visible .tooltip {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .fab:hover {
+    transform: translateY(-2px);
+    background-color: var(--zalo-bg-hover);
+    box-shadow:
+      var(--zalo-shadow),
+      0 0 0 5px var(--zalo-ring);
+  }
+
+  .fab:hover .tooltip {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab,
+  .tooltip {
+    transition: none;
+  }
+
+  .fab:hover,
+  .fab:active {
+    transform: none;
+  }
+}

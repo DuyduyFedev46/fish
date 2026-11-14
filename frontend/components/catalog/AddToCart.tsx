@@ -15,7 +15,7 @@ import s from "./AddToCart.module.css";
 
 export interface AddToCartProps {
   item: ProductCardItem;
-  /** card: trên thẻ ("Thêm 1 kg" thành bộ tăng giảm). detail: chọn số lượng và thanh mua ở trang chi tiết. */
+  /** card: trên thẻ ("Thêm 0,5 kg" thành bộ tăng giảm). detail: chọn số lượng và thanh mua ở trang chi tiết. */
   variant: "card" | "detail";
   /** Số lượng khách chọn đang có trong giỏ (không phải tồn kho). 0: chưa có. */
   quantityInCart: number;

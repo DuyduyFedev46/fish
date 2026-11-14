@@ -10,7 +10,7 @@ import s from "./HowToBuyView.module.css";
  * Trang Cách mua (SHOP-5-04 AC3, màn P3-HowToBuy, DesktopPolicy#cach-mua). Đọc thân bài CMS `cach-mua-hang`:
  * - danh sách số mà mỗi mục mở đầu bằng chữ đậm -> thẻ bước có số (chữ đậm = tên bước, phần sau = mô tả);
  * - H3 + các đoạn sau nó -> hỏi đáp thu gọn `<details>` (02b §3.7.4).
- * Số 1 kg / 0,5 kg / 30 phút nằm sẵn trong CMS, do lệnh nạp lấy từ settings (`{min_qty_kg}`, `{qty_step_kg}`,
+ * Số 0,5 kg / 30 phút nằm sẵn trong CMS, do lệnh nạp lấy từ settings (`{min_qty_kg}`, `{qty_step_kg}`,
  * `{hold_minutes}`), FE không viết cứng.
  */
 

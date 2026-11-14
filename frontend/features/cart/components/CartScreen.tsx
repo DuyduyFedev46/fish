@@ -15,6 +15,7 @@ import CartLine, { CartLineSkeleton } from "@/components/cart/CartLine";
 import CartSummary from "@/components/cart/CartSummary";
 import CheckoutSteps from "@/components/cart/CheckoutSteps";
 import VoucherField from "@/components/cart/VoucherField";
+import Icon from "@/components/ui/Icon";
 import { BottomSheet } from "@/components/ui/Sheet";
 import RemoveItemDialog from "@/components/cart/RemoveItemDialog";
 import Banner from "@/components/ui/Banner";
@@ -25,7 +26,8 @@ import { useToast } from "@/components/ui/Toast";
 import { useCart } from "@/components/CartContext";
 import { itemHref, toCardItem } from "@/features/catalog/cardItem";
 import { groupIconOf } from "@/features/catalog/groupIcon";
-import { reconcileCart } from "../reconcile";
+import { qtyFixesToPersist, reconcileCart } from "../reconcile";
+import { DELIVERY_ETA_TEXT } from "../deliveryEta";
 import { useVoucher } from "../useVoucher";
 import { describeTermsFull, minOrderOf } from "../voucherView";
 import s from "./CartScreen.module.css";
@@ -43,6 +45,7 @@ export default function CartScreen() {
   const [retrying, setRetrying] = useState(false);
   const [adjustedNotice, setAdjustedNotice] = useState(false);
   const [holdMinutes, setHoldMinutes] = useState<number | null>(null);
+  const [siteMinQtyKg, setSiteMinQtyKg] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [live, setLive] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -69,6 +72,8 @@ export default function CartScreen() {
       .then((info) => {
         const m = info?.policies?.hold_minutes;
         if (active && typeof m === "number" && m > 0) setHoldMinutes(m);
+        const minKg = info?.policies?.min_qty_kg;
+        if (active && typeof minKg === "string" && Number(minKg) > 0) setSiteMinQtyKg(minKg);
       })
       .catch(() => {});
     return () => {
@@ -82,12 +87,15 @@ export default function CartScreen() {
   );
 
   // Số lượng lẻ từ Shop cũ: làm tròn lên mức hợp lệ, ghi lại và báo (AC6). Không tự xoá món.
+  // GUI-12: chỉ ghi khi đã có catalog thật; đang tải hoặc lỗi mạng thì giữ nguyên giỏ đã lưu.
   useEffect(() => {
-    if (!cart.ready || result.adjustedCount === 0) return;
-    const fixed = new Map(result.lines.map((l) => [l.entry.item_code, l.qty]));
+    if (!cart.ready) return;
+    const fixes = qtyFixesToPersist(result, loadState === "ready");
+    if (!fixes) return;
+    const fixed = new Map(fixes);
     cart.updateEntries((prev) => prev.map((e) => ({ ...e, qty: fixed.get(e.item_code) ?? e.qty })));
     setAdjustedNotice(true);
-  }, [cart.ready, result, cart]);
+  }, [cart.ready, result, cart, loadState]);
 
   // Sau khi bỏ một dòng: tiêu điểm về tên dòng kế tiếp, hết dòng thì về tiêu đề.
   useEffect(() => {
@@ -123,6 +131,12 @@ export default function CartScreen() {
   const itemCount = result.lines.length;
   const available = itemCount - result.outCount;
   const pendingLine = pending ? result.lines.find((l) => l.entry.item_code === pending) : undefined;
+  const minKgLabel = useMemo(() => {
+    const fromCatalog = catalog?.find((i) => i.unit === "kg")?.min_qty;
+    const fromLines = result.lines.find((l) => l.entry.unit === "kg")?.rule.minQty;
+    const raw = Number(fromCatalog ?? siteMinQtyKg ?? fromLines ?? 0.5);
+    return formatQty(Number.isFinite(raw) && raw > 0 ? raw : 0.5);
+  }, [catalog, siteMinQtyKg, result.lines]);
 
   function focusVoucherRemove() {
     const buttons = Array.from(document.querySelectorAll<HTMLElement>("[data-voucher-remove]"));
@@ -223,7 +237,7 @@ export default function CartScreen() {
         <EmptyState
           icon="cart"
           title="Giỏ hàng đang trống"
-          description="Mua tối thiểu 1 kg mỗi món, giá tính theo kg"
+          description={`Mua tối thiểu ${minKgLabel} kg mỗi món, giá tính theo kg`}
           primaryAction={{ label: "Xem hàng đang có", href: "/shop/" }}
           framed={false}
         />
@@ -321,7 +335,11 @@ export default function CartScreen() {
               );
             })}
           </ul>
-          <p className={s.rule}>Mua tối thiểu 1 kg mỗi món.</p>
+          <p className={s.rule}>Mua tối thiểu {minKgLabel} kg mỗi món.</p>
+          <p className={s.eta} data-testid="delivery-eta">
+            <Icon name="truck" size={16} />
+            <span>{DELIVERY_ETA_TEXT}</span>
+          </p>
           <div className={s.deskNote}>
             {holdMinutes ? <p>Hàng được giữ {holdMinutes} phút sau khi đặt. Khi còn nằm trong giỏ, hàng chưa được giữ.</p> : null}
             <Link href="/shop/">Mua thêm hàng khác</Link>

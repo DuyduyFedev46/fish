@@ -62,10 +62,27 @@ eq("đếm chỉnh", r.adjustedCount, 2);
 // combo nguyên
 r = mod.reconcileCart([entry("K", "50000", 1.5, "combo")], [item("K", "50000", "in", "combo")]);
 eq("combo 1,5 -> 2", r.lines[0].qty, 2);
-// chưa có catalog: giữ giá, vẫn chỉnh số lượng, không báo hết
-r = mod.reconcileCart([entry("A", "10000", 0.5)], null);
+// chưa có catalog: giữ giá, vẫn chỉnh số lượng theo mặc định 0,5 kg, không báo hết
+r = mod.reconcileCart([entry("A", "10000", 0.3), entry("B", "10000", 0.5)], null);
 eq("chưa có catalog: ok", r.lines[0].status, "ok");
-eq("chưa có catalog: qty", r.lines[0].qty, 1);
+eq("chưa có catalog: 0,3 -> 0,5", r.lines[0].qty, 0.5);
+eq("chưa có catalog: 0,5 giữ 0,5", r.lines[1].qty, 0.5);
+// catalog có min_qty = "0.5"
+const item05 = (code, price, level) => ({ ...item(code, price, level), min_qty: "0.5" });
+r = mod.reconcileCart([entry("A", "10000", 0.3), entry("B", "10000", 0.5)], [item05("A", "10000", "in"), item05("B", "10000", "in")]);
+eq("catalog min_qty=0,5: 0,3 -> 0,5", r.lines[0].qty, 0.5);
+eq("catalog min_qty=0,5: 0,5 giữ nguyên", r.lines[1].qty, 0.5);
+eq("catalog min_qty=0,5: đếm chỉnh = 1", r.adjustedCount, 1);
+
+// GUI-12: chỉ ghi số lượng đã chỉnh vào giỏ khi đã có catalog thật (loadState "ready")
+const lazy = mod.reconcileCart([entry("A", "10000", 0.3), entry("B", "10000", 0.5)], null);
+eq("GUI-12 chưa có catalog (loading/error): không ghi gì vào giỏ", mod.qtyFixesToPersist(lazy, false), null);
+eq("GUI-12 0,5 kg luôn giữ 0,5 khi chưa có catalog", lazy.lines[1].qty, 0.5);
+const real = mod.reconcileCart([entry("A", "10000", 0.3), entry("B", "10000", 0.5)], [item05("A", "10000", "in"), item05("B", "10000", "in")]);
+eq("GUI-12 có catalog: ghi 0,3 -> 0,5", mod.qtyFixesToPersist(real, true), [["A", 0.5], ["B", 0.5]]);
+const clean = mod.reconcileCart([entry("B", "10000", 0.5)], [item05("B", "10000", "in")]);
+eq("GUI-12 có catalog, không số lẻ: không ghi", mod.qtyFixesToPersist(clean, true), null);
+eq("GUI-12 combo chưa có catalog: tối thiểu 1", mod.reconcileCart([entry("K", "5", 1, "combo")], null).lines[0].qty, 1);
 
 // catalogView
 const cat = [item("A", "300", "out"), item("B", "200", "in"), item("C", "100", "low")];

@@ -73,8 +73,9 @@ with sync_playwright() as p:
         R.ok(f"{tag} Liên hệ: không form/ô nhập, không ô giữ chỗ '[…]'", page.locator("main form, main input, main textarea").count() == 0 and "[" not in mt, mt[:200])
         goto(page, "/pages/?slug=cach-mua-hang", 900)
         mt = page.inner_text("main")
-        R.ok(f"{tag} Cách mua: ≥ 5 bước, hỏi đáp <details>, có 1 kg / 0,5 kg / 30 phút",
-             page.locator("main ol > li").count() >= 5 and page.locator("main details").count() >= 1 and all(w in mt for w in ("1 kg", "0,5 kg", "30 phút")), mt[:200])
+        R.ok(f"{tag} Cách mua: ≥ 5 bước, hỏi đáp <details>, có mức tối thiểu / bước 0,5 kg / 30 phút",
+             page.locator("main ol > li").count() >= 5 and page.locator("main details").count() >= 1
+             and all(w in mt for w in ("0,5 kg", "30 phút")) and ("1 kg" in mt or "0,5 kg" in mt), mt[:200])
         for slug in ("doi-tra", "giao-hang", "thanh-toan", "quyen-rieng-tu", "dieu-khoan", "khieu-nai", "thong-tin-nguoi-ban", "lien-he", "cach-mua-hang"):
             goto(page, f"/pages/?slug={slug}", 500)
             t = page.inner_text("main").lower()
@@ -106,13 +107,14 @@ with sync_playwright() as p:
         qs = parse_qs(urlparse(links[0]).query) if links else {}
         R.ok(f"{tag} thẻ món: link sang trang món có UTM đúng (caveve_web / bai_viet / slug bài)",
              qs == {"code": ["CA-THU"], "utm_source": ["caveve_web"], "utm_medium": ["bai_viet"], "utm_campaign": [SLUG]}, links)
-        R.ok(f"{tag} thẻ món: giá lấy từ catalog (165.000đ), có nút 'Thêm 1 kg'", price_in_card(page, "CA-THU") == 165000
-             and page.locator('li:has(a[href*="code=CA-THU"]) button', has_text="Thêm 1 kg").count() == 1)
+        add_ca_thu_btn = page.locator('li:has(a[href*="code=CA-THU"]) button').filter(has_text=re.compile(r"^Thêm (0,5|1)\s*kg$"))
+        R.ok(f"{tag} thẻ món: giá lấy từ catalog (165.000đ), có nút 'Thêm <min_qty> kg'", price_in_card(page, "CA-THU") == 165000
+             and add_ca_thu_btn.count() == 1)
         snap(page, "blog-article-itemcard", width, "content")
         # thêm giỏ từ thẻ
-        page.locator('li:has(a[href*="code=CA-THU"]) button', has_text="Thêm 1 kg").first.click()
+        add_ca_thu_btn.first.click()
         page.wait_for_timeout(500)
-        R.ok(f"{tag} thêm từ thẻ món: giỏ có CA-THU 1 kg, toast có 'Xem giỏ'",
+        R.ok(f"{tag} thêm từ thẻ món: giỏ có CA-THU ở mức tối thiểu, toast có 'Xem giỏ'",
              "CA-THU" in page.evaluate("localStorage.getItem('cangcaloc_cart_v1')||''") and page.get_by_role("link", name="Xem giỏ").count() >= 1)
         # chỉ gọi API công khai
         calls = [u for _, u, _ in watch.requests[reqs_before:] if "/api/" in u]
@@ -132,7 +134,7 @@ with sync_playwright() as p:
         stock_set("CA-THU", 0)
         goto(page, f"/blog/?slug={SLUG}", 1000)
         R.ok(f"{tag} món hết hàng: thẻ hiện 'Liên hệ chúng tôi', không nút thêm", page.locator('li:has(a[href*="code=CA-THU"])', has_text="Liên hệ chúng tôi").count() >= 1
-             and page.locator('li:has(a[href*="code=CA-THU"]) button', has_text="Thêm 1 kg").count() == 0)
+             and page.locator('li:has(a[href*="code=CA-THU"]) button').filter(has_text=re.compile(r"^Thêm (0,5|1)\s*kg$")).count() == 0)
         stock_set("CA-THU", 40)
         manage_shell("from apps.catalog.models import Item\nItem.objects.filter(code='CA-THU').update(is_active=False)")
         goto(page, f"/blog/?slug={SLUG}", 1000)

@@ -175,7 +175,7 @@ def _(c): goto(c.page, "/shop/item/?code=CA-THU"); return c.page
 @screen("A4", "[Popup] Đã thêm vào giỏ", "A4-Toast", M, "viewport")
 def _(c):
     goto(c.page, "/shop/")
-    c.page.get_by_role("button", name=re.compile(r"^Thêm 1\s(kg|combo)")).nth(2).evaluate("e => e.click()"); c.page.wait_for_timeout(700)
+    c.page.get_by_role("button", name=re.compile(r"^Thêm (0,5|1)\s(kg|combo)")).nth(2).evaluate("e => e.click()"); c.page.wait_for_timeout(700)
     return c.page
 
 @screen("A5", "Lỗi · Tìm không thấy", "A5-NotFound", M, "viewport")
@@ -209,7 +209,7 @@ def _(c): set_cart(c.page, STD_CART()); goto_cart(c.page); return c.page
 
 @screen("B2", "[Popup] Xác nhận bỏ món", "B2-RemoveConfirm", M, "viewport")
 def _(c):
-    set_cart(c.page, [cart_line("CA-THU", 1)]); goto_cart(c.page)
+    set_cart(c.page, [cart_line("CA-THU", 0.5)]); goto_cart(c.page)
     c.page.get_by_role("button", name=re.compile(r"^Bỏ Cá thu")).first.click() if False else None
     c.page.get_by_role("button", name=re.compile(r"^Bỏ Cá thu khỏi giỏ")).first.click(); c.page.wait_for_timeout(500)
     return c.page
@@ -435,7 +435,7 @@ def _(c):
 
 @screen("DP5", "Máy tính · [Popup] Xác nhận bỏ món", "DesktopRemoveConfirm", D, "viewport")
 def _(c):
-    set_cart(c.page, [cart_line("CA-THU", 1)]); goto_cart(c.page)
+    set_cart(c.page, [cart_line("CA-THU", 0.5)]); goto_cart(c.page)
     c.page.get_by_role("button", name=re.compile(r"^Bỏ Cá thu khỏi giỏ")).first.click(); c.page.wait_for_timeout(500); return c.page
 
 @screen("DP6", "Máy tính · [Popup] Lỗi kết nối khi đặt", "DesktopNetworkError", D, "viewport")
@@ -476,7 +476,7 @@ def _(c):
 @screen("DE7", "Máy tính · [Toast] Đã thêm vào giỏ + giỏ mini", "DesktopToast", D)
 def _(c):
     goto(c.page, "/shop/")
-    c.page.get_by_role("button", name=re.compile(r"^Thêm 1\s(kg|combo)")).nth(2).evaluate("e => e.click()"); c.page.wait_for_timeout(700); return c.page
+    c.page.get_by_role("button", name=re.compile(r"^Thêm (0,5|1)\s(kg|combo)")).nth(2).evaluate("e => e.click()"); c.page.wait_for_timeout(700); return c.page
 
 @screen("DE8", "Máy tính · Trạng thái · Đang tải", "DesktopLoading", D)
 def _(c):

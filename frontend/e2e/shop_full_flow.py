@@ -81,7 +81,8 @@ def journey(browser, width):
     # 2. Danh mục + lọc nhóm
     goto(page, "/shop/")
     R.ok(f"[{tag}] danh mục: 8 món, 3 mức tồn đủ cả ba (Còn hàng/Sắp hết/Hết hàng)",
-         all(s in page.inner_text("body") for s in ("Sắp hết", "Hết hàng")) and page.locator("text=Thêm 1 kg").count() >= 3)
+         all(s in page.inner_text("body") for s in ("Sắp hết", "Hết hàng"))
+         and page.get_by_role("button", name=re.compile(r"^Thêm (0,5|1)\s*kg")).count() >= 3)
     page.get_by_role("button", name="Cá", exact=True).first.click() if page.get_by_role("button", name="Cá", exact=True).count() else \
         page.get_by_role("link", name="Cá", exact=True).first.click()
     page.wait_for_timeout(600)
@@ -348,7 +349,7 @@ def error_branches(browser):
     create_voucher(V_ONCE, total_uses=1)
     create_voucher(V_GONE)
     ctx, page, watch = fresh_context(browser, 360)
-    add_to_cart(page, "CA-THU")
+    add_to_cart(page, "CA-THU", 1)
     goto_cart(page)
     cases = [("KHONGCO", "không"), (V_EXPIRED, "hết hạn"), (V_MIN, "tối thiểu")]
     for code_try, needle in cases:
@@ -408,7 +409,12 @@ def error_branches(browser):
 
     # --- B2: bấm "Đặt hàng" ngay sau khi vào form có mã đã áp (FE chưa kiểm lại mã) → đơn vẫn có giảm giá
     ctx, page, watch = fresh_context(browser, 360)
-    add_to_cart(page, "CA-THU")
+    page.goto(SHOP + "/shop/orders/")
+    page.wait_for_load_state("networkidle")
+    page.evaluate(
+        "(l)=>localStorage.setItem('cangcaloc_cart_v1', JSON.stringify(l))",
+        [{"item_code": "CA-THU", "name": "Cá thu", "unit": "kg", "price": "165000", "qty": 1}],
+    )
     goto_cart(page)
     open_code_ui(page)
     page.locator("input[type=text]:visible").last.fill(V_MAIN)
@@ -434,7 +440,7 @@ def error_branches(browser):
     # (2) Đã áp mã ở giỏ rồi sang đặt hàng mới mất mạng kiểm mã: khối tóm tắt hiện "Mã X · sẽ kiểm khi đặt", đơn gửi kèm mã và trang thanh toán hiện đúng tổng đã giảm (148.500đ).
     for idx, width_net in enumerate((360, 1280)):
         ctx, page, watch = fresh_context(browser, width_net)
-        add_to_cart(page, "CA-THU")
+        add_to_cart(page, "CA-THU", 1)
         page.route("**/api/shop/vouchers/check/", lambda r: r.abort("internetdisconnected"))
         goto_cart(page)
         open_code_ui(page)
@@ -465,7 +471,7 @@ def error_branches(browser):
         ctx.close()
 
         ctx, page, watch = fresh_context(browser, width_net)
-        add_to_cart(page, "CA-THU")
+        add_to_cart(page, "CA-THU", 1)
         goto_cart(page)
         open_code_ui(page)
         page.locator("input[type=text]:visible").last.fill(V_MAIN)
@@ -497,7 +503,7 @@ def error_branches(browser):
     code_desk_gone = f"GDSK{SUF}"
     create_voucher(code_desk_gone)
     ctx, page, watch = fresh_context(browser, 1280)
-    add_to_cart(page, "CA-THU")
+    add_to_cart(page, "CA-THU", 1)
     goto_cart(page)
     open_code_ui(page)
     page.locator("input[type=text]:visible").last.fill(code_desk_gone)
@@ -522,7 +528,8 @@ def error_branches(browser):
         code_nq = f"GNQ{idx_nq}{SUF}"
         create_voucher(code_nq)
         ctx, page, watch = fresh_context(browser, width_nq)
-        add_to_cart(page, "CA-THU")
+        add_to_cart(page, "CA-THU", 1)
+        page.wait_for_function("() => (localStorage.getItem('cangcaloc_cart_v1') || '').includes('CA-THU')")
         goto_cart(page)
         open_code_ui(page)
         page.locator("input[type=text]:visible").last.fill(code_nq)
@@ -594,10 +601,97 @@ def error_branches(browser):
         be2.terminate()
 
 
+def cart_qtys(page):
+    raw = page.evaluate("() => localStorage.getItem('cangcaloc_cart_v1')") or "[]"
+    return {e["item_code"]: e["qty"] for e in json.loads(raw)}
+
+
+def delay_catalog(page, seconds):
+    """Làm chậm GET /api/shop/catalog/ (GUI-12)."""
+    import time
+
+    def slow(route):
+        time.sleep(seconds)
+        route.continue_()
+    page.route("**/api/shop/catalog/**", slow)
+
+
+def quantity_kept_while_catalog_loads(browser):
+    """GUI-12 (BR-BH-22): chọn 0,5 kg thì giỏ, đặt hàng và tải lại đều giữ 0,5 kg; catalog chậm hay lỗi không đổi số lượng."""
+    price = {i["item_code"]: i for i in api("GET", "/api/shop/catalog/")[1]["items"]}["CA-THU"]
+    half = f"{round(float(price['price']) * 0.5):,}".replace(",", ".") + "đ"
+    for width in (360, 1280):
+        ctx, page, watch = fresh_context(browser, width)
+        add_to_cart(page, "CA-THU")  # số lượng mặc định = mức tối thiểu 0,5 kg
+        R.ok(f"[{width}] GUI-12 thêm 0,5 kg vào giỏ: localStorage qty 0,5", cart_qtys(page).get("CA-THU") == 0.5, cart_qtys(page))
+        delay_catalog(page, 3)
+        page.goto(SHOP + "/shop/cart/")
+        page.wait_for_selector("text=Tóm tắt đơn", timeout=15000)
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(400)
+        R.ok(f"[{width}] GUI-12 catalog chậm 3 giây, mở giỏ xong vẫn 0,5 kg trong giỏ đã lưu", cart_qtys(page).get("CA-THU") == 0.5, cart_qtys(page))
+        main_text = page.inner_text("main")
+        R.ok(f"[{width}] GUI-12 giỏ hiện tạm tính = 0,5 × giá ({half})", half in main_text, main_text[:300])
+        R.ok(f"[{width}] GUI-12 giỏ không báo 'Số lượng đã chỉnh'", "Số lượng đã chỉnh" not in main_text)
+        page.get_by_role("button", name=re.compile(r"^Tiếp tục")).first.click()
+        page.wait_for_url("**/shop/checkout/**")
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(400)
+        R.ok(f"[{width}] GUI-12 trang đặt hàng vẫn 0,5 kg và tổng {half}", cart_qtys(page).get("CA-THU") == 0.5 and half in (page.text_content("main") or ""), cart_qtys(page))
+        page.reload()
+        page.wait_for_load_state("networkidle")
+        R.ok(f"[{width}] GUI-12 tải lại trang vẫn 0,5 kg", cart_qtys(page).get("CA-THU") == 0.5, cart_qtys(page))
+        ctx.close()
+    # catalog lỗi mạng: không tự đổi số lượng (giỏ cũ lẻ 0,3 kg vẫn nguyên)
+    ctx, page, watch = fresh_context(browser, 360)
+    goto(page, "/shop/")
+    page.evaluate("""() => localStorage.setItem('cangcaloc_cart_v1', JSON.stringify([
+        {item_code: 'CA-THU', name: 'Cá thu', unit: 'kg', price: '165000', qty: 0.3}]))""")
+    page.route("**/api/shop/catalog/**", lambda route: route.abort())
+    page.goto(SHOP + "/shop/cart/")
+    page.wait_for_selector("text=Chưa cập nhật được giá", timeout=15000)
+    page.wait_for_timeout(600)
+    snap(page, "gui12-catalog-error", 360, "gui-12")
+    R.ok("[360] GUI-12 catalog lỗi mạng: số lượng giỏ đã lưu không tự đổi (0,3 giữ nguyên)", cart_qtys(page).get("CA-THU") == 0.3, cart_qtys(page))
+    ctx.close()
+    # giỏ cũ 0,3 kg, catalog tải được (min_qty 0,5): làm tròn lên 0,5 và báo
+    ctx, page, watch = fresh_context(browser, 360)
+    goto(page, "/shop/")
+    page.evaluate("""() => localStorage.setItem('cangcaloc_cart_v1', JSON.stringify([
+        {item_code: 'CA-THU', name: 'Cá thu', unit: 'kg', price: '165000', qty: 0.3}]))""")
+    goto_cart(page)
+    page.wait_for_timeout(600)
+    R.ok("[360] GUI-12 giỏ cũ 0,3 kg + catalog min 0,5: làm tròn lên 0,5 kg và báo", cart_qtys(page).get("CA-THU") == 0.5
+         and "Số lượng đã chỉnh theo mức bán" in page.inner_text("main"), (cart_qtys(page), page.inner_text("main")[:200]))
+    ctx.close()
+
+
+def delivery_eta_label(browser):
+    """GUI-13: nhãn thời gian giao ở giỏ (chữ thật, 360 + 1280, không cuộn ngang; giỏ trống thì không hiện)."""
+    want = ("Giao trong 2 giờ kể từ lúc đặt hàng nếu cách vựa dưới 15 km"
+            " · Từ 15 km trở lên: trong 4 giờ")
+    for width in (360, 1280):
+        ctx, page, watch = fresh_context(browser, width)
+        goto(page, "/shop/cart/")
+        R.ok(f"[{width}] GUI-13 giỏ trống: không có nhãn thời gian giao", page.locator("[data-testid=delivery-eta]").count() == 0
+             and "Giao trong 2 giờ" not in page.inner_text("main"))
+        add_to_cart(page, "CA-THU")
+        goto_cart(page)
+        eta = page.locator("[data-testid=delivery-eta]")
+        R.ok(f"[{width}] GUI-13 giỏ có hàng: nhãn đúng câu, là chữ thật", eta.count() == 1 and eta.inner_text().strip() == want,
+             eta.inner_text() if eta.count() else "không thấy")
+        R.ok(f"[{width}] GUI-13 nhãn hiện, không cuộn ngang", eta.is_visible() and no_hscroll(page, width))
+        eta.scroll_into_view_if_needed()
+        snap(page, "gui13-delivery-eta", width, "gui-13", full=True)
+        ctx.close()
+
+
 def main():
     create_voucher(V_MAIN)
     with sync_playwright() as p:
         browser = p.chromium.launch()
+        quantity_kept_while_catalog_loads(browser)  # GUI-12
+        delivery_eta_label(browser)  # GUI-13
         code360 = journey(browser, 360)
         code1280 = journey(browser, 1280)
         lookup_from_other_session(browser, code360, 360)

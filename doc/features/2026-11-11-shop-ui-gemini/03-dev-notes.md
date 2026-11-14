@@ -276,3 +276,115 @@ PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  footer_consent: 31 đạt, 0 lỗi, 1 bỏ qua
 PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
 ```
+
+---
+
+## GUI-06 — Nút chat Zalo nổi trên mọi trang Shop (+ sửa góp ý Medium `05-techlead-review.md`)
+
+### Thay đổi chính
+- `frontend/components/ZaloFloatingButton.tsx`, `frontend/components/ZaloFloatingButton.module.css`: thêm nút tròn nổi góc dưới phải (`data-testid="zalo-floating-btn"`, `aria-label="Nhắn Zalo với Cá Về"`), đọc `zaloUrl` từ `useHotline()` (`seller.zalo`), mở tab mới với `target="_blank" rel="noopener noreferrer"`. Khi không có `zaloUrl` hợp lệ thì ẩn hoàn toàn (`null`). Trên điện thoại (`< 768px`) nút tự nâng cao độ theo trang: trang thường nằm trên `BottomNav`, trang chi tiết món (`/shop/item`) và trang giỏ có món (`/shop/cart`) tự nhích lên trên thanh mua/thanh giỏ cố định; ẩn trên `/shop/checkout` và `/shop/orders` có `?code=` để không che nút chính đặt hàng/thanh toán.
+- `frontend/components/useHotline.ts`: chuẩn hoá `zaloUrl` qua `safeZaloHref` (chỉ nhận `https://zalo.me/...` hoặc số điện thoại hợp lệ từ `parsePhone`).
+- `frontend/components/ShopFrame.tsx`, `frontend/app/globals.css`: gắn `<ZaloFloatingButton />` vào khung chung của Shop và khai báo biến màu `--zalo-bg`, `--zalo-bg-hover` trong `globals.css`.
+- `frontend/components/search/SearchBox.module.css`: nâng vùng chạm nút `.brand .clear` trên điện thoại lên `44px × 44px` (dùng `margin-block: -4px` trong pill `40px`) theo góp ý Medium tại `05-techlead-review.md`.
+- `frontend/scripts/test-phone.mjs`: thêm 4 ca đơn vị cho `safeZaloHref` (`21/21 đạt`).
+
+---
+
+## GUI-07 — Ảnh đại diện cho các mục danh mục: combo, cá, ghẹ, mực, tôm…
+
+### Thay đổi chính
+- `frontend/features/catalog/catalogView.ts`: thêm trường `image: string | null` vào `CategoryChip`, tự chọn ảnh của món đầu tiên có ảnh (`item.image`) trong mỗi mục danh mục (bao gồm cả mục `"Tất cả"`).
+- `frontend/components/catalog/CategoryTile.tsx`, `frontend/components/catalog/CategoryTile.module.css`: hiển thị thẻ `<img>` (`loading="lazy"`, `decoding="async"`, tỉ lệ khung vuông `1:1` cố định không giật bố cục) khi mục có ảnh; tự động chuyển về khung biểu tượng SVG nội bộ khi mục chưa có ảnh hoặc khi tải ảnh bị lỗi mạng (`onError`).
+- `frontend/features/home/components/HomeScreen.tsx`, `frontend/features/catalog/components/CatalogScreen.tsx`, `frontend/features/catalog/components/CatalogScreen.module.css`: truyền `image={c.image}` xuống `CategoryTile` ở trang chủ và dải chip danh mục đầu trang `/shop/` (kèm thumbnail tròn nhỏ gọn hoặc icon SVG thay thế khi thiếu/lỗi ảnh).
+- `frontend/scripts/test-catalog-view.mjs`: thêm 6 ca đơn vị kiểm chọn ảnh đại diện danh mục (`27/27 đạt`).
+
+---
+
+## GUI-08 — Đổi chữ "từ 1 kg" theo mức mua tối thiểu mới 0,5 kg
+
+### Thay đổi chính
+- `frontend/lib/quantity.ts`, `frontend/features/cart/reconcile.ts`: đổi mức tối thiểu mặc định của món tính theo `kg` từ `1` sang `0.5` khi catalog chưa trả `min_qty` (món `combo` giữ nguyên `1`), đồng thời vẫn ưu tiên đọc động `item.min_qty` từ API.
+- `frontend/app/layout.tsx`, `frontend/app/page.tsx`: cập nhật metadata SEO tĩnh sang `"từ 0,5 kg"`.
+- `frontend/features/cart/components/CartScreen.tsx`: đọc mức mua tối thiểu theo kg động từ danh sách món trong catalog thay vì viết cứng `"1 kg"`.
+- `frontend/lib/mock.ts`, `frontend/features/site/mock.ts`, `frontend/features/content/mock.ts`, `frontend/features/ui-preview/PreviewGallery.tsx` & comment trong `QtyStepper.tsx`, `ProductCard.tsx`, `AddToCart.tsx`, `ArticleItems.tsx`, `HowToBuyView.tsx`: đồng bộ `min_qty: "0.5"` và câu chữ `"từ 0,5 kg"`.
+- `frontend/scripts/test-quantity.mjs` (`65/65 đạt`), `frontend/scripts/test-cart-reconcile.mjs` (`24/24 đạt`), `frontend/scripts/test-home-content.mjs` (`37/37 đạt`), `frontend/e2e/{shop_full_flow,shop_content_pages,shop_general_rules}.py`: cập nhật và bổ sung kiểm chứng động theo `min_qty` (`0,5 kg` và `1 kg`).
+
+---
+
+## GUI-09 — Tìm ảnh minh hoạ có giấy phép thương mại miễn phí cho 6 món đang bán
+
+### Thay đổi chính
+- Tải 6 ảnh hải sản tươi/sống đúng loài từ Wikimedia Commons (CC BY 4.0 / CC BY-SA 3.0–4.0, cạnh ngắn ≥ 1768 px, ≤ 2.3 MB, không chữ/logo/watermark/mặt người) vào `doc/features/2026-11-11-shop-ui-gemini/anh-san-pham/`:
+  - `BACH-TUOC.jpg` (2656×1768), `CA-HOI-NU.jpg` (2985×2300), `CA-THU.jpg` (2955×2216), `GHE-XANH.jpg` (2816×2112), `MUC-ONG.jpg` (2400×1800), `TOM-SU-1.jpg` (2816×2112).
+- Ghi đầy đủ nguồn, tác giả, giấy phép và ngày tải trong `doc/features/2026-11-11-shop-ui-gemini/anh-san-pham/nguon-anh.md`.
+
+---
+
+## GUI-10 — Banner trang chủ thiếu hình (minh hoạ SVG nội bộ + fallback CMS 404 + 3 ảnh banner)
+
+### Thay đổi chính
+- `frontend/features/home/components/HomeScreen.tsx`, `frontend/features/home/components/HomeScreen.module.css`:
+  - **(a) Slide CMS không có ảnh** (hoặc ảnh bị lỗi `onError`): hiển thị nền biển đêm kèm tranh minh hoạ SVG nội bộ sắc nét (`data-testid="home-banner-illustration"` — sóng biển, ngọn hải đăng, tàu cá về cảng, la bàn hàng hải và đàn cá/mực), chữ trắng tương phản cao.
+  - **(b) CMS `home-banner` trả 404 hoặc rỗng**: vẫn hiển thị nguyên khung hero banner cùng nền minh hoạ SVG nội bộ với `<h1>Cá Về: hải sản cấp đông theo lô</h1>`, dòng phụ lấy từ `stripText` (`fallbackStripText` / `site-info`, không tự bịa câu mới) và nút `"Xem hàng đang có"` dẫn tới `/shop/`. Giữ đúng duy nhất 1 thẻ `<h1>` trên trang và giữ khung cố định khi đang tải.
+  - **(c) Ảnh banner ngang gợi ý cho CMS**: tải 3 ảnh cảng cá & thuyền đánh cá Việt Nam (Lăng Cô, Nha Trang, Mũi Né Phan Thiết — CC BY 4.0 / CC BY-SA 2.0, cạnh ngắn ≥ 1704 px) vào `doc/features/2026-11-11-shop-ui-gemini/anh-san-pham/banner/banner-{1,2,3}.jpg` và ghi nguồn trong `nguon-anh.md`.
+
+### Kết quả lệnh kiểm chứng tổng hợp (GUI-06 .. GUI-10)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: 4 file mock, 23 chuỗi seed, 65 file build (out/)
+check-no-mock: XANH — không thấy seed mock nào trong bản build.
+test-cart-reconcile: 24/24 đạt, 0 sai
+test-catalog-view: 27/27 đạt, 0 sai
+test-format: 33/33 đạt, 0 sai (TZ=mặc định, lib/format.ts)
+test-home-content: 37/37 đạt, 0 sai
+test-order-state: 81/81 đạt
+test-phone: 21/21 đạt, 0 sai
+test-quantity: 65/65 đạt, 0 sai (lib/quantity.ts)
+test-safe-href: 40/40 đạt, 0 sai (features/content/safeHref.ts)
+test-voucher: 43/43 ca đạt
+check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 168 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
+PASS  content_pages: 58 đạt, 0 lỗi, 0 bỏ qua
+```
+
+---
+
+## GUI-11 — Gỡ ô "Chuyển khoản quét mã QR · Tiền về đủ là đơn tự xác nhận" ở trang chủ
+
+### Thay đổi chính
+- `frontend/features/home/components/HomeScreen.tsx`, `frontend/features/home/components/HomeScreen.module.css`: gỡ hẳn hằng số `PAYMENT_TILE`, thẻ `<Link className={cx(s.tile, s.tilePay)}>` và các lớp CSS `.tilePay`, `.tileEyebrowGood`, `.tileNote`. Cân lại thẻ `tileCombo` (`min-height: 252px`, badge icon `76px × 76px`, pill `"Combo nấu nhanh"`, CTA `"Xem chi tiết combo →"`) khớp trọn chiều cao hero banner trên máy tính (1280 px); khi không có combo thì ẩn hẳn `.sideTiles` để banner tự giãn đầy chiều ngang.
+- `frontend/e2e/shop_general_rules.py`, `frontend/e2e/shop_full_flow.py`, `frontend/e2e/shop_design_screens.py`: thêm phép kiểm `GUI-11` ở 360 px & 1280 px và đồng bộ các ca E2E với cấu hình `SHOP_MIN_QTY_KG = 0.5` vừa gộp từ `main`.
+
+### Kết quả lệnh kiểm chứng (GUI-11)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH — không thấy seed mock nào trong bản build.
+9/9 script test-*.mjs (371/371 ca) xanh · check_naming: OK
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 170 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
+```
+
+---
+
+## GUI-12 — Chọn 0,5 kg mà giỏ thành 1 kg (BR-BH-22) · FE do `fe-dev` (Claude)
+
+- Nguyên nhân còn lại sau GUI-08: effect "Số lượng lẻ từ Shop cũ" trong `CartScreen.tsx` ghi số đã làm tròn vào giỏ đã lưu cả khi chưa có catalog thật (đang tải, lỗi mạng), tức là theo luật dự phòng. Trên nhánh này luật dự phòng của `reconcileCart` đã là 0,5 kg (GUI-08) nên ca "catalog chậm" không còn tự đỏ; ca đỏ thật là catalog lỗi mạng với giỏ cũ 0,3 kg: giỏ bị ghi thành 0,5.
+- Sửa: hàm thuần `qtyFixesToPersist(result, catalogReady)` ở `features/cart/reconcile.ts`; effect chỉ ghi khi `loadState === "ready"`. `CheckoutScreen.tsx` bỏ hai chỗ `?? 1`, dùng `parseQtyRule(undefined, undefined, unit).minQty`.
+- TDD: `scripts/test-cart-reconcile.mjs` thêm 5 ca (đỏ trước: `TypeError: mod.qtyFixesToPersist is not a function`; xanh sau: 29/29). E2E `shop_full_flow.py::quantity_kept_while_catalog_loads` (360 + 1280): catalog chậm 3 giây, giữ 0,5 kg ở giỏ, tạm tính 82.500đ, đặt hàng, tải lại; catalog lỗi mạng không đổi 0,3; giỏ cũ 0,3 + catalog min 0,5 vẫn lên 0,5 và báo. Đỏ trước: `FAIL [360] ... catalog lỗi mạng ... <{'CA-THU': 0.5}>`.
+- Ảnh: `shots/gui-12/gui12-do-truoc-sua-360.png` (đỏ: giỏ hiện 0,5 dù đã lưu 0,3) và `gui12-sau-khi-sua-360.png` (xanh).
+
+## GUI-13 — Nhãn thời gian giao ở giỏ
+
+- Hằng số duy nhất `frontend/features/cart/deliveryEta.ts` (`DELIVERY_ETA`, `DELIVERY_ETA_TEXT`). Nhãn đặt ngay dưới dòng "Mua tối thiểu … kg mỗi món" trong `CartScreen.tsx`, icon `truck` có sẵn + chữ thật, token `--ink-3`/`--accent`. Giỏ trống không hiện. Không đổi API, không đo khoảng cách.
+- E2E `delivery_eta_label` (360 + 1280): giỏ trống không có nhãn; có hàng thì đúng câu, hiển thị, không cuộn ngang. Ảnh: `shots/gui-13/gui13-delivery-eta-{360,1280}.png`.
+
+### Ghi chú môi trường e2e
+- Các ca e2e mới nằm trong `shop_full_flow.py` (runner `run_shop_e2e.py` không nằm trong danh sách file được sửa nên không thêm suite mới).
+- Runner đôi khi chập chờn (`ERR_CONNECTION_RESET`/hết giờ chờ) vì server tĩnh bind `127.0.0.1` còn trình duyệt gọi `localhost`; chạy lại thì qua. Worktree cần symlink `backend/.venv` và `npm ci` ở `erp-console/` (không commit).

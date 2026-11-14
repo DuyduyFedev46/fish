@@ -81,28 +81,73 @@
   padding-top: var(--space-2);
 }
 
-.bannerArt {
+/* Nền minh hoạ biển/cảng/hải sản nội bộ khi slide không có ảnh (GUI-10). */
+.bannerScene {
   position: absolute;
-  right: -20px;
-  bottom: -26px;
-  display: flex;
+  inset: 0;
+  z-index: 0;
   color: var(--on-accent);
-  opacity: 0.14;
   pointer-events: none;
-}
-.bannerArt svg {
-  width: 156px;
-  height: 156px;
+  overflow: hidden;
 }
 
-/* Ảnh nền slide (CMS): phủ khung, hoà vào nền brand-deep để chữ trắng vẫn đủ tương phản. */
+.bannerGlow {
+  position: absolute;
+  top: -36%;
+  right: -12%;
+  width: 320px;
+  height: 320px;
+  border-radius: var(--radius-full);
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+  opacity: 0.9;
+}
+
+.bannerArtSvg {
+  position: absolute;
+  top: 0;
+  right: -24px;
+  bottom: 0;
+  width: 100%;
+  min-width: 360px;
+  height: 100%;
+  color: var(--on-brand-muted);
+}
+
+/* Lớp che dịu bên trái giúp chữ trắng trên nền minh hoạ luôn đạt tương phản WCAG AA ở cả 360 px và 1280 px. */
+.bannerTextScrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--brand-deep) 0%,
+    var(--brand-deep) 38%,
+    rgba(14, 58, 115, 0.72) 64%,
+    rgba(14, 58, 115, 0.12) 100%
+  );
+}
+
+/* Ảnh nền slide (CMS): phủ khung, kèm lớp phủ tối để chữ trắng luôn đọc rõ trên mọi ảnh thật. */
 .bannerImage {
   position: absolute;
   inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  opacity: 0.26;
+  object-position: center;
+}
+
+.bannerScrim {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(10, 44, 89, 0.92) 0%,
+    rgba(14, 58, 115, 0.82) 52%,
+    rgba(14, 58, 115, 0.44) 100%
+  );
+  pointer-events: none;
 }
 
 /* Chấm chọn slide: vùng bấm 44 px, chấm nhìn thấy 8 px. */
@@ -473,29 +518,42 @@
     margin-top: var(--space-2);
   }
 
-  .bannerArt {
-    right: -28px;
-    bottom: -68px;
+  .bannerGlow {
+    top: -42%;
+    right: -6%;
+    width: 480px;
+    height: 480px;
   }
-  .bannerArt svg {
-    width: 300px;
-    height: 300px;
+
+  .bannerArtSvg {
+    right: 0;
+    min-width: 560px;
+  }
+
+  .bannerTextScrim {
+    background: linear-gradient(
+      90deg,
+      var(--brand-deep) 0%,
+      var(--brand-deep) 34%,
+      rgba(14, 58, 115, 0.56) 62%,
+      rgba(14, 58, 115, 0.05) 100%
+    );
   }
 
   .sideTiles {
     display: flex;
     flex: 1 1 290px;
     flex-direction: column;
-    gap: var(--space-4);
   }
 
   .tile {
     display: flex;
     flex: 1;
     align-items: center;
-    gap: var(--space-4);
-    min-height: 116px;
-    padding: var(--space-5) var(--space-6);
+    justify-content: space-between;
+    gap: var(--space-5);
+    min-height: 252px;
+    padding: var(--space-6) var(--space-6);
     border-radius: var(--radius-sheet);
     color: var(--ink);
     box-shadow: var(--shadow-card);
@@ -514,45 +572,62 @@
     background-image: var(--card-gradient);
     color: var(--accent-text);
   }
-  .tilePay {
-    border: 1px solid var(--border-subtle);
-    background-color: var(--surface);
-    background-image: var(--card-gradient);
-    color: var(--good);
-  }
 
   .tileText {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: var(--space-1);
+    align-items: flex-start;
+    gap: var(--space-2);
     min-width: 0;
   }
-  .tileEyebrow,
-  .tileEyebrowGood {
+  .tileEyebrow {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-full);
+    background-color: var(--surface);
+    color: var(--accent-text);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.01em;
   }
   .tileTitle {
     color: var(--ink);
-    font-size: 17px;
+    font-size: 22px;
     font-weight: 700;
-    line-height: 1.25;
-    letter-spacing: -0.01em;
+    line-height: 1.22;
+    letter-spacing: -0.015em;
   }
   .tilePrice {
     color: var(--accent-text);
-    font-size: 15px;
+    font-size: 20px;
     font-weight: 700;
   }
   .tileUnit {
     color: var(--ink-2);
+    font-size: 15px;
     font-weight: 500;
   }
-  .tileNote {
-    color: var(--ink-2);
-    font-size: 13px;
+  .tileCta {
+    margin-top: var(--space-2);
+    color: var(--accent-text);
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .tileIconBadge {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 76px;
+    height: 76px;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-sheet);
+    background-color: var(--surface);
+    color: var(--accent-text);
+    box-shadow: var(--shadow-xs);
   }
 
   .data {

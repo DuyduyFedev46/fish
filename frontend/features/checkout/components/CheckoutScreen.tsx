@@ -314,7 +314,7 @@ function CheckoutForm() {
           name: l.name,
           unit: l.unit,
           qty: l.qty,
-          minQty: minQtyRef.current.get(l.item_code) ?? 1,
+          minQty: minQtyRef.current.get(l.item_code) ?? parseQtyRule(undefined, undefined, l.unit).minQty,
           level: row.stock_level === "out" ? "out" : "short",
           changed: false,
         });
@@ -410,7 +410,8 @@ function CheckoutForm() {
 
   // ---- C3: cập nhật giỏ rồi đặt lại ----
   function changeToMin(code: string) {
-    cart.setQty(code, minQtyRef.current.get(code) ?? 1);
+    const unit = cart.lines.find((l) => l.item_code === code)?.unit ?? "kg";
+    cart.setQty(code, minQtyRef.current.get(code) ?? parseQtyRule(undefined, undefined, unit).minQty);
     setSoldOut((prev) => prev && prev.map((l) => (l.itemCode === code ? { ...l, changed: true } : l)));
   }
 

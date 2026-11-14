@@ -5,7 +5,7 @@ import HomeScreen from "@/features/home/components/HomeScreen";
 // không ngoặc vuông, không "Lô mới", "miễn phí giao", "tươi sống" (UI-RULES §6.4).
 const TITLE = "Cá Về — Hải sản cấp đông theo lô, giao tận nhà";
 const DESCRIPTION =
-  "Mua hải sản cấp đông theo kg, từ 1 kg: cá, tôm, mực, cua ghẹ và combo nấu nhanh. Thanh toán quét mã QR, giao tận nhà ở Phan Thiết.";
+  "Mua hải sản cấp đông theo kg, từ 0,5 kg: cá, tôm, mực, cua ghẹ và combo nấu nhanh. Thanh toán quét mã QR, giao tận nhà ở Phan Thiết.";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -16,3 +16,4 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return <HomeScreen />;
 }
+

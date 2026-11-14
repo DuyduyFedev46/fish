@@ -64,5 +64,29 @@ eq("parse rỗng", recent.parseRecent(null), []);
 eq("parse bỏ SĐT, số, chuỗi rỗng", recent.parseRecent(JSON.stringify(["mực", "0900000001", 5, "", "tôm"])), ["mực", "tôm"]);
 eq("parse giữ tối đa 5", recent.parseRecent(JSON.stringify(["a", "b", "c", "d", "e", "f", "g"])).length, 5);
 
+// GUI-07: groupRepresentativeImage & groupImageMap
+const img1 = { alt: "Cá bớp cắt khoanh", is_illustration: false, urls: { thumb: "/m/ca-bop-t.jpg", card: "/m/ca-bop-c.jpg", detail: "/m/ca-bop-d.jpg" } };
+const img2 = { alt: "Cá thu tươi", is_illustration: false, urls: { thumb: "/m/ca-thu-t.jpg", card: "/m/ca-thu-c.jpg", detail: "/m/ca-thu-d.jpg" } };
+const imgCombo = { alt: "Combo bếp nhà", is_illustration: true, urls: { thumb: "/m/combo-t.jpg", card: "/m/combo-c.jpg", detail: "/m/combo-d.jpg" } };
+
+const catWithImg = [
+  { ...item("CA-1", "Cá bớp", "300000", "out"), image: img1 },
+  { ...item("CA-2", "Cá cam", "200000", "in"), image: null },
+  { ...item("CA-3", "Cá thu", "165000", "in"), image: img2 },
+  { ...item("TOM-1", "Tôm sú", "280000", "in"), group: { slug: "tom", name: "Tôm" }, image: null },
+  { ...item("CB-1", "Combo lẩu", "450000", "in"), item_type: "BUNDLE", unit: "combo", group: { slug: "combo", name: "Combo" }, image: imgCombo },
+];
+
+eq("nhóm có món có ảnh: bỏ qua món đầu không ảnh và ưu tiên món còn hàng trước món hết", view.groupRepresentativeImage(catWithImg, "ca"), img2);
+eq("nhóm chỉ có món hết hàng có ảnh: vẫn lấy ảnh của món đó", view.groupRepresentativeImage([catWithImg[0]], "ca"), img1);
+eq("nhóm không có món nào có ảnh -> null", view.groupRepresentativeImage(catWithImg, "tom"), null);
+eq("nhóm combo -> lấy ảnh từ món BUNDLE", view.groupRepresentativeImage(catWithImg, "combo"), imgCombo);
+eq("nhóm all/rỗng -> lấy ảnh món còn hàng đầu tiên có ảnh", view.groupRepresentativeImage(catWithImg, "all"), img2);
+eq("groupImageMap trả đủ khoá", view.groupImageMap(catWithImg, ["ca", "tom", "combo"]), {
+  ca: img2,
+  tom: null,
+  combo: imgCombo,
+});
+
 console.log(`test-catalog-view: ${n - fail}/${n} đạt, ${fail} sai`);
 process.exit(fail ? 1 : 0);

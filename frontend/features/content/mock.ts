@@ -9,7 +9,7 @@ import type {
 
 // Dữ liệu mock nội dung (NEXT_PUBLIC_USE_MOCK=1), sinh từ nội dung soạn sẵn
 // `backend/apps/content/management/shop_content/*.json` qua bộ đổi `content_markup.py` (lô 5b, mkt-brand), biến thay như
-// lệnh nạp khi chưa cấu hình: hotline "[hotline]", giữ hàng 30 phút, 1 kg, bước 0,5 kg. Mã thẻ hàng đổi sang mã của
+// lệnh nạp khi chưa cấu hình: hotline "[hotline]", giữ hàng 30 phút, 0,5 kg, bước 0,5 kg. Mã thẻ hàng đổi sang mã của
 // `lib/mock.ts` (CA-THU-KHUC, TOM-SU-TUOI, MUC-ONG; CUA-HOANG-DE luôn hết; MON-DA-NGUNG không có trong catalog = ngưng bán).
 // Không ảnh ngoài, không tên/SĐT người thật. Ca lỗi: slug `bai-da-go` -> 410, slug không có -> 404.
 
@@ -37,8 +37,8 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
     "slug": "cach-mua-hang",
     "title": "Cách mua hàng",
     "seo_title": "Cách mua hàng ở Cá Về",
-    "description": "Năm bước đặt hải sản cấp đông ở Cá Về: chọn món từ 1 kg, đặt hàng, chuyển khoản quét mã QR và nhận hàng tận nhà.",
-    "excerpt": "Chọn món từ 1 kg, đặt hàng, quét mã QR để thanh toán, rồi nhận hàng tận nhà.",
+    "description": "Năm bước đặt hải sản cấp đông ở Cá Về: chọn món từ 0,5 kg, đặt hàng, chuyển khoản quét mã QR và nhận hàng tận nhà.",
+    "excerpt": "Chọn món từ 0,5 kg, đặt hàng, quét mã QR để thanh toán, rồi nhận hàng tận nhà.",
     "category": null,
     "cover_image": null,
     "body": {
@@ -61,7 +61,7 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
                 ]
               },
               {
-                "text": " Mỗi món mua từ 1 kg, thêm từng 0,5 kg. Combo mua theo combo."
+                "text": " Mỗi món mua từ 0,5 kg, thêm từng 0,5 kg. Combo mua theo combo."
               }
             ],
             [
@@ -124,7 +124,7 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
           "type": "paragraph",
           "children": [
             {
-              "text": "Mỗi món từ 1 kg, thêm từng 0,5 kg. Combo mua từ 1 combo."
+              "text": "Mỗi món từ 0,5 kg, thêm từng 0,5 kg. Combo mua từ 1 combo."
             }
           ]
         },
@@ -268,7 +268,7 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
     "title": "Giới thiệu Cá Về",
     "seo_title": "Giới thiệu Cá Về — Từ cảng về bếp nhà bạn",
     "description": "Cá Về mua hải sản theo từng lô tại cảng, bán hàng cấp đông theo kg và giao tận nhà ở Phan Thiết. Xem cách chúng tôi mua, bảo quản và giao hàng.",
-    "excerpt": "Cá Về mua hải sản theo từng lô tại cảng, bán hàng cấp đông theo kg từ 1 kg và giao tận nhà bạn ở Phan Thiết.",
+    "excerpt": "Cá Về mua hải sản theo từng lô tại cảng, bán hàng cấp đông theo kg từ 0,5 kg và giao tận nhà bạn ở Phan Thiết.",
     "category": null,
     "cover_image": null,
     "body": {
@@ -1057,7 +1057,7 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
           "type": "paragraph",
           "children": [
             {
-              "text": "Giá niêm yết theo kg, combo niêm yết theo combo. Mỗi món mua từ 1 kg, thêm từng 0,5 kg. Giá đã gồm giao hàng trong khu vực Phan Thiết. Nếu giá hoặc tình trạng hàng trong giỏ thay đổi, Shop báo cho bạn trước khi đặt. [Câu chữ cuối do legal-vn soạn.]"
+              "text": "Giá niêm yết theo kg, combo niêm yết theo combo. Mỗi món mua từ 0,5 kg, thêm từng 0,5 kg. Giá đã gồm giao hàng trong khu vực Phan Thiết. Nếu giá hoặc tình trạng hàng trong giỏ thay đổi, Shop báo cho bạn trước khi đặt. [Câu chữ cuối do legal-vn soạn.]"
             }
           ]
         },
@@ -1889,13 +1889,13 @@ MOCK_ENTRY_MAP["home-banner"] = {
   ...HOME_PAGE_BASE,
   slug: "home-banner",
   title: "Banner trang chủ",
-  description: "Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà",
-  excerpt: "Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà",
+  description: "Hải sản cấp đông theo lô · mua từ 0,5 kg · giao tận nhà",
+  excerpt: "Hải sản cấp đông theo lô · mua từ 0,5 kg · giao tận nhà",
   body: {
     type: "doc",
     blocks: [
       { type: "heading", level: 2, text: "Mua theo lô tại cảng" },
-      { type: "paragraph", children: [{ text: "Hải sản cấp đông, giá theo kg, mua từ 1 kg." }] },
+      { type: "paragraph", children: [{ text: "Hải sản cấp đông, giá theo kg, mua từ 0,5 kg." }] },
       { type: "paragraph", children: [{ text: "Xem hàng đang có", href: "/shop/" }] },
     ],
   },
