@@ -349,7 +349,7 @@ def error_branches(browser):
     create_voucher(V_ONCE, total_uses=1)
     create_voucher(V_GONE)
     ctx, page, watch = fresh_context(browser, 360)
-    add_to_cart(page, "CA-THU")
+    add_to_cart(page, "CA-THU", 1)
     goto_cart(page)
     cases = [("KHONGCO", "không"), (V_EXPIRED, "hết hạn"), (V_MIN, "tối thiểu")]
     for code_try, needle in cases:
@@ -440,7 +440,7 @@ def error_branches(browser):
     # (2) Đã áp mã ở giỏ rồi sang đặt hàng mới mất mạng kiểm mã: khối tóm tắt hiện "Mã X · sẽ kiểm khi đặt", đơn gửi kèm mã và trang thanh toán hiện đúng tổng đã giảm (148.500đ).
     for idx, width_net in enumerate((360, 1280)):
         ctx, page, watch = fresh_context(browser, width_net)
-        add_to_cart(page, "CA-THU")
+        add_to_cart(page, "CA-THU", 1)
         page.route("**/api/shop/vouchers/check/", lambda r: r.abort("internetdisconnected"))
         goto_cart(page)
         open_code_ui(page)
@@ -471,7 +471,7 @@ def error_branches(browser):
         ctx.close()
 
         ctx, page, watch = fresh_context(browser, width_net)
-        add_to_cart(page, "CA-THU")
+        add_to_cart(page, "CA-THU", 1)
         goto_cart(page)
         open_code_ui(page)
         page.locator("input[type=text]:visible").last.fill(V_MAIN)
@@ -503,7 +503,7 @@ def error_branches(browser):
     code_desk_gone = f"GDSK{SUF}"
     create_voucher(code_desk_gone)
     ctx, page, watch = fresh_context(browser, 1280)
-    add_to_cart(page, "CA-THU")
+    add_to_cart(page, "CA-THU", 1)
     goto_cart(page)
     open_code_ui(page)
     page.locator("input[type=text]:visible").last.fill(code_desk_gone)
@@ -528,7 +528,7 @@ def error_branches(browser):
         code_nq = f"GNQ{idx_nq}{SUF}"
         create_voucher(code_nq)
         ctx, page, watch = fresh_context(browser, width_nq)
-        add_to_cart(page, "CA-THU")
+        add_to_cart(page, "CA-THU", 1)
         page.wait_for_function("() => (localStorage.getItem('cangcaloc_cart_v1') || '').includes('CA-THU')")
         goto_cart(page)
         open_code_ui(page)

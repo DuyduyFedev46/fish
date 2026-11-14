@@ -33,16 +33,10 @@ const RAIL_LIMIT = 8;
 const COMBO_LIMIT = 3;
 const POST_LIMIT = 3;
 
-// Khẩu hiệu thương hiệu (06-marketing K1, chữ giao diện ở code) và ô phụ thanh toán (06-marketing H6, ĐÃ ĐỐI CHIẾU:
-// BR-TT-04 tiền thiếu thì không tự xác nhận). Chữ banner và cam kết lấy từ CMS (SHOP-5-03).
+// Khẩu hiệu thương hiệu (06-marketing K1, chữ giao diện ở code). Chữ banner và cam kết lấy từ CMS (SHOP-5-03).
 const BRAND_SLOGAN = "Từ cảng về bếp nhà bạn";
 const DEFAULT_BANNER_TITLE = "Cá Về: hải sản cấp đông theo lô";
 const DEFAULT_BANNER_BUTTON = { label: "Xem hàng đang có", href: "/shop/" } as const;
-const PAYMENT_TILE = {
-  eyebrow: "Chuyển khoản quét mã QR",
-  title: "Tiền về đủ là đơn tự xác nhận",
-  note: "Quét bằng app ngân hàng của bạn",
-};
 
 /** Món hết xếp cuối, còn lại giữ thứ tự catalog. */
 function outLast(items: CatalogItem[]): CatalogItem[] {
@@ -122,8 +116,8 @@ export default function HomeScreen() {
       <div className={cx("container", s.page)}>
         <section className={s.hero} aria-label="Khuyến mãi">
           <HomeBanner slides={slides} headingRef={headingRef} minQtyKg={effectiveMinQtyKg} />
-          <div className={s.sideTiles}>
-            {view.featuredCombo ? (
+          {view.featuredCombo ? (
+            <div className={s.sideTiles}>
               <Link href={itemHref(view.featuredCombo.item_code)} className={cx(s.tile, s.tileCombo)}>
                 <span className={s.tileText}>
                   <span className={s.tileEyebrow}>Combo nấu nhanh</span>
@@ -131,19 +125,14 @@ export default function HomeScreen() {
                   <span className={cx(s.tilePrice, "num")}>
                     {formatPriceVnd(view.featuredCombo.price)} <span className={s.tileUnit}>/ combo</span>
                   </span>
+                  <span className={s.tileCta}>Xem chi tiết combo →</span>
                 </span>
-                <Icon name="combo" size={52} strokeWidth={1.2} />
+                <span className={s.tileIconBadge} aria-hidden="true">
+                  <Icon name="combo" size={44} strokeWidth={1.3} />
+                </span>
               </Link>
-            ) : null}
-            <Link href="/shop/" className={cx(s.tile, s.tilePay)}>
-              <span className={s.tileText}>
-                <span className={s.tileEyebrowGood}>{PAYMENT_TILE.eyebrow}</span>
-                <span className={s.tileTitle}>{PAYMENT_TILE.title}</span>
-                <span className={s.tileNote}>{PAYMENT_TILE.note}</span>
-              </span>
-              <Icon name="qr" size={48} strokeWidth={1.3} />
-            </Link>
-          </div>
+            </div>
+          ) : null}
         </section>
 
         <div aria-busy={busy} className={s.data}>

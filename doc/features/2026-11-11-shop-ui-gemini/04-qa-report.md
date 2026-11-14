@@ -141,3 +141,11 @@
 | Ca 3 (slide CMS có ảnh thật): hiển thị ảnh nền phủ lớp tối (`::after`) giúp chữ trắng đọc rõ, ẩn SVG minh hoạ dự phòng | Giả lập slide CMS có `image` hợp lệ ở 360 px & 1280 px, kiểm DOM + xem ảnh chụp | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-10/banner-slide-with-image-360.png`, `shots/gui-10/banner-slide-with-image-1280.png` |
 | Phần (c) — 3 ảnh banner ngang có giấy phép thương mại miễn phí lưu tại `anh-san-pham/banner/` kèm nguồn trong `nguon-anh.md` | Xem trực tiếp 3 ảnh `banner-{1,2,3}.jpg` (cảng cá Lăng Cô, Nha Trang, Mũi Né Phan Thiết) + kiểm kích thước ≥ 1704 px | **PASS — ĐẠT** | `anh-san-pham/banner/banner-{1,2,3}.jpg` |
 | Hồi quy tổng lực toàn bộ Shop (`general_rules`, `full_flow`, `design_screens`, `content_pages`) | `run_shop_e2e.py --skip-build --suite general_rules --suite full_flow --suite design_screens --suite content_pages` | **PASS — APPROVED** (`168 + 115 + 91 + 58` đạt, `0` lỗi) | — |
+
+
+## GUI-11 — Gỡ ô "Chuyển khoản quét mã QR · Tiền về đủ là đơn tự xác nhận" ở trang chủ
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh bằng chứng |
+|---|---|---|---|
+| Trang chủ không còn chữ `"Tiền về đủ là đơn tự xác nhận"` và `"Chuyển khoản quét mã QR"` ở khối bên cạnh banner; thẻ `"Combo nấu nhanh"` tự cân chiều cao 252 px ngang bằng hero banner trên máy tính (1280 px), không cuộn ngang ở 360 px & 1280 px | Kịch bản Playwright `shop_general_rules.py` + `shop_design_screens.py` (`A1`, `DK1`) + xem ảnh chụp 360 px & 1280 px | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-11/home-no-pay-tile-360.png`, `shots/gui-11/home-no-pay-tile-1280.png` |
+| Không ảnh hưởng thông tin thanh toán ở trang đặt hàng (`/shop/checkout/`), trang thanh toán (`/shop/orders/?code=…`) và trang chính sách | Chạy trọn bộ `general_rules` (`170/170 PASS`), `full_flow` (`115/115 PASS`), `design_screens` (`91/91 PASS`) | **PASS — APPROVED** | — |

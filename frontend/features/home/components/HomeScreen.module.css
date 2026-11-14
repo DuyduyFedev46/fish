@@ -544,16 +544,16 @@
     display: flex;
     flex: 1 1 290px;
     flex-direction: column;
-    gap: var(--space-4);
   }
 
   .tile {
     display: flex;
     flex: 1;
     align-items: center;
-    gap: var(--space-4);
-    min-height: 116px;
-    padding: var(--space-5) var(--space-6);
+    justify-content: space-between;
+    gap: var(--space-5);
+    min-height: 252px;
+    padding: var(--space-6) var(--space-6);
     border-radius: var(--radius-sheet);
     color: var(--ink);
     box-shadow: var(--shadow-card);
@@ -572,45 +572,62 @@
     background-image: var(--card-gradient);
     color: var(--accent-text);
   }
-  .tilePay {
-    border: 1px solid var(--border-subtle);
-    background-color: var(--surface);
-    background-image: var(--card-gradient);
-    color: var(--good);
-  }
 
   .tileText {
     display: flex;
     flex: 1;
     flex-direction: column;
-    gap: var(--space-1);
+    align-items: flex-start;
+    gap: var(--space-2);
     min-width: 0;
   }
-  .tileEyebrow,
-  .tileEyebrowGood {
+  .tileEyebrow {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-full);
+    background-color: var(--surface);
+    color: var(--accent-text);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.01em;
   }
   .tileTitle {
     color: var(--ink);
-    font-size: 17px;
+    font-size: 22px;
     font-weight: 700;
-    line-height: 1.25;
-    letter-spacing: -0.01em;
+    line-height: 1.22;
+    letter-spacing: -0.015em;
   }
   .tilePrice {
     color: var(--accent-text);
-    font-size: 15px;
+    font-size: 20px;
     font-weight: 700;
   }
   .tileUnit {
     color: var(--ink-2);
+    font-size: 15px;
     font-weight: 500;
   }
-  .tileNote {
-    color: var(--ink-2);
-    font-size: 13px;
+  .tileCta {
+    margin-top: var(--space-2);
+    color: var(--accent-text);
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .tileIconBadge {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 76px;
+    height: 76px;
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius-sheet);
+    background-color: var(--surface);
+    color: var(--accent-text);
+    box-shadow: var(--shadow-xs);
   }
 
   .data {

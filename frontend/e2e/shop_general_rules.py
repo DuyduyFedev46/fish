@@ -138,18 +138,19 @@ R.ok("G3 ERP: Chủ dùng được (200)", s_own == 200, s_own)
 
 # ============================================================ G4 BE: số lượng sai
 before = order_count()
-bad_qty = [("CA-THU", "0.5"), ("CA-THU", "0.3"), ("CA-THU", "1.25"), ("COMBO-BEP-NHA", "1.5"), ("COMBO-BEP-NHA", "0"), ("CA-THU", "0"),
+bad_qty = [("CA-THU", "0.3"), ("CA-THU", "1.25"), ("COMBO-BEP-NHA", "1.5"), ("COMBO-BEP-NHA", "0"), ("CA-THU", "0"),
            ("CA-THU", "-1"), ("CA-THU", "abc"), ("CA-THU", "1e30"), ("CA-THU", "NaN")]
 res = []
 for item, qty in bad_qty:
     s, b = create_order_api([(item, qty)])
     res.append((item, qty, s, b.get("code") if isinstance(b, dict) else b))
-R.ok("G4 BE: mọi số lượng sai (0,5/0,3/1,25 kg, 1,5 combo, 0, âm, chữ, 1e30, NaN) → 400 và không tạo đơn",
+R.ok("G4 BE: mọi số lượng sai (0,3/1,25 kg, 1,5 combo, 0, âm, chữ, 1e30, NaN) → 400 và không tạo đơn",
      all(r[2] == 400 for r in res) and order_count() == before, res)
 R.ok("G4 BE: mã lỗi là INVALID_QTY hoặc VALIDATION (không 500)", all(r[3] in ("INVALID_QTY", "VALIDATION") for r in res), res)
 reserved_before = manage_shell("from apps.inventory.models import Batch\nfrom django.db.models import Sum\nprint(Batch.objects.aggregate(s=Sum('qty_reserved'))['s'])")
-s_ok, _ = create_order_api([("CA-THU", "1")])
-R.ok("G4 BE: đúng bước hợp lệ (1 kg) vẫn đặt được", s_ok == 201, s_ok)
+s_ok_05, _ = create_order_api([("CA-THU", "0.5")])
+s_ok_1, _ = create_order_api([("CA-THU", "1")])
+R.ok("G4 BE: đúng bước hợp lệ (0,5 kg và 1 kg) đặt được", s_ok_05 == 201 and s_ok_1 == 201, (s_ok_05, s_ok_1))
 
 # ============================================================ UI: quét chữ/aria-label G1, G2; hex; popup; axe
 ROUTES = ["/", "/shop/", "/shop/?q=muc", "/shop/item/?code=CA-THU", "/shop/item/?code=MUC-ONG", "/shop/item/?code=TOM-SU-1",
@@ -200,11 +201,11 @@ with sync_playwright() as p:
         R.ok(f"G2 [{width}] console sạch lỗi JS, không PII", not watch.console_errors() and not contains_pii(" ".join(t for _, t in watch.console)),
              watch.console_errors()[:2])
 
-        # ---------------- G4 FE: "−" ở mức tối thiểu
+        # ---------------- G4 FE: "−" ở mức tối thiểu (0,5 kg cho món kg, 1 bộ cho combo)
         set_cart_js = "(l)=>localStorage.setItem('cangcaloc_cart_v1', JSON.stringify(l))"
         page.goto(SHOP + "/shop/orders/")
         page.wait_for_load_state("networkidle")
-        page.evaluate(set_cart_js, [{"item_code": "CA-THU", "name": "Cá thu", "unit": "kg", "price": "165000", "qty": 1},
+        page.evaluate(set_cart_js, [{"item_code": "CA-THU", "name": "Cá thu", "unit": "kg", "price": "165000", "qty": 0.5},
                                      {"item_code": "COMBO-BEP-NHA", "name": "Combo bếp nhà", "unit": "combo", "price": "450000", "qty": 1}])
         goto(page, "/shop/cart/", 900)
         page.wait_for_selector("text=Tóm tắt đơn")
@@ -212,7 +213,7 @@ with sync_playwright() as p:
         btn.click()
         page.wait_for_timeout(500)
         dlg = page.locator("[role=dialog]")
-        R.ok(f"G4/G5 [{width}] giỏ: bấm '−' ở 1 kg → mở hộp 'Bỏ món này?' (không về 0,5 kg)", dlg.count() == 1 and "Bỏ" in dlg.inner_text(), dlg.inner_text() if dlg.count() else "")
+        R.ok(f"G4/G5 [{width}] giỏ: bấm '−' ở mức tối thiểu (0,5 kg) → mở hộp 'Bỏ món này?'", dlg.count() == 1 and "Bỏ" in dlg.inner_text(), dlg.inner_text() if dlg.count() else "")
         if dlg.count():
             R.ok(f"G5 [{width}] hộp bỏ món: role=dialog, aria-modal=true, có tên (aria-label/labelledby)",
                  dlg.get_attribute("aria-modal") == "true" and (dlg.get_attribute("aria-labelledby") or dlg.get_attribute("aria-label")))
@@ -240,13 +241,13 @@ with sync_playwright() as p:
         page.get_by_role("button", name="Bỏ khỏi giỏ").click()
         page.wait_for_timeout(400)
         left = json.loads(page.evaluate("localStorage.getItem('cangcaloc_cart_v1')"))
-        R.ok(f"G4 [{width}] 'Bỏ' xoá đúng dòng combo; không dòng nào có số lượng < tối thiểu", [x["item_code"] for x in left] == ["CA-THU"] and all(x["qty"] >= 1 for x in left), left)
-        # chi tiết: bộ chọn số lượng không xuống dưới 1 kg
+        R.ok(f"G4 [{width}] 'Bỏ' xoá đúng dòng combo; không dòng nào có số lượng < tối thiểu", [x["item_code"] for x in left] == ["CA-THU"] and all(x["qty"] >= 0.5 for x in left), left)
+        # chi tiết: bộ chọn số lượng không xuống dưới mức tối thiểu (0,5 kg)
         goto(page, "/shop/item/?code=CA-THU", 700)
         page.get_by_role("heading", name="Cá thu").wait_for(timeout=10000)
         minus = page.get_by_role("button", name=re.compile(r"^Bớt 0,5\s?kg"))
         dis = minus.first.is_disabled() if minus.count() else None
-        R.ok(f"G4 [{width}] chi tiết: ở 1 kg nút 'Bớt 0,5 kg' bị vô hiệu (không xuống 0,5 kg)", dis is True, dis)
+        R.ok(f"G4 [{width}] chi tiết: ở mức tối thiểu (0,5 kg) nút 'Bớt 0,5 kg' bị vô hiệu", dis is True, dis)
 
         # ---------------- G5: các popup khác mở thật
         # Leave payment (D6)
@@ -664,10 +665,19 @@ with sync_playwright() as p:
         snap(page10_noimg, "banner-slide-no-image", width, "gui-10")
         hero_noimg = page10_noimg.locator("section[aria-label='Khuyến mãi']")
         h1_noimg = page10_noimg.locator("h1")
+        home_body_noimg = page10_noimg.inner_text("body")
+        snap(page10_noimg, "home-no-pay-tile", width, "gui-11")
         R.ok(
             f"GUI-10 [{width}] ca slide không có ảnh: hiện nền minh hoạ SVG nội bộ, đúng 1 thẻ h1",
             hero_noimg.locator("svg").count() >= 1 and h1_noimg.count() == 1 and bool(h1_noimg.inner_text().strip()),
             (hero_noimg.locator("svg").count(), h1_noimg.count(), h1_noimg.inner_text()),
+        )
+        R.ok(
+            f"GUI-11 [{width}] trang chủ đã gỡ ô 'Chuyển khoản quét mã QR · Tiền về đủ là đơn tự xác nhận', không cuộn ngang",
+            "Tiền về đủ là đơn tự xác nhận" not in home_body_noimg
+            and "Chuyển khoản quét mã QR" not in home_body_noimg
+            and no_hscroll(page10_noimg, width),
+            (no_hscroll(page10_noimg, width),),
         )
         ctx10_noimg.close()
 

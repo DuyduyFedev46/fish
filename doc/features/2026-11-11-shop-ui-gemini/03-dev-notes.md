@@ -350,3 +350,23 @@ PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
 PASS  content_pages: 58 đạt, 0 lỗi, 0 bỏ qua
 ```
+
+---
+
+## GUI-11 — Gỡ ô "Chuyển khoản quét mã QR · Tiền về đủ là đơn tự xác nhận" ở trang chủ
+
+### Thay đổi chính
+- `frontend/features/home/components/HomeScreen.tsx`, `frontend/features/home/components/HomeScreen.module.css`: gỡ hẳn hằng số `PAYMENT_TILE`, thẻ `<Link className={cx(s.tile, s.tilePay)}>` và các lớp CSS `.tilePay`, `.tileEyebrowGood`, `.tileNote`. Cân lại thẻ `tileCombo` (`min-height: 252px`, badge icon `76px × 76px`, pill `"Combo nấu nhanh"`, CTA `"Xem chi tiết combo →"`) khớp trọn chiều cao hero banner trên máy tính (1280 px); khi không có combo thì ẩn hẳn `.sideTiles` để banner tự giãn đầy chiều ngang.
+- `frontend/e2e/shop_general_rules.py`, `frontend/e2e/shop_full_flow.py`, `frontend/e2e/shop_design_screens.py`: thêm phép kiểm `GUI-11` ở 360 px & 1280 px và đồng bộ các ca E2E với cấu hình `SHOP_MIN_QTY_KG = 0.5` vừa gộp từ `main`.
+
+### Kết quả lệnh kiểm chứng (GUI-11)
+```text
+✓ Generating static pages (12/12)
+check-no-mock: XANH — không thấy seed mock nào trong bản build.
+9/9 script test-*.mjs (371/371 ca) xanh · check_naming: OK
+hex grep ngoài globals.css: rỗng · transition: all grep: rỗng
+======== TỔNG KẾT E2E
+PASS  general_rules: 170 đạt, 0 lỗi, 0 bỏ qua
+PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
+PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
+```
