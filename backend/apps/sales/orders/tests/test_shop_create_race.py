@@ -84,6 +84,38 @@ class ShopCreateRaceTests(PostgresRaceFixtureMixin, TransactionTestCase):
                 # dọn để vòng sau có lô mới sạch
                 Batch.objects.filter(pk=batch.pk).update(status=Batch.Status.CLOSED)
 
+    def test_s1_ac11_two_parallel_half_kg_orders_on_half_kg_stock_exactly_one_wins(self):
+        """FISH-66 S1, BR-BH-05: tồn 0,5 kg, hai khách cùng đặt 0,5 kg -> đúng một đơn, tồn không âm."""
+        for i in range(ROUNDS):
+            with self.subTest(i=i):
+                batch = self._batch("0.5")
+                barrier = threading.Barrier(2)
+                outcomes = []
+
+                def place(n):
+                    try:
+                        barrier.wait(JOIN_TIMEOUT_SECONDS)
+                        self._order("0.5", n)
+                        outcomes.append("ok")
+                    except OutOfStockError as exc:
+                        outcomes.append(exc.code)
+                    except Exception as exc:  # noqa: BLE001
+                        outcomes.append(f"ERROR {type(exc).__name__}")
+                    finally:
+                        connection.close()
+
+                threads = [threading.Thread(target=place, args=(900 + i * 10 + k,)) for k in (1, 2)]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join(JOIN_TIMEOUT_SECONDS)
+                    self.assertFalse(t.is_alive(), "treo quá thời hạn (nghi deadlock)")
+                self.assertEqual(sorted(outcomes), ["OUT_OF_STOCK", "ok"])
+                batch.refresh_from_db()
+                self.assertEqual(batch.qty_reserved, Decimal("0.5"))
+                self.assertLessEqual(batch.qty_reserved, batch.qty_available)
+                Batch.objects.filter(pk=batch.pk).update(status=Batch.Status.CLOSED)
+
     def test_s2_02_waiter_after_lock_wait_gets_out_of_stock_not_500(self):
         """Người thứ hai qua kiểm tồn rồi CHỜ khoá lô; người trước commit giữ hết -> OUT_OF_STOCK, không 500."""
         for i in range(ROUNDS):

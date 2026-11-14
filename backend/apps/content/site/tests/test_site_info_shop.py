@@ -58,6 +58,7 @@ class SiteInfoShopTests(TestCase):
         SELLER_WEBSITE_NOTICE_URL="https://example.com/thong-bao",
         SELLER_WEBSITE_NOTICE_IMAGE="https://example.com/da-thong-bao.png",
         SHOP_RETURN_REPORT_HOURS="24",
+        SHOP_MIN_QTY_KG=Decimal("1"),  # FISH-66 S1: ca cũ kiểm khối policies với 1 kg; mặc định mới là 0,5
     )
     def test_shop_5_01_ac1_returns_new_seller_keys_and_policies(self):
         """AC1 (BR-ND-18): env có giá trị -> trả đúng các khoá mới + khối policies."""

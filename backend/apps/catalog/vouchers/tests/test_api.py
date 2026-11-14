@@ -91,13 +91,13 @@ class CreateTests(VoucherUsers, TestCase):
         self.make_users()
 
     def test_s3b_01_ac1_create_stores_utc_times_and_audits(self):
-        body = create_body(starts_at="2026-10-15T08:00:00+07:00", ends_at="2026-10-31T23:59:00+07:00")
+        body = create_body(starts_at="2099-10-15T08:00:00+07:00", ends_at="2099-10-31T23:59:00+07:00")
         response = self.owner_client.post(URL, body, format="json")
         self.assertEqual(response.status_code, 201, response.content)
         data = response.json()
         self.assertEqual(data["code"], "CAVE10")
-        self.assertEqual(data["starts_at"], "2026-10-15T01:00:00Z")
-        self.assertEqual(data["ends_at"], "2026-10-31T16:59:00Z")
+        self.assertEqual(data["starts_at"], "2099-10-15T01:00:00Z")
+        self.assertEqual(data["ends_at"], "2099-10-31T16:59:00Z")
         self.assertEqual((data["kind"], data["value"], data["max_discount"], data["min_order_amount"]),
                          ("PERCENT", "10", "50000", "300000"))
         self.assertEqual((data["total_uses"], data["used_count"], data["held_count"]), (100, 0, 0))
