@@ -99,3 +99,45 @@
 |---|---|---|---|
 | Thanh tìm kiếm viên thuốc 42 px (`max-width: 520px` căn giữa) trên máy tính và 40 px trên điện thoại; đệm trên/dưới Header 16 px rõ ràng, không chạm viền kể cả khi mở gợi ý & vòng sáng focus | Xem trực tiếp ảnh Playwright 360 px & 1280 px (`A1, A2, A9, DK1, DK2, DP4`) + chạy `design_screens` (91/91 PASS) | **PASS** (360 px & 1280 px) | `shots/gui-05/a-home-after-1280.png`, `shots/gui-05/a-home-after-360.png`, `shots/gui-05/b-catalog-after-1280.png`, `shots/gui-05/b-catalog-after-360.png` |
 | Bỏ hộp viền bao ngoài khối `"Đang có hàng"` trên trang chủ máy tính; khôi phục đầy đủ đệm trên/dưới của Footer (`.top`, `.legal`, `.reserveNav`) | Xem trực tiếp ảnh Playwright + `footer_consent` (31/31 PASS) + `general_rules` (136/136 PASS) + `full_flow` (115/115 PASS) | **PASS — APPROVED** | `shots/gui-05/a-home-after-1280.png`, `shots/gui-05/a-home-after-360.png` |
+
+
+## GUI-06 — Nút chat Zalo nổi trên mọi trang Shop
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh bằng chứng |
+|---|---|---|---|
+| Hiển thị nút tròn nổi góc dưới phải trên trang chủ, chi tiết món, giỏ hàng ở 360 px và 1280 px; có `aria-label`, focus được bằng bàn phím, `href="https://zalo.me/..."`, `target="_blank"`, `rel*="noopener"` | Kịch bản Playwright `shop_general_rules.py` ở 360 px & 1280 px: kiểm toạ độ bounding box không đè lên `BottomNav` / nút `"Thêm vào giỏ"` / thanh giỏ cố định, ẩn trên `/shop/checkout/` | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-06/zalo-home-360.png`, `shots/gui-06/zalo-home-1280.png`, `shots/gui-06/zalo-item-360.png`, `shots/gui-06/zalo-item-1280.png`, `shots/gui-06/zalo-cart-360.png`, `shots/gui-06/zalo-cart-1280.png` |
+| Ngoài đường thuận: `site-info` trả `seller.zalo: ""` → không render nút Zalo nổi | Giả lập `/api/public/site-info/` trả `zalo: ""` trên trình duyệt 360 px & 1280 px, kiểm `[data-testid='zalo-floating-btn']` count = `0` | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-06/zalo-absent-home-360.png`, `shots/gui-06/zalo-absent-home-1280.png` |
+
+
+## GUI-07 — Ảnh cho các mục danh mục: combo, cá, ghẹ, mực, tôm…
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh bằng chứng |
+|---|---|---|---|
+| Khối danh mục ở trang chủ và dải chip đầu trang `/shop/` hiện ảnh đại diện từ món đầu tiên có ảnh trong mục (`alt`, `loading="lazy"`, khung `1:1` không giật bố cục) | Giả lập catalog có món gắn ảnh hợp lệ (`COMBO-BEP-NHA`, `CA-THU`, `GHE-XANH`) trên trình duyệt 360 px & 1280 px, kiểm `naturalWidth > 0` và xem ảnh chụp | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-07/home-categories-360.png`, `shots/gui-07/home-categories-1280.png`, `shots/gui-07/catalog-categories-360.png`, `shots/gui-07/catalog-categories-1280.png` |
+| Ngoài đường thuận: mục chưa có ảnh (`Tôm`) hoặc ảnh món bị lỗi mạng (`CA-HOI-NU` trả 404 → `onError`) tự động lui về khung SVG nội bộ, không hiện icon ảnh vỡ | Giả lập `broken-cat-img.png` trả 404 trên trình duyệt 360 px & 1280 px, kiểm thẻ chuyển sang SVG fallback sạch sẽ | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-07/home-categories-360.png`, `shots/gui-07/catalog-categories-1280.png` |
+
+
+## GUI-08 — Đổi chữ "từ 1 kg" theo mức mua tối thiểu mới 0,5 kg
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh bằng chứng |
+|---|---|---|---|
+| Bỏ mọi chữ viết cứng `"1 kg"` về mức tối thiểu; khi `min_qty = "0.5"`, ghi chú danh mục hiện `"Mua tối thiểu 0,5 kg"`, nút thẻ món hiện `"Thêm 0,5 kg"`, bấm ở `0,5 kg` mở hộp xác nhận `"Mỗi món mua tối thiểu 0,5 kg. Bớt nữa sẽ bỏ món này khỏi giỏ."` | Kịch bản Playwright `shop_general_rules.py` ở 360 px & 1280 px + `grep -rn "1 kg"` + bộ test `test-quantity.mjs` (`65/65`), `test-cart-reconcile.mjs` (`24/24`) | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-08/catalog-min-05kg-360.png`, `shots/gui-08/catalog-min-05kg-1280.png`, `shots/gui-08/cart-remove-dialog-05kg-360.png`, `shots/gui-08/cart-remove-dialog-05kg-1280.png` |
+| Ngoài đường thuận / tương thích động: khi API catalog trả `min_qty = "1"` (hoặc `"1.0"`), giao diện tự động hiện `"Thêm 1 kg"` và `"Mua tối thiểu 1 kg"` (không viết cứng `0,5 kg` trong component) | Chạy toàn bộ `full_flow` (`115/115 PASS`) và `design_screens` (`91/91 PASS`) với dữ liệu seed `min_qty = 1.0` của backend hiện tại | **PASS — ĐẠT** | — |
+
+
+## GUI-09 — Tìm ảnh minh hoạ trên mạng cho các món đang bán
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh bằng chứng |
+|---|---|---|---|
+| 6 ảnh món (`BACH-TUOC`, `CA-HOI-NU`, `CA-THU`, `GHE-XANH`, `MUC-ONG`, `TOM-SU-1`) đúng loài, tươi/sống, không chữ/watermark/mặt người, cạnh ngắn ≥ 1200 px, ≤ 10 MB, giấy phép thương mại miễn phí Wikimedia Commons ghi đủ trong `nguon-anh.md` | Kiểm kích thước pixel/dung lượng + xem trực tiếp từng ảnh bằng mắt + kiểm bảng nguồn trong `anh-san-pham/nguon-anh.md` | **PASS — ĐẠT** (6/6 ảnh đạt chuẩn) | `anh-san-pham/{BACH-TUOC,CA-HOI-NU,CA-THU,GHE-XANH,MUC-ONG,TOM-SU-1}.jpg` |
+
+
+## GUI-10 — Banner trang chủ thiếu hình
+
+| Tiêu chí | Cách kiểm | Kết quả | Ảnh bằng chứng |
+|---|---|---|---|
+| Ca 1 (slide CMS không có ảnh): hiển thị nền biển đêm kèm minh hoạ SVG nội bộ (hải đăng, tàu cá, la bàn, đàn cá), chữ trắng tương phản cao, đúng 1 thẻ `<h1>` | Kịch bản Playwright `shop_general_rules.py` ở 360 px & 1280 px + xem ảnh chụp | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-10/banner-slide-no-image-360.png`, `shots/gui-10/banner-slide-no-image-1280.png` |
+| Ca 2 (ngoài đường thuận — CMS `home-banner` trả 404 hoặc rỗng): vẫn hiện banner mặc định cùng nền minh hoạ SVG nội bộ, `<h1>Cá Về: hải sản cấp đông theo lô</h1>`, dòng phụ từ `stripText`, nút `"Xem hàng đang có"` → `/shop/` | Giả lập `/api/public/content/entries/?code=home-banner` trả 404 ở 360 px & 1280 px, kiểm DOM + xem ảnh chụp | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-10/banner-cms-404-360.png`, `shots/gui-10/banner-cms-404-1280.png` |
+| Ca 3 (slide CMS có ảnh thật): hiển thị ảnh nền phủ lớp tối (`::after`) giúp chữ trắng đọc rõ, ẩn SVG minh hoạ dự phòng | Giả lập slide CMS có `image` hợp lệ ở 360 px & 1280 px, kiểm DOM + xem ảnh chụp | **PASS — ĐẠT** (360 px & 1280 px) | `shots/gui-10/banner-slide-with-image-360.png`, `shots/gui-10/banner-slide-with-image-1280.png` |
+| Phần (c) — 3 ảnh banner ngang có giấy phép thương mại miễn phí lưu tại `anh-san-pham/banner/` kèm nguồn trong `nguon-anh.md` | Xem trực tiếp 3 ảnh `banner-{1,2,3}.jpg` (cảng cá Lăng Cô, Nha Trang, Mũi Né Phan Thiết) + kiểm kích thước ≥ 1704 px | **PASS — ĐẠT** | `anh-san-pham/banner/banner-{1,2,3}.jpg` |
+| Hồi quy tổng lực toàn bộ Shop (`general_rules`, `full_flow`, `design_screens`, `content_pages`) | `run_shop_e2e.py --skip-build --suite general_rules --suite full_flow --suite design_screens --suite content_pages` | **PASS — APPROVED** (`168 + 115 + 91 + 58` đạt, `0` lỗi) | — |
