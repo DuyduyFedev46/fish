@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ERP · Wireframe · Tải và nhập file Excel mặt hàng (S3–S6)</title>
+<!-- Wireframe tĩnh cho 02a-ux-flow.md (hồ sơ 2026-11-14-hang-ban-excel-dong-lanh). Dữ liệu giả. Không phải code sản phẩm.
+     Màu lấy đúng giá trị token của erp-console/shared/ui/tokens.css (chỉ khai lại tên biến để file chạy độc lập). -->
+<style>
+:root{--canvas:#FBFBFC;--sidebar:#F4F4F6;--surface:#FFFFFF;--surface-2:#F4F4F6;--border:#E4E4E9;--border-strong:#D4D4DB;
+--ink:#17171C;--ink-2:#4E4E58;--ink-3:#686874;--accent:#1F66D1;--accent-text:#1A5BC0;--accent-soft:#EBF2FE;--on-accent:#FFFFFF;
+--good:#157F3D;--good-soft:#E9F7EE;--warn:#A85A07;--warn-soft:#FDF3E3;--crit:#C0312B;--crit-soft:#FCEDEC}
+@media (prefers-color-scheme:dark){:root{--canvas:#111113;--sidebar:#151518;--surface:#1A1A1E;--surface-2:#222227;--border:#2A2A30;--border-strong:#3A3A42;
+--ink:#EDEDF0;--ink-2:#AEAEB8;--ink-3:#9696A1;--accent:#2F6FDB;--accent-text:#7FB0FA;--accent-soft:#1A2740;
+--good:#5CC98A;--good-soft:#15271D;--warn:#E3AA4B;--warn-soft:#2A2114;--crit:#F2807A;--crit-soft:#2E1817}}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 Inter,system-ui,sans-serif;background:var(--canvas);color:var(--ink)}
+h1{font-size:18px;margin:24px 24px 4px}
+.frame{margin:24px;border:1px solid var(--border);border-radius:10px;background:var(--surface);overflow:hidden;max-width:1280px}
+.ftag{font-size:12px;color:var(--ink-3);padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+.top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;gap:12px;flex-wrap:wrap}
+.title{font-size:18px;font-weight:600}
+.back{color:var(--accent-text);font-size:13px;text-decoration:none}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{min-height:44px;padding:0 14px;border:1px solid var(--border-strong);background:var(--surface);color:var(--ink);border-radius:8px;font:inherit;display:inline-flex;align-items:center;gap:6px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
+.btn[disabled]{opacity:.55}
+.tabs{display:flex;gap:20px;padding:0 20px;border-bottom:1px solid var(--border)}
+.tabs span{padding:10px 0;color:var(--ink-2)}.tabs .on{color:var(--ink);border-bottom:2px solid var(--accent);font-weight:500}
+.body{padding:16px 20px}
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-weight:500;color:var(--ink-3);padding:8px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:8px;border-bottom:1px solid var(--border);white-space:nowrap}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px}
+.strong{font-weight:600}
+.flag td:first-child{box-shadow:inset 3px 0 0 var(--crit)}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:500;margin-right:4px}
+.chip.crit{background:var(--crit-soft);color:var(--crit)}.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.info{background:var(--accent-soft);color:var(--accent-text)}.chip.good{background:var(--good-soft);color:var(--good)}
+.chip.mut{background:var(--surface-2);color:var(--ink-2)}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:8px;margin-bottom:12px}
+.alert.err{background:var(--crit-soft);color:var(--crit)}.alert.warn{background:var(--warn-soft);color:var(--warn)}
+.alert .btn{margin-left:auto}
+.strip{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--border);border-radius:8px;margin-bottom:16px}
+.strip div{padding:10px 16px;border-right:1px solid var(--border)}.strip div:last-child{border-right:0}
+.strip small{display:block;color:var(--ink-3);font-size:12px}.strip b{font-variant-numeric:tabular-nums;font-size:16px}
+.sec{margin:18px 0 8px;display:flex;align-items:baseline;gap:12px}
+.sec h3{margin:0;font-size:15px}.sec span{color:var(--ink-2);font-size:13px}
+.drop{border:1.5px dashed var(--border-strong);border-radius:10px;padding:28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.drop.bad{border-color:var(--crit)}
+.ferr{color:var(--crit);font-size:13px;margin-top:6px}
+.sum{display:grid;grid-template-columns:200px 1fr;max-width:640px;margin-top:16px;border:1px solid var(--border);border-radius:8px}
+.sum div{padding:8px 12px;border-bottom:1px solid var(--border)}.sum div:nth-last-child(-n+2){border-bottom:0}
+.sum .k{color:var(--ink-3)}
+.bar{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:12px 20px;border-top:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+.bar .count{margin-right:auto;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.skel{height:14px;border-radius:4px;background:var(--surface-2);margin:10px 0}
+.modalbg{background:rgba(23,23,28,.45);padding:40px;display:flex;justify-content:center}
+.modal{background:var(--surface);border-radius:10px;width:560px;max-width:100%;border:1px solid var(--border)}
+.modal header{padding:16px 20px;font-weight:600;font-size:16px;border-bottom:1px solid var(--border)}
+.modal .mb{padding:16px 20px}
+.check{display:flex;gap:8px;align-items:center;min-height:44px;margin-top:8px}
+.reason{font-size:13px;color:var(--ink-2)}
+.toast{display:inline-flex;gap:10px;align-items:center;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);margin:4px 0}
+</style>
+</head>
+<body>
+<h1>Tải và nhập file Excel mặt hàng — wireframe (S3–S6)</h1>
+<p style="margin:0 24px;color:var(--ink-2)">Đi kèm <code>doc/features/2026-11-14-hang-ban-excel-dong-lanh/02a-ux-flow.md</code>. Khung xếp theo luồng. Dữ liệu giả.</p>
+
+<!-- M1 -->
+<section class="frame" aria-label="M1 danh sách mặt hàng">
+  <div class="ftag">M1 · trang · /catalog/?tab=items · Chủ (Quản lý, NV kho: chỉ thấy Tải file Excel và nút …)</div>
+  <div class="top"><span class="title">Danh mục &amp; giá</span></div>
+  <div class="tabs"><span class="on">Mặt hàng</span><span>Bảng giá</span><span>Ưu đãi</span><span>Nhóm hàng</span></div>
+  <div class="top">
+    <span class="strong">Mặt hàng · 214</span>
+    <div class="btns">
+      <button class="btn">⤓ Tải file Excel</button>
+      <a class="btn" href="#m2" style="text-decoration:none">⤒ Nhập từ Excel</a>
+      <button class="btn" aria-label="Thao tác khác với file" aria-haspopup="menu">…</button>
+      <button class="btn">+ Thêm combo</button>
+      <button class="btn primary">+ Thêm mặt hàng</button>
+    </div>
+  </div>
+  <div class="body">
+    <p class="reason">Menu “…” mở ra: <b>Tải file mẫu</b>. Đang tải: nút thành “Đang tạo file…”, khoá.</p>
+    <div class="toast" role="status">✓ Đã tải file hang-ban-20261114-1530.xlsx (214 món). <button class="btn" aria-label="Đóng thông báo">×</button></div><br>
+    <div class="toast" role="status" style="color:var(--warn)">⚠ Không có món nào khớp bộ lọc. File chỉ có dòng tiêu đề.</div><br>
+    <div class="toast" role="alert" style="color:var(--crit)">⨯ Chưa tải được file. Kiểm tra mạng rồi bấm Tải file Excel lại.</div>
+  </div>
+</section>
+
+<!-- M2 -->
+<section class="frame" id="m2" aria-label="M2 chọn file">
+  <div class="ftag">M2 · trang riêng · /catalog/import/ · chỉ Chủ · bước chọn file (có kèm trạng thái lỗi file E10)</div>
+  <div class="top" style="flex-direction:column;align-items:flex-start;gap:4px"><a class="back" href="#">← Danh mục &amp; giá</a><span class="title">Nhập mặt hàng từ Excel</span></div>
+  <div class="body">
+    <div class="drop bad">
+      <button class="btn primary">⤒ Chọn file Excel</button>
+      <span>hoặc kéo thả file vào đây</span>
+      <span style="margin-left:auto"><a href="#" class="back">Tải danh sách hiện có</a> · <a href="#" class="back">Tải file mẫu</a></span>
+    </div>
+    <p class="ferr" role="alert">bang-gia.csv — Chỉ nhận file .xlsx. Trong Excel chọn Lưu thành → Sổ làm việc Excel (.xlsx).</p>
+    <div class="sum" aria-label="Cách hệ thống đọc file">
+      <div class="k">Nhận diện món</div><div>Theo cột Mã hàng: mã có rồi thì sửa, mã mới thì tạo món</div>
+      <div class="k">Món không có trong file</div><div>Giữ nguyên</div>
+      <div class="k">Ô chữ để trống</div><div>Giữ nguyên chữ cũ (muốn xoá chữ, sửa ở trang mặt hàng)</div>
+      <div class="k">Giá mới để trống</div><div>Giữ giá đang bán</div>
+      <div class="k">Cột chỉ để xem</div><div>Loại · Đơn vị · Giá bán hiện hành</div>
+      <div class="k">Tồn kho, lô</div><div>Không đổi</div>
+      <div class="k">Giới hạn</div><div>File .xlsx, tối đa 1.000 dòng, 2 MB</div>
+    </div>
+  </div>
+  <div class="bar"><button class="btn">Huỷ</button></div>
+</section>
+
+<!-- Đang đọc -->
+<section class="frame" aria-label="M2 đang đọc file">
+  <div class="ftag">M2 · đang đọc file (aria-busy)</div>
+  <div class="body" aria-busy="true">
+    <div class="drop"><button class="btn" disabled>⤒ Chọn file Excel</button><span>hang-ban-20261114-1530.xlsx · ◌ Đang đọc file…</span></div>
+    <div class="skel" style="width:60%"></div><div class="skel"></div><div class="skel"></div><div class="skel" style="width:80%"></div>
+  </div>
+  <div class="bar"><button class="btn">Huỷ</button></div>
+</section>
+
+<!-- M3 -->
+<section class="frame" aria-label="M3 xem trước">
+  <div class="ftag">M3 · cùng trang · xem trước (đổi giá đứng đầu, sắp theo |Chênh %|)</div>
+  <div class="top" style="flex-direction:column;align-items:flex-start;gap:4px"><a class="back" href="#">← Danh mục &amp; giá</a><span class="title">Nhập mặt hàng từ Excel</span></div>
+  <div class="body">
+    <h2 tabindex="-1" style="font-size:16px;margin:0 0 12px">Xem trước thay đổi</h2>
+    <div class="strip">
+      <div><small>Đổi giá</small><b>20</b></div><div><small>Món mới</small><b>1</b></div><div><small>Món sửa</small><b>1</b></div>
+      <div><small>Đổi ẩn/hiện</small><b>1</b></div><div><small>Không đổi</small><b>193</b></div><div><small>Sẽ hiện trên Shop</small><b>1</b></div>
+      <div><small>Giữ xem trước đến</small><b>15:58</b></div>
+    </div>
+    <div class="alert warn" role="status">⚠ <span>3 dòng có sửa ở cột Giá bán hiện hành. Cột này chỉ để xem, không đổi gì. Muốn đổi giá, ghi vào cột Giá mới. Dòng: 31, 44, 52.</span></div>
+
+    <div class="sec"><h3>Đổi giá (20)</h3><span>20 giá mới · 1 cần kiểm lại số 0 · 1 chênh lớn · 1 lùi ngày</span></div>
+    <div class="wrap"><table>
+      <caption class="sr" style="position:absolute;left:-9999px">Giá đổi trong file</caption>
+      <thead><tr><th scope="col">Dòng</th><th scope="col">Mã hàng</th><th scope="col">Mặt hàng</th><th scope="col">Trên Shop</th>
+      <th scope="col" class="num">Giá hiện hành</th><th scope="col" class="num">Giá mới</th><th scope="col" class="num">Chênh lệch</th>
+      <th scope="col" class="num" aria-sort="descending">Chênh % ▾</th><th scope="col">Áp dụng từ</th><th scope="col">Cần xem</th></tr></thead>
+      <tbody>
+        <tr class="flag"><td class="num">17</td><td class="mono">CA-07</td><td>Cá thu cắt khúc</td><td><span class="chip mut">Đang bán</span></td>
+          <td class="num">185.000 đ</td><td class="num strong">18.500 đ</td><td class="num">▼ −166.500 đ</td><td class="num">▼ −90,0%</td><td>14/11/2026</td><td><span class="chip crit">Kiểm lại số 0</span></td></tr>
+        <tr><td class="num">23</td><td class="mono">MUC-03</td><td>Mực lá</td><td><span class="chip mut">Đang ẩn</span></td>
+          <td class="num">240.000 đ</td><td class="num strong">320.000 đ</td><td class="num">▲ +80.000 đ</td><td class="num">▲ +33,3%</td><td>10/11/2026</td><td><span class="chip warn">Chênh lớn</span><span class="chip warn">Lùi ngày</span></td></tr>
+        <tr><td class="num">4</td><td class="mono">TOM-02</td><td>Tôm sú</td><td><span class="chip mut">Đang bán</span></td>
+          <td class="num">278.000 đ</td><td class="num strong">265.000 đ</td><td class="num">▼ −13.000 đ</td><td class="num">▼ −4,7%</td><td>15/11/2026</td><td></td></tr>
+        <tr><td class="num">201</td><td class="mono">MUC-09</td><td>Mực ống</td><td><span class="chip info">Sẽ hiện</span></td>
+          <td class="num">—</td><td class="num strong">180.000 đ</td><td class="num">—</td><td class="num">—</td><td>14/11/2026</td><td></td></tr>
+      </tbody></table></div>
+    <p class="reason">… 16 dòng nữa · <button class="btn">Hiện thêm</button></p>
+
+    <div class="sec"><h3>Ẩn/hiện trên Shop (1)</h3></div>
+    <div class="wrap"><table><thead><tr><th>Dòng</th><th>Mã hàng</th><th>Mặt hàng</th><th>Trước</th><th>Sau</th><th>Trên Shop</th></tr></thead>
+      <tbody><tr><td class="num">40</td><td class="mono">GH-02</td><td>Ghẹ xanh</td><td>Có</td><td>Không</td><td><span class="chip warn">Sẽ ẩn khỏi Shop</span></td></tr></tbody></table></div>
+
+    <div class="sec"><h3>Món mới (1)</h3><span>1 món sẽ hiện trên Shop, hiện Hết hàng tới khi có lô</span></div>
+    <div class="wrap"><table><thead><tr><th>Dòng</th><th>Mã hàng</th><th>Tên</th><th>Nhóm hàng</th><th>Đang kinh doanh</th><th class="num">Giá mới</th><th>Trên Shop</th></tr></thead>
+      <tbody><tr><td class="num">201</td><td class="mono">MUC-09</td><td>Mực ống</td><td>Mực</td><td>Có</td><td class="num">180.000 đ</td><td><span class="chip info">Sẽ hiện trên Shop</span></td></tr></tbody></table></div>
+
+    <div class="sec"><h3>Món sửa (1)</h3></div>
+    <div class="wrap"><table><thead><tr><th>Dòng</th><th>Mã hàng</th><th>Mặt hàng</th><th>Trường</th><th>Trước</th><th>Sau</th></tr></thead>
+      <tbody><tr><td class="num">3</td><td class="mono">CA-01</td><td>Cá thu</td><td>Tên</td><td>Cá thu</td><td>Cá thu một nắng</td></tr></tbody></table></div>
+  </div>
+  <div class="bar"><span class="count">20 giá mới · 1 món mới · 1 món sửa</span><button class="btn">Chọn file khác</button><button class="btn">Huỷ</button><button class="btn primary">Xác nhận nhập</button></div>
+</section>
+
+<!-- M4 -->
+<section class="frame" aria-label="M4 bảng lỗi">
+  <div class="ftag">M4 · cùng trang · có dòng lỗi, không ghi gì</div>
+  <div class="body">
+    <div class="alert err" role="alert">⨯ <span><b>File có 5 lỗi ở 4 dòng. Chưa ghi gì.</b> Sửa trong file Excel rồi bấm Chọn file khác.</span></div>
+    <div class="wrap"><table><thead><tr><th scope="col" class="num">Dòng</th><th scope="col">Mã hàng</th><th scope="col">Cột</th><th scope="col">Cách sửa</th></tr></thead>
+      <tbody>
+        <tr><td class="num">5</td><td class="mono">CA-03</td><td>Giá mới</td><td>Giá phải là số nguyên đồng lớn hơn 0.</td></tr>
+        <tr><td class="num">8</td><td class="mono">TOM-05</td><td>Nhóm hàng</td><td>Nhóm "Tôm hùmm" chưa có. Tạo nhóm ở ERP trước hoặc sửa đúng tên nhóm.</td></tr>
+        <tr><td class="num">9</td><td class="mono">CA-01</td><td>Mã hàng</td><td>Mã CA-01 lặp ở dòng 9 và 12. Mỗi mã chỉ ghi một dòng.</td></tr>
+        <tr><td class="num">12</td><td class="mono">CA-01</td><td>Mã hàng</td><td>Mã CA-01 lặp ở dòng 9 và 12. Mỗi mã chỉ ghi một dòng.</td></tr>
+        <tr><td class="num">14</td><td class="mono">MUC-04</td><td>Tên</td><td>Tên có tên nhà cung cấp. Bỏ tên nhà cung cấp khỏi tên món.</td></tr>
+      </tbody></table></div>
+  </div>
+  <div class="bar"><button class="btn">Huỷ</button><button class="btn primary">Chọn file khác</button></div>
+</section>
+
+<!-- M5 -->
+<section class="frame" aria-label="M5 hộp xác nhận">
+  <div class="ftag">M5 · popup (dialog) nổi trên M3 · focus ban đầu ở “Quay lại xem”</div>
+  <div class="modalbg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m5t">
+    <header id="m5t">Nhập 20 giá mới, 1 món mới, 1 món sửa?</header>
+    <div class="mb">
+      <div class="sum" style="margin-top:0">
+        <div class="k">Giá mới</div><div>20</div><div class="k">Món mới</div><div>1</div><div class="k">Món sửa</div><div>1</div>
+        <div class="k">Sẽ hiện trên Shop</div><div>1</div><div class="k">Sẽ ẩn khỏi Shop</div><div>1</div>
+        <div class="k">Áp dụng giá từ</div><div>10/11/2026 (1 món), 14/11/2026 (3 món), 15/11/2026 (16 món)</div>
+      </div>
+      <div class="alert warn" style="margin-top:12px">⚠ <span>2 giá cần xem:<br><span class="mono">CA-07</span> 185.000 đ → <b>18.500 đ</b> · Kiểm lại số 0<br><span class="mono">MUC-03</span> 240.000 đ → <b>320.000 đ</b> · Chênh lớn</span></div>
+      <label class="check"><input type="checkbox"> Tôi đã kiểm 2 giá cần xem</label>
+    </div>
+    <div class="bar"><span class="reason" id="why">Đánh dấu ô kiểm giá để tiếp tục</span><button class="btn">Quay lại xem</button><button class="btn primary" disabled aria-describedby="why">Xác nhận nhập 20 giá mới</button></div>
+  </div></div>
+</section>
+
+<!-- 409 -->
+<section class="frame" aria-label="409 dữ liệu đổi giữa chừng">
+  <div class="ftag">M3 · sau 409 IMPORT_DATA_CHANGED (hộp đã đóng, không ghi gì) · tương tự cho 410 hết phiên</div>
+  <div class="body">
+    <div class="alert warn" role="status" tabindex="-1">⟳ <span>Mặt hàng vừa được sửa sau lúc bạn xem trước. Chưa ghi gì. Bấm Xem trước lại để so với dữ liệu mới.</span><button class="btn">Xem trước lại</button></div>
+    <div class="alert err" role="alert">⨯ <span>Mất kết nối khi đang ghi. Bấm Thử lại, hệ thống không ghi hai lần.</span></div>
+    <p class="reason">(Khung thứ hai là alert E30 trong hộp M5 khi rớt mạng; nút chính của hộp đổi thành “Thử lại”.)</p>
+    <div class="toast" role="status">✓ Đã nhập: 1 món mới, 1 món sửa, 20 giá mới.</div>
+  </div>
+</section>
+</body>
+</html>

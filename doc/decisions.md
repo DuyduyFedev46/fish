@@ -276,3 +276,11 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 - **Test PostgreSQL chạy trên GitHub Actions** (thực hiện chốt 10/10 "chạy trên cloud, DB test riêng"): mỗi lần push, GitHub dựng Postgres tạm, chạy toàn bộ test backend, không cần bí mật, không đụng staging/production, không deploy.
 - **Lãi lỗ theo lô trừ phần giảm giá mã đã phân bổ vào từng dòng đơn**, áp cho đơn từ nay; kỳ/lô đã chốt không đổi số (giữ luật "không sửa số kỳ cũ"). Làm thành lô nhỏ riêng sau lô 3b, có test.
 - **Chọn phương thức thanh toán ngay ở form đặt hàng** (Duy 11/10): khối "Phương thức thanh toán" dưới ô địa chỉ; bấm "Đặt hàng" là vào thẳng cổng quét mã, bỏ bước bấm "Thanh toán" ở trang đơn (trang đơn giữ nút dự phòng khi mở cổng lỗi hoặc khách quay lại). Thay luồng C1 → D1 trong thiết kế 06/10.
+
+## 2026-11-14 — Feedback Lộc trên sheet FIX WEB — [DUY CHỐT]
+- **Mua tối thiểu 0,5 kg** cho món bán theo kg, bước vẫn 0,5 kg (Duy 14/11). Thay ý "tối thiểu 1 kg" ở mục 10/10 (dòng "Giá theo kg, tối thiểu 1 kg") và ngưỡng Q4 "đuôi lô dưới 1 kg" (nay là dưới 0,5 kg). Combo giữ nguyên tối thiểu 1, bước 1. Đơn cũ không đổi. Hồ sơ `doc/features/2026-11-14-hang-ban-excel-dong-lanh/`.
+- **"Thêm đồ đông lạnh" là hiểu lầm**: hàng trên web đã là hải sản cấp đông, gốc vấn đề là Shop thiếu nhóm hàng (danh mục) nên khó phân biệt. Không thêm loại hàng hay đơn vị bán mới.
+- **File Excel "hàng bán" là danh sách mặt hàng** (mã, tên, nhóm, giá bán, trạng thái, chữ mô tả), không bao giờ có giá vốn. Nhập file: mã có thì sửa, mã mới thì tạo, món không có trong file giữ nguyên; file có dòng lỗi thì không ghi dòng nào và báo lỗi theo số dòng.
+- **Ảnh minh hoạ món lấy từ mạng** (Duy 14/11): chỉ ảnh có giấy phép dùng thương mại miễn phí, ghi nguồn và tác giả, đúng loài; Gemini tìm, đội Claude tải lên ERP sau khi Duy xem.
+- **Mức 0,5 kg áp mọi nơi** (Duy 14/11, trả lời Q-TL-1 FISH-66): đổi mặc định trong code, không khoá 1 kg trên production.
+- **Tên món phải theo luật chữ công khai BR-DM-25** (không giá, SĐT, nhà cung cấp…), kiểm ở form ERP và file nhập khi tạo mới hoặc đổi tên (Duy 14/11, Q-TL-2).
