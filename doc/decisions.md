@@ -284,3 +284,8 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 - **Ảnh minh hoạ món lấy từ mạng** (Duy 14/11): chỉ ảnh có giấy phép dùng thương mại miễn phí, ghi nguồn và tác giả, đúng loài; Gemini tìm, đội Claude tải lên ERP sau khi Duy xem.
 - **Mức 0,5 kg áp mọi nơi** (Duy 14/11, trả lời Q-TL-1 FISH-66): đổi mặc định trong code, không khoá 1 kg trên production.
 - **Tên món phải theo luật chữ công khai BR-DM-25** (không giá, SĐT, nhà cung cấp…), kiểm ở form ERP và file nhập khi tạo mới hoặc đổi tên (Duy 14/11, Q-TL-2).
+
+## 2026-11-14 — Nhãn thời gian giao ở giỏ hàng (Duy chốt)
+- Giỏ hàng Shop hiện một nhãn cố định: "Giao trong 2 giờ kể từ lúc đặt hàng nếu cách vựa dưới 15 km · Từ 15 km trở lên: trong 4 giờ".
+- Mốc tính là **lúc đặt hàng** (Duy chọn). Chưa đo khoảng cách theo địa chỉ khách: giỏ chưa có địa chỉ, Google Maps chưa bật. Khi bật Maps sẽ cân nhắc hiện đúng một mức ở trang đặt hàng.
+- Câu chữ và các con số để ở một hằng số trong code Shop để đổi một chỗ. Đây là lời hứa với khách: giờ làm việc, đơn đặt ban đêm và việc giao trễ là vận hành của Lộc. Làm ở phiếu Gemini GUI-13.

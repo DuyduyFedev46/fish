@@ -78,6 +78,7 @@ class ValidQtyTests(ShopCreateBase):
         self.assertEqual(data["total_amount"], "300000")  # SHOP-3-01: money_str, không còn ".00"
 
 
+@override_settings(SHOP_MIN_QTY_KG=Decimal("1"))  # FISH-66 S1: ca cũ kiểm mức 1 kg; mặc định 0,5 ở test_shop_min_qty.py
 class InvalidQtyTests(ShopCreateBase):
     def setUp(self):
         super().setUp()
@@ -90,7 +91,7 @@ class InvalidQtyTests(ShopCreateBase):
         self.assertEqual(resp.status_code, 400, resp.content)
         body = resp.json()
         self.assertEqual(body["code"], "INVALID_QTY")
-        self.assertEqual(body["detail"], "Số lượng không hợp lệ.")
+        self.assertTrue(body["detail"].startswith("Món theo kg đặt từ "), body["detail"])
         self.assertEqual([line["item_code"] for line in body["lines"]], expected_codes)
         return body
 
@@ -202,6 +203,7 @@ class OutOfStockTests(ShopCreateBase):
         resp = self.post([("CUA", "2"), ("TOM-SU", "1")])
         self.assert_out_of_stock(resp, [{"item_code": "TOM-SU", "stock_level": "out"}])
 
+    @override_settings(SHOP_MIN_QTY_KG=Decimal("1"))
     def test_line_level_out_when_item_below_minimum_sellable(self):
         """Còn 0,9 kg: dưới mức tối thiểu 1 kg nên là "out" chứ không phải "short" (BR-BH-23)."""
         self._stocked_batch(self._item("TAIL", price="100000"), "0.9")
