@@ -12,6 +12,7 @@ from apps.catalog.item_files.columns import IMPORT_PERMS, columns_for
 from apps.catalog.item_files.workbook import build_items_workbook
 from apps.catalog.models import Item, ItemGroup, ItemPrice, PriceList
 from apps.common.exceptions import ConflictError
+from apps.common.tests.postgres_race import PostgresRaceFixtureMixin
 from apps.common.tests.fixtures import make_user
 
 
@@ -52,7 +53,7 @@ class CommitSequentialTests(TestCase):
 
 
 @skipUnless(connection.vendor == "postgresql", "Cần PostgreSQL cho select_for_update song song thật")
-class CommitConcurrentPgTests(TransactionTestCase):
+class CommitConcurrentPgTests(PostgresRaceFixtureMixin, TransactionTestCase):
     def setUp(self):
         super().setUp()
         self.owner = make_user("u_owner", perms=IMPORT_PERMS)
