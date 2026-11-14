@@ -80,7 +80,7 @@ class ConsentOrderTests(ErrorOrderBase):
         self.assertEqual(resp.json()["code"], "VALIDATION")
 
     def test_invalid_qty_comes_before_policy_changed(self):
-        resp = self.post([("MUC-ONG", "0.5")], privacy_consent={"accepted": True, "policy_version_id": 999999})
+        resp = self.post([("MUC-ONG", "0.25")], privacy_consent={"accepted": True, "policy_version_id": 999999})
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json()["code"], "INVALID_QTY")
 

@@ -408,6 +408,7 @@ class LoadShopContentHomeBlockTests(LoadShopContentBase):
         self.assertNotIn("home-banner", slugs)
         self.assertNotIn("home-commitments", slugs)
 
+    @override_settings(SHOP_MIN_QTY_KG="1")  # FISH-66 S1: câu cũ "mua từ 1 kg"; mặc định mới 0,5 ở ca dưới
     def test_shop_5_03_banner_shape_follows_contract(self):
         """Mỗi slide: heading cấp 2 + paragraph + (tuỳ chọn) paragraph chỉ có một link nội bộ. Tối đa 3 slide.
         excerpt = dải chữ đầu trang, số kg tối thiểu lấy từ settings (L7)."""

@@ -358,7 +358,7 @@ PRIVACY_CONSENT_REQUIRED = privacy_consent_required(TESTING, DEBUG, os.environ)
 # --- Shop làm lại 2026-10 (doc/features/2026-10-06-shop-giao-dien-moi/02b §2.3) -----------
 # Khai một lần ở lô 1 cho cả đợt; lô sau chỉ đọc. Tham số nghiệp vụ không hard-code (bất biến 7).
 # Số lượng đặt và mức tồn hiển thị (BR-BH-22, BR-BH-23, V-01).
-SHOP_MIN_QTY_KG = Decimal(os.getenv("SHOP_MIN_QTY_KG", "1"))
+SHOP_MIN_QTY_KG = Decimal(os.getenv("SHOP_MIN_QTY_KG", "0.5"))
 SHOP_QTY_STEP_KG = Decimal(os.getenv("SHOP_QTY_STEP_KG", "0.5"))
 SHOP_LOW_STOCK_KG = Decimal(os.getenv("SHOP_LOW_STOCK_KG", "3"))
 SHOP_LOW_STOCK_COMBO = int(os.getenv("SHOP_LOW_STOCK_COMBO", "3"))
