@@ -1,4 +1,4 @@
-import type { CatalogItem } from "@/lib/types";
+import type { CatalogItem, ItemImage } from "@/lib/types";
 import { foldVietnamese } from "@/lib/text";
 import type { SortValue } from "@/components/catalog/SortControl";
 
@@ -29,4 +29,36 @@ export function rulesText(items: CatalogItem[]): string {
   const fmt = (v: string) => Number(v).toString().replace(".", ",");
   if (!kg) return "Combo tính theo combo.";
   return `Giá tính theo kg. Mua tối thiểu ${fmt(kg.min_qty)} kg, tăng từng ${fmt(kg.qty_step)} kg. Combo tính theo combo.`;
+}
+
+/**
+ * Lấy ảnh đại diện cho một mục danh mục từ món đầu tiên có ảnh trong mục (ưu tiên món còn hàng nhờ rankItems).
+ * - `groupSlug === "combo"`: tìm món BUNDLE (hoặc thuộc nhóm `combo`) có ảnh.
+ * - `groupSlug === ""` hoặc `"all"`: tìm món đầu tiên bất kỳ có ảnh.
+ * - Các nhóm khác: tìm món đầu tiên có `i.group.slug === groupSlug` và có ảnh.
+ */
+export function groupRepresentativeImage(items: CatalogItem[], groupSlug: string): ItemImage | null {
+  const ranked = rankItems(items);
+  const matched = ranked.find((i) => {
+    const inGroup =
+      groupSlug === "combo"
+        ? i.item_type === "BUNDLE" || i.group.slug === "combo"
+        : groupSlug === "" || groupSlug === "all"
+          ? true
+          : i.group.slug === groupSlug;
+    if (!inGroup || !i.image) return false;
+    const u = i.image.urls;
+    return Boolean(u && (u.thumb || u.card || u.detail));
+  });
+  return matched?.image ?? null;
+}
+
+/** Tạo bảng tra cứu ảnh đại diện theo danh sách `groupSlugs`. */
+export function groupImageMap(items: CatalogItem[], groupSlugs?: string[]): Record<string, ItemImage | null> {
+  const slugs = groupSlugs ?? Array.from(new Set(["", "all", "combo", ...items.map((i) => i.group.slug)]));
+  const out: Record<string, ItemImage | null> = {};
+  for (const slug of slugs) {
+    out[slug] = groupRepresentativeImage(items, slug);
+  }
+  return out;
 }

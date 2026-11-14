@@ -23,14 +23,19 @@
 }
 
 .iconBox {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 48px;
   height: 48px;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  overflow: hidden;
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-xl);
   background-color: var(--surface-tint);
+  background-image: var(--surface-gradient);
   color: var(--accent-text);
   box-shadow: var(--shadow-xs);
   transition:
@@ -38,6 +43,20 @@
     border-color var(--dur-color) var(--ease-out),
     color var(--dur-color) var(--ease-out),
     box-shadow var(--dur-color) var(--ease-out);
+}
+
+.iconBoxHasImg {
+  background-color: var(--surface-2);
+  background-image: none;
+}
+
+.thumbImg {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  border-radius: inherit;
 }
 
 .label {
@@ -70,6 +89,7 @@
 .md .iconBox {
   width: 58px;
   height: 58px;
+  aspect-ratio: 1 / 1;
   border-radius: var(--radius-sheet);
 }
 .md .iconBox svg {
@@ -97,6 +117,7 @@
   .auto .iconBox {
     width: 58px;
     height: 58px;
+    aspect-ratio: 1 / 1;
     border-radius: var(--radius-sheet);
   }
   .auto .iconBox svg {

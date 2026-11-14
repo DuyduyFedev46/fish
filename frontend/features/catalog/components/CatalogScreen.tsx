@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCatalog } from "@/lib/api";
 import { formatQty } from "@/lib/quantity";
-import type { CatalogResponse } from "@/lib/types";
+import type { CatalogResponse, GroupIcon, ItemImage } from "@/lib/types";
 import ShopFrame from "@/components/ShopFrame";
 import { useHotline } from "@/components/useHotline";
 import { groupHref, contactTarget } from "@/components/shopLinks";
@@ -16,13 +17,14 @@ import CartBar from "@/components/cart/CartBar";
 import MiniCart from "@/components/cart/MiniCart";
 import RemoveItemDialog from "@/components/cart/RemoveItemDialog";
 import Breadcrumb from "@/components/ui/Breadcrumb";
-import Chip from "@/components/ui/Chip";
 import EmptyState from "@/components/ui/EmptyState";
 import ErrorState from "@/components/ui/ErrorState";
+import Icon from "@/components/ui/Icon";
 import { ChipRowSkeleton, ProductCardSkeleton } from "@/components/ui/Skeleton";
+import { cx } from "@/components/ui/cx";
 import { useCartActions } from "@/features/cart/useCartActions";
 import { itemHref, toCardItem } from "../cardItem";
-import { filterAndSort, rulesText } from "../catalogView";
+import { filterAndSort, groupImageMap, rulesText } from "../catalogView";
 import { groupIconOf } from "../groupIcon";
 import { useSearchSuggest } from "../useSearchSuggest";
 import s from "./CatalogScreen.module.css";
@@ -112,7 +114,11 @@ export default function CatalogScreen() {
     router.replace(hrefWith({ group, type, sort: v === "default" ? "" : v }));
   }
 
-  const groupChips = [{ slug: "", name: "Tất cả" }, ...(catalog?.groups ?? [])];
+  const groupChips = useMemo(() => [{ slug: "", name: "Tất cả" }, ...(catalog?.groups ?? [])], [catalog?.groups]);
+  const groupImages = useMemo(
+    () => groupImageMap(items, groupChips.map((g) => g.slug)),
+    [items, groupChips]
+  );
   const busy = state === "loading";
   const miniLines = cart.lines.map((l) => {
     const it = items.find((i) => i.item_code === l.item_code);
@@ -149,10 +155,12 @@ export default function CatalogScreen() {
             <ChipRowSkeleton />
           ) : (
             groupChips.map((g) => (
-              <Chip
+              <CatalogCategoryChip
                 key={g.slug || "all"}
                 label={g.name}
                 href={groupLink(g.slug)}
+                icon={groupIconOf(g.slug || "combo")}
+                image={groupImages[g.slug] ?? null}
                 selected={(g.slug || "") === currentSlug}
               />
             ))
@@ -250,5 +258,53 @@ export default function CatalogScreen() {
       />
       <RemoveItemDialog item={actions.pendingView} onKeep={actions.keep} onRemove={actions.confirmRemove} />
     </ShopFrame>
+  );
+}
+
+/** Ô mục danh mục ở đầu trang `/shop/`: hiện ảnh đại diện món (hoặc khung icon dự phòng) kèm tên nhóm. */
+function CatalogCategoryChip({
+  label,
+  href,
+  icon,
+  image,
+  selected,
+}: {
+  label: string;
+  href: string;
+  icon: GroupIcon;
+  image: ItemImage | null;
+  selected: boolean;
+}) {
+  const src = image?.urls?.thumb || image?.urls?.card || image?.urls?.detail || "";
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+
+  const showImage = Boolean(src) && !broken;
+
+  return (
+    <Link
+      href={href}
+      className={cx(s.catChip, selected && s.catChipSelected)}
+      aria-label={label}
+      aria-current={selected ? "page" : undefined}
+    >
+      <span className={cx(s.catThumb, showImage && s.catThumbHasImg)}>
+        {showImage ? (
+          <img
+            src={src}
+            alt={image?.alt || label}
+            loading="lazy"
+            className={s.catThumbImg}
+            onError={() => setBroken(true)}
+          />
+        ) : (
+          <Icon name={icon} size={18} strokeWidth={1.6} />
+        )}
+      </span>
+      <span className={s.catChipLabel}>{label}</span>
+    </Link>
   );
 }
