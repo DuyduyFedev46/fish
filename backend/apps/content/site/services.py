@@ -70,7 +70,7 @@ def site_info() -> dict[str, Any]:
 
     policies = {
         "return_report_hours": _positive_int_or_none(getattr(settings, "SHOP_RETURN_REPORT_HOURS", "")),
-        "min_qty_kg": _kg_text(getattr(settings, "SHOP_MIN_QTY_KG", Decimal("1"))),
+        "min_qty_kg": _kg_text(settings.SHOP_MIN_QTY_KG),
         "qty_step_kg": _kg_text(getattr(settings, "SHOP_QTY_STEP_KG", Decimal("0.5"))),
         "hold_minutes": int(settings.SALES_ORDER_TTL_MINUTES),
     }

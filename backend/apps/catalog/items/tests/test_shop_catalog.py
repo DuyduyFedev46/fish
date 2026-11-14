@@ -84,6 +84,7 @@ class ShopCatalogBase(TestCase):
         return next(i for i in self.catalog()["items"] if i["item_code"] == code)["stock_level"]
 
 
+@override_settings(SHOP_MIN_QTY_KG=Decimal("1"))  # FISH-66 S1: ca này kiểm ngưỡng 1 kg; mặc định mới 0,5 ở test_shop_min_qty.py
 class StockLevelTests(ShopCatalogBase):
     def test_s2_01_ac1_simple_levels_in_low_out_out(self):
         self.item("IN5", kg="5")
@@ -184,6 +185,7 @@ class StockLevelTests(ShopCatalogBase):
 
 
 class CatalogShapeTests(ShopCatalogBase):
+    @override_settings(SHOP_MIN_QTY_KG=Decimal("1"))  # FISH-66 S1: ca này kiểm ngưỡng 1 kg; mặc định mới 0,5 ở test_shop_min_qty.py
     def test_contract_shape_groups_and_items(self):
         shrimp = ItemGroup.objects.create(name="Tôm")
         self.item("MUC-ONG", kg="2.7", name="Mực ống làm sạch")
@@ -319,6 +321,7 @@ class NoLeakTests(ShopCatalogBase):
             self.assertNotIn("Đầu mối giả", raw)
             self.assertNotIn(json.dumps("Đầu mối giả", ensure_ascii=True)[1:-1], raw)
 
+    @override_settings(SHOP_MIN_QTY_KG=Decimal("1"))  # FISH-66 S1: ca này kiểm ngưỡng 1 kg; mặc định mới 0,5 ở test_shop_min_qty.py
     def test_stock_level_is_one_of_three_values(self):
         levels = {i["stock_level"] for i in self.catalog()["items"]}
         self.assertTrue(levels <= {"in", "low", "out"})

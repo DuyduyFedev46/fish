@@ -150,7 +150,7 @@ class Command(BaseCommand):
         return {
             "{hotline}": hotline,
             "{hold_minutes}": str(settings.SALES_ORDER_TTL_MINUTES),
-            "{min_qty_kg}": _format_kg(getattr(settings, "SHOP_MIN_QTY_KG", Decimal("1"))),
+            "{min_qty_kg}": _format_kg(settings.SHOP_MIN_QTY_KG),
             "{qty_step_kg}": _format_kg(getattr(settings, "SHOP_QTY_STEP_KG", Decimal("0.5"))),
             "{cancel_callback_within}": str(getattr(settings, "SHOP_CANCEL_CALLBACK_WITHIN", "1 ngày làm việc")),
         }
