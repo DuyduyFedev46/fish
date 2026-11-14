@@ -17,6 +17,10 @@ flowchart TD
 ```
 
 > PO · 14/11/2026 · Nguồn: `01-analysis.md` (ĐÃ DUYỆT 14/11) + `doc/decisions.md` mục 2026-11-14 · Trạng thái: **ĐÃ DUYỆT** (Duy 14/11, duyệt cả S1–S6)
+>
+> Techlead 14/11: các khối "Contract API dự kiến" dưới đây là bản nháp; contract thật ở `02b-tech-design.md` §3 (đổi
+> chính: lỗi dòng trả 400 `IMPORT_INVALID_ROWS` thay 422, `preview_id` thành `preview_token` gửi kèm file, lọc
+> `item_type=SIMPLE|BUNDLE`). Sửa AC S6-AC6, S6-AC7, S6-AC9 và thêm S5-AC17 (C-1) cho khớp 02b và 02a.
 
 ## Mục tiêu & thước đo
 
@@ -201,6 +205,7 @@ Bối cảnh: UC-4 bước 1–3, các ngoại lệ về file và dòng lỗi.
 | S5-AC14 (giá vốn) | Chủ chọn file hợp lệ | Xem phản hồi xem trước | Phản hồi chỉ có trường mặt hàng và giá bán; không có giá mua, giá vốn, lãi lỗ, mã lô, tồn | bất biến 1 |
 | S5-AC15 (nhật ký, log) | Chủ chọn file lỗi hoặc hợp lệ | Sau xem trước | Không ghi AuditLog (chưa đổi gì); log máy chủ không chứa tên file hay nội dung ô | BR-PQ-04, rủi ro §8 |
 | S5-AC16 (hiệu năng) | File 1.000 dòng hợp lệ | Chọn file | Có kết quả xem trước trong ≤ 10 giây trên staging; số truy vấn DB không tăng theo số dòng | |
+| S5-AC17 (ô chữ trống, C-1) | Món `CA-01` có Mô tả và Quy cách; file để trống hai ô đó, không sửa gì khác | Chọn file, rồi xác nhận | Xem trước báo "File không có gì mới"; Mô tả và Quy cách của `CA-01` giữ nguyên chữ cũ (thêm techlead 14/11 theo C-1, 02b §4.3) | BR-DM-29, C-1 |
 
 **Contract API dự kiến:**
 ```
@@ -246,10 +251,10 @@ Bối cảnh: UC-4 bước 4–6, ngoại lệ đua và bấm hai lần.
 | S6-AC3 (không đụng kho) | Có lô đang mở bán và đơn đang giữ chỗ của các món trong file | Xác nhận nhập | Số dòng và giá trị của `Batch`, `StockLedgerEntry`, `PurchaseReceipt*`, `SalesOrder*`, `*LineBatch` không đổi (so sánh trước/sau trong test) | BR-DM-32, bất biến 1, 6 |
 | S6-AC4 | Huỷ ở màn xem trước | Chủ bấm "Huỷ" | Không gọi API ghi; DB không đổi | BR-DM-31 |
 | S6-AC5 (lỗi lúc ghi) | Dòng thứ 150 hỏng lúc ghi (giả lập lỗi trong test) | Xác nhận | Không dòng nào được ghi, kể cả 149 dòng trước; không AuditLog nào; ERP báo lỗi, có thể nhập lại | BR-DM-31 |
-| S6-AC6 (dữ liệu đổi giữa chừng) | Sau khi xem trước, có người sửa tay tên hoặc giá một món trong file (hoặc một lượt nhập khác vừa ghi) | Chủ bấm xác nhận | 409, báo "Dữ liệu vừa thay đổi, hãy tải lại file"; không ghi dòng nào | UC-4 ngoại lệ |
-| S6-AC7 (bấm hai lần) | Chủ bấm xác nhận hai lần liên tiếp, hoặc gửi lại cùng request sau khi mạng rớt | Hai request ghi | Chỉ một lần được ghi: số `Item`, `ItemPrice` và AuditLog `import_items` đúng như ghi một lần; request sau trả lại kết quả lần đầu hoặc báo "Lượt nhập này đã ghi"; FE khoá nút khi đang gửi | BR-DM-31 |
+| S6-AC6 (dữ liệu đổi giữa chừng) | Sau khi xem trước, có người sửa tay tên hoặc giá một món trong file (hoặc một lượt nhập khác vừa ghi) | Chủ bấm xác nhận | 409 `IMPORT_DATA_CHANGED`; không ghi dòng nào; ERP hiện banner W2 (02a §5) với nút **Xem trước lại**, bấm thì gửi lại chính file đang giữ trong trang để xem trước với dữ liệu mới (mất file thì nút thành "Chọn file khác") (sửa techlead 14/11, 02b §3.5) | UC-4 ngoại lệ |
+| S6-AC7 (bấm hai lần) | Chủ bấm xác nhận hai lần liên tiếp, hoặc gửi lại cùng request sau khi mạng rớt | Hai request ghi | Chỉ một lần được ghi: số `Item`, `ItemPrice` và AuditLog `import_items` đúng như ghi một lần; request sau trả **409 `IMPORT_ALREADY_APPLIED`** kèm số đếm của lần đầu (`created`, `updated`, `price_changed`, `visibility_changed`), ERP hiện toast T5 "Lượt nhập này đã ghi rồi" và về danh sách; FE khoá nút khi đang gửi (sửa techlead 14/11, 02b §3.5) | BR-DM-31 |
 | S6-AC8 (đua) | Hai request ghi đồng thời cùng phiên xem trước (test đua Postgres trên cloud) | Gửi song song | Đúng một lần ghi thành công | BR-DM-31 |
-| S6-AC9 (quyền) | Quản lý (kể cả được uỷ "Sửa giá bán"), NV kho, NV giao gửi request ghi, kể cả với `preview_id` do Chủ tạo | Gọi API ghi | 403, DB không đổi | BR-DM-28, Q-08 |
+| S6-AC9 (quyền) | Quản lý (kể cả được uỷ "Sửa giá bán"), NV kho, NV giao gửi request ghi, kể cả với `preview_token` và file do Chủ tạo | Gọi API ghi | 403, DB không đổi | BR-DM-28, Q-08 |
 | S6-AC10 (quyền đổi giữa chừng) | Chủ bị gỡ quyền giữa lúc xem trước và xác nhận | Gọi API ghi | 403, DB không đổi | BR-PQ |
 | S6-AC11 (Shop) | Món mới đang kinh doanh + có giá, chưa có lô | Sau khi ghi, khách gọi API danh mục Shop | Món hiện với "hết hàng"; món đổi "Đang kinh doanh" = Không thì không còn trên Shop | Q-15, BR-BH-23 |
 | S6-AC12 (giá vốn) | Sau khi ghi | Xem phản hồi API ghi | Chỉ có số đếm và mã món; không có giá vốn, giá mua, lãi lỗ | bất biến 1 |
