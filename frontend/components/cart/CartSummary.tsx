@@ -84,7 +84,7 @@ export default function CartSummary({
   };
 
   return (
-    <section className={cx(s.summary, s[context])} aria-labelledby="cart-summary-title">
+    <section className={cx(s.summary, s[context])} aria-labelledby="cart-summary-title" data-cart-summary="">
       <h2 id="cart-summary-title" className={s.title}>
         {title}
       </h2>

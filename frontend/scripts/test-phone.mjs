@@ -40,6 +40,10 @@ eq("cắt khoảng trắng đầu cuối", mod.validHotline("  0900000000 "), "0
 eq("pickHotline bỏ giữ chỗ lấy số sau", mod.pickHotline("1900 xxxx", "0900000000"), "0900000000");
 eq("pickHotline ưu tiên số đầu hợp lệ", mod.pickHotline("0911111111", "0900000000"), "0911111111");
 eq("pickHotline không có số hợp lệ", mod.pickHotline(null, "1900 xxxx"), undefined);
+eq("zaloUrlOf từ số điện thoại", mod.zaloUrlOf("0900 000 999"), "https://zalo.me/0900000999");
+eq("zaloUrlOf giữ URL https", mod.zaloUrlOf("https://zalo.me/caveve"), "https://zalo.me/caveve");
+eq("zaloUrlOf rỗng -> undefined", mod.zaloUrlOf("   "), undefined);
+eq("zaloUrlOf null -> undefined", mod.zaloUrlOf(null), undefined);
 
 console.log(`\ntest-phone: ${n - fail}/${n} đạt, ${fail} sai`);
 process.exit(fail ? 1 : 0);

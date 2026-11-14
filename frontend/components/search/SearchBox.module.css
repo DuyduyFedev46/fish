@@ -77,9 +77,9 @@
   box-shadow: var(--shadow-xs, var(--shadow-sm));
 }
 .brand .clear {
-  width: 36px;
-  height: 36px;
-  margin: 0 -2px 0 0;
+  width: 44px;
+  height: 44px;
+  margin: -2px -6px -2px 0;
 }
 .brand:focus-within {
   border-color: var(--accent-border, var(--accent));
@@ -110,9 +110,6 @@
     height: 42px;
     padding: 3px 4px 3px var(--space-4);
   }
-  .brand .input {
-    font-size: 14px;
-  }
   .brand .submit {
     display: inline-flex;
     flex: none;
@@ -140,6 +137,12 @@
     width: 34px;
     height: 34px;
     margin: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .brand .input {
+    font-size: 14px;
   }
 }
 

@@ -5,9 +5,11 @@ import { pickHotline, zaloUrlOf } from "@/lib/phone";
 import { getSiteInfo } from "@/features/site/api";
 
 /** Hotline hợp lệ (ưu tiên số người bán) và link Zalo từ site-info; lỗi hoặc chưa có thì để trống, nút dẫn tới trang Liên hệ. */
-export function useHotline(): { hotline?: string; zaloUrl?: string } {
+export function useHotline(options?: { skip?: boolean }): { hotline?: string; zaloUrl?: string } {
+  const skip = options?.skip ?? false;
   const [state, setState] = useState<{ hotline?: string; zaloUrl?: string }>({});
   useEffect(() => {
+    if (skip) return;
     let active = true;
     getSiteInfo()
       .then((info) => {
@@ -21,6 +23,6 @@ export function useHotline(): { hotline?: string; zaloUrl?: string } {
     return () => {
       active = false;
     };
-  }, []);
+  }, [skip]);
   return state;
 }
