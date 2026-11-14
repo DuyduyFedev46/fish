@@ -18,7 +18,19 @@ export const CATALOG_PERM = {
   addBundleLine: "catalog.add_bundleline",
   /** SHOP-3b-02: Tầng 2, chỉ Chủ (uỷ được). Cần cho mọi thao tác ở màn Mã giảm giá, kể cả xem. */
   manageVoucher: "catalog.manage_voucher",
+  changeItemPrice: "catalog.change_itemprice",
 } as const;
+
+/**
+ * FISH-66 (02b §3.1): nhập mặt hàng từ Excel cần ĐỦ 4 quyền này, đúng `IMPORT_PERMS` ở BE (`item_files/columns.py`).
+ * Chỉ xét quyền, không xét tên nhóm.
+ */
+export const IMPORT_PERMS = [
+  CATALOG_PERM.addItem,
+  CATALOG_PERM.changeItem,
+  CATALOG_PERM.addItemPrice,
+  CATALOG_PERM.changeItemPrice,
+] as const;
 
 /** Quyền người đang xem có, gom theo việc màn cần quyết định. */
 export type CatalogAbility = {
@@ -34,6 +46,8 @@ export type CatalogAbility = {
   addGroup: boolean;
   changeGroup: boolean;
   manageVoucher: boolean;
+  /** Có đủ cả 4 quyền nhập Excel (IMPORT_PERMS). */
+  canImport: boolean;
 };
 
 export function catalogAbility(perms: readonly string[]): CatalogAbility {
@@ -51,5 +65,6 @@ export function catalogAbility(perms: readonly string[]): CatalogAbility {
     addGroup: has(CATALOG_PERM.addItemGroup),
     changeGroup: has(CATALOG_PERM.changeItemGroup),
     manageVoucher: has(CATALOG_PERM.manageVoucher),
+    canImport: IMPORT_PERMS.every(has),
   };
 }

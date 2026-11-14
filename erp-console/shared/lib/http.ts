@@ -183,19 +183,15 @@ function detailOf(body: unknown): { detail?: string; code?: string; details?: un
   return {};
 }
 
-export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> {
-  const token = init.auth === false ? null : getToken();
-  const { status, body } = USE_MOCK ? await sendMock(path, init, token) : await sendReal(path, init, token);
-
-  if (status >= 200 && status < 300) return (status === 204 ? undefined : body) as T;
-
+/** Đổi mã lỗi HTTP thành `ApiError` (và báo handler 401/403 toàn cục). Dùng chung cho apiFetch và apiDownload. */
+function raiseHttpError(status: number, body: unknown, token: string | null, method: string, path: string): never {
   const { detail, code, details } = detailOf(body);
   if (status === 401) {
     if (token && onUnauthorized) onUnauthorized();
     throw new ApiError(detail || MSG.unauthorized, 401, code);
   }
   if (status === 403) {
-    if (onForbidden) onForbidden(code, `${init.method || "GET"} ${path}`);
+    if (onForbidden) onForbidden(code, `${method} ${path}`);
     throw new ApiError(detail || MSG.forbidden, 403, code);
   }
   if (status === 404) {
@@ -207,6 +203,96 @@ export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> 
   // để ConflictBanner nói "… vừa được <tên> sửa lúc …" (W6f).
   if (status === 409) throw new ApiError(detail || MSG.conflict, 409, code, details);
   throw new ApiError(detail || MSG.server(status), status, code);
+}
+
+export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> {
+  const token = init.auth === false ? null : getToken();
+  const { status, body } = USE_MOCK ? await sendMock(path, init, token) : await sendReal(path, init, token);
+
+  if (status >= 200 && status < 300) return (status === 204 ? undefined : body) as T;
+  return raiseHttpError(status, body, token, init.method || "GET", path);
+}
+
+// ---- Tải file (FISH-66 S3, S4) ----
+
+/** File đã tải: nội dung, tên lấy từ `Content-Disposition`, số dòng lấy từ `X-Row-Count` (null nếu máy chủ không gửi). */
+export type DownloadResult = { blob: Blob; filename: string; rowCount: number | null };
+
+/** Thân của mock tải file (chỉ chế độ mock): thay cho bytes + header của máy chủ thật. */
+export type MockDownloadBody = { filename: string; rowCount: number; content: string; contentType: string };
+
+/** Lấy tên file từ header `Content-Disposition` (`filename="x.xlsx"` hoặc `filename*=UTF-8''x.xlsx`). */
+export function filenameFromDisposition(header: string | null | undefined): string | null {
+  if (!header) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      /* rơi xuống dạng thường */
+    }
+  }
+  const plain = /filename\s*=\s*"([^"]+)"/.exec(header) ?? /filename\s*=\s*([^;]+)/.exec(header);
+  return plain ? plain[1].trim() : null;
+}
+
+/** `X-Row-Count` → số nguyên không âm, hoặc null. */
+export function rowCountFromHeader(value: string | null | undefined): number | null {
+  if (value == null || value.trim() === "") return null;
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+/**
+ * Tải một file nhị phân (xlsx) bằng GET. Lỗi (401/403/400/5xx, mất mạng) ném `ApiError` giống `apiFetch`
+ * và KHÔNG bao giờ trả blob hỏng (S3-AC9). Thành công mà thân rỗng cũng coi là lỗi máy chủ.
+ * Chế độ mock: `mock` trả `{status:200, body: MockDownloadBody}` thay cho bytes.
+ */
+export async function apiDownload(
+  path: string,
+  init: { mock?: MockHandler; signal?: AbortSignal; fallbackName?: string } = {}
+): Promise<DownloadResult> {
+  const token = getToken();
+  const fallback = init.fallbackName || "tai-ve.xlsx";
+  if (USE_MOCK) {
+    const { status, body } = await sendMock(path, { method: "GET", mock: init.mock }, token);
+    if (status >= 200 && status < 300) {
+      const f = body as MockDownloadBody;
+      return { blob: new Blob([f.content], { type: f.contentType }), filename: f.filename, rowCount: f.rowCount };
+    }
+    return raiseHttpError(status, body, token, "GET", path);
+  }
+
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Token ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, { method: "GET", headers, cache: "no-store", signal: init.signal });
+  } catch (err) {
+    if ((err as Error)?.name === "AbortError") throw err;
+    throw new ApiError(MSG.network, 0);
+  }
+  if (res.status >= 200 && res.status < 300) {
+    let blob: Blob;
+    try {
+      blob = await res.blob();
+    } catch {
+      throw new ApiError(MSG.network, 0);
+    }
+    if (blob.size === 0) throw new ApiError(MSG.server(res.status), res.status);
+    return {
+      blob,
+      filename: filenameFromDisposition(res.headers.get("Content-Disposition")) || fallback,
+      rowCount: rowCountFromHeader(res.headers.get("X-Row-Count")),
+    };
+  }
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  return raiseHttpError(res.status, body, token, "GET", path);
 }
 
 /**
