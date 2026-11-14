@@ -15,6 +15,7 @@ import CartLine, { CartLineSkeleton } from "@/components/cart/CartLine";
 import CartSummary from "@/components/cart/CartSummary";
 import CheckoutSteps from "@/components/cart/CheckoutSteps";
 import VoucherField from "@/components/cart/VoucherField";
+import Icon from "@/components/ui/Icon";
 import { BottomSheet } from "@/components/ui/Sheet";
 import RemoveItemDialog from "@/components/cart/RemoveItemDialog";
 import Banner from "@/components/ui/Banner";
@@ -26,6 +27,7 @@ import { useCart } from "@/components/CartContext";
 import { itemHref, toCardItem } from "@/features/catalog/cardItem";
 import { groupIconOf } from "@/features/catalog/groupIcon";
 import { qtyFixesToPersist, reconcileCart } from "../reconcile";
+import { DELIVERY_ETA_TEXT } from "../deliveryEta";
 import { useVoucher } from "../useVoucher";
 import { describeTermsFull, minOrderOf } from "../voucherView";
 import s from "./CartScreen.module.css";
@@ -334,6 +336,10 @@ export default function CartScreen() {
             })}
           </ul>
           <p className={s.rule}>Mua tối thiểu {minKgLabel} kg mỗi món.</p>
+          <p className={s.eta} data-testid="delivery-eta">
+            <Icon name="truck" size={16} />
+            <span>{DELIVERY_ETA_TEXT}</span>
+          </p>
           <div className={s.deskNote}>
             {holdMinutes ? <p>Hàng được giữ {holdMinutes} phút sau khi đặt. Khi còn nằm trong giỏ, hàng chưa được giữ.</p> : null}
             <Link href="/shop/">Mua thêm hàng khác</Link>

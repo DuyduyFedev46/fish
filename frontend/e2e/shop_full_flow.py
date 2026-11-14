@@ -666,11 +666,32 @@ def quantity_kept_while_catalog_loads(browser):
     ctx.close()
 
 
+def delivery_eta_label(browser):
+    """GUI-13: nhãn thời gian giao ở giỏ (chữ thật, 360 + 1280, không cuộn ngang; giỏ trống thì không hiện)."""
+    want = ("Giao trong 2 giờ kể từ lúc đặt hàng nếu cách vựa dưới 15 km"
+            " · Từ 15 km trở lên: trong 4 giờ")
+    for width in (360, 1280):
+        ctx, page, watch = fresh_context(browser, width)
+        goto(page, "/shop/cart/")
+        R.ok(f"[{width}] GUI-13 giỏ trống: không có nhãn thời gian giao", page.locator("[data-testid=delivery-eta]").count() == 0
+             and "Giao trong 2 giờ" not in page.inner_text("main"))
+        add_to_cart(page, "CA-THU")
+        goto_cart(page)
+        eta = page.locator("[data-testid=delivery-eta]")
+        R.ok(f"[{width}] GUI-13 giỏ có hàng: nhãn đúng câu, là chữ thật", eta.count() == 1 and eta.inner_text().strip() == want,
+             eta.inner_text() if eta.count() else "không thấy")
+        R.ok(f"[{width}] GUI-13 nhãn hiện, không cuộn ngang", eta.is_visible() and no_hscroll(page, width))
+        eta.scroll_into_view_if_needed()
+        snap(page, "gui13-delivery-eta", width, "gui-13", full=True)
+        ctx.close()
+
+
 def main():
     create_voucher(V_MAIN)
     with sync_playwright() as p:
         browser = p.chromium.launch()
         quantity_kept_while_catalog_loads(browser)  # GUI-12
+        delivery_eta_label(browser)  # GUI-13
         code360 = journey(browser, 360)
         code1280 = journey(browser, 1280)
         lookup_from_other_session(browser, code360, 360)
