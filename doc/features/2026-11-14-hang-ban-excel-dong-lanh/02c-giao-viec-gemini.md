@@ -35,6 +35,7 @@ flowchart TD
 - TDD từng AC của S5, S6 (thấy đỏ rồi mới xanh). Có test đua Postgres cho "bấm xác nhận hai lần" (SQLite sẽ bỏ qua, ghi rõ).
 - Rủi ro bắt buộc có test: không giá vốn ở bất kỳ phản hồi nào; chỉ Chủ (đủ 4 quyền) nhập được, Quản lý 403 dù có quyền giá; file `.csv` đổi đuôi, file có macro, zip bomb, file có công thức đều bị chặn đúng mã lỗi; dòng lỗi thì không ghi dòng nào (400 `IMPORT_INVALID_ROWS`); 409 `IMPORT_DATA_CHANGED`, 409 `IMPORT_ALREADY_APPLIED` kèm số đếm lần đầu, 410 hết phiếu; không đụng tồn kho/lô/giá vốn; AuditLog từng món + dòng tổng `import_items`; vòng "tải về → nhập lại → không có gì mới" (lưu ý ký tự điều khiển, §13.2).
 - Sửa L1 (bỏ `head`), L2 (dùng chung quyền xem giá), L3, L4, L5 (assert `openpyxl.xml.LXML is False`).
+- QA lô 2 ghi thêm B2: sheet "Hướng dẫn" trong file của NV kho (14 cột) vẫn nhắc cột "Giá mới", "Ngày áp dụng giá mới" — bỏ các dòng đó khi file không có cột giá. Biên bản review/QA lô 2 nằm trên nhánh `feat/fish66-lo2-gop` (gộp nhánh đó vào trước khi làm: `git merge feat/fish66-lo2-gop`).
 
 ## Kiểm chứng (dán output thật vào `03-dev-notes.md`)
 ```bash
