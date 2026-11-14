@@ -634,3 +634,7 @@ QA lô 2–3: mở file xlsx thật do Chủ, Quản lý, NV kho tải trên sta
 | 1b | — | |
 | 2 | — | |
 | 3 | — | |
+
+## Duy trả lời câu hỏi 🔴 (14/11)
+- **Q-TL-1:** "là 0,5 mọi chỗ luôn, không cần hard". Đổi mặc định `SHOP_MIN_QTY_KG` = 0,5 trong code, **không** đặt env khoá 1 kg trên production. Lần deploy production kế tiếp sẽ bật 0,5 kg; điều phối viên gom S1 + S2 (nội dung) + GUI-08 (chữ Shop) lên cùng đợt khi có thể.
+- **Q-TL-2:** A. Kiểm luật chữ công khai BR-DM-25 cho **Tên món** ở cả form ERP và file nhập, chỉ khi tên mới hoặc đổi tên. Lô 3 làm theo A.

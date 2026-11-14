@@ -282,3 +282,5 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 - **"Thêm đồ đông lạnh" là hiểu lầm**: hàng trên web đã là hải sản cấp đông, gốc vấn đề là Shop thiếu nhóm hàng (danh mục) nên khó phân biệt. Không thêm loại hàng hay đơn vị bán mới.
 - **File Excel "hàng bán" là danh sách mặt hàng** (mã, tên, nhóm, giá bán, trạng thái, chữ mô tả), không bao giờ có giá vốn. Nhập file: mã có thì sửa, mã mới thì tạo, món không có trong file giữ nguyên; file có dòng lỗi thì không ghi dòng nào và báo lỗi theo số dòng.
 - **Ảnh minh hoạ món lấy từ mạng** (Duy 14/11): chỉ ảnh có giấy phép dùng thương mại miễn phí, ghi nguồn và tác giả, đúng loài; Gemini tìm, đội Claude tải lên ERP sau khi Duy xem.
+- **Mức 0,5 kg áp mọi nơi** (Duy 14/11, trả lời Q-TL-1 FISH-66): đổi mặc định trong code, không khoá 1 kg trên production.
+- **Tên món phải theo luật chữ công khai BR-DM-25** (không giá, SĐT, nhà cung cấp…), kiểm ở form ERP và file nhập khi tạo mới hoặc đổi tên (Duy 14/11, Q-TL-2).
