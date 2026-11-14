@@ -370,3 +370,21 @@ PASS  general_rules: 170 đạt, 0 lỗi, 0 bỏ qua
 PASS  full_flow: 115 đạt, 0 lỗi, 0 bỏ qua
 PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
 ```
+
+---
+
+## GUI-12 — Chọn 0,5 kg mà giỏ thành 1 kg (BR-BH-22) · FE do `fe-dev` (Claude)
+
+- Nguyên nhân còn lại sau GUI-08: effect "Số lượng lẻ từ Shop cũ" trong `CartScreen.tsx` ghi số đã làm tròn vào giỏ đã lưu cả khi chưa có catalog thật (đang tải, lỗi mạng), tức là theo luật dự phòng. Trên nhánh này luật dự phòng của `reconcileCart` đã là 0,5 kg (GUI-08) nên ca "catalog chậm" không còn tự đỏ; ca đỏ thật là catalog lỗi mạng với giỏ cũ 0,3 kg: giỏ bị ghi thành 0,5.
+- Sửa: hàm thuần `qtyFixesToPersist(result, catalogReady)` ở `features/cart/reconcile.ts`; effect chỉ ghi khi `loadState === "ready"`. `CheckoutScreen.tsx` bỏ hai chỗ `?? 1`, dùng `parseQtyRule(undefined, undefined, unit).minQty`.
+- TDD: `scripts/test-cart-reconcile.mjs` thêm 5 ca (đỏ trước: `TypeError: mod.qtyFixesToPersist is not a function`; xanh sau: 29/29). E2E `shop_full_flow.py::quantity_kept_while_catalog_loads` (360 + 1280): catalog chậm 3 giây, giữ 0,5 kg ở giỏ, tạm tính 82.500đ, đặt hàng, tải lại; catalog lỗi mạng không đổi 0,3; giỏ cũ 0,3 + catalog min 0,5 vẫn lên 0,5 và báo. Đỏ trước: `FAIL [360] ... catalog lỗi mạng ... <{'CA-THU': 0.5}>`.
+- Ảnh: `shots/gui-12/gui12-do-truoc-sua-360.png` (đỏ: giỏ hiện 0,5 dù đã lưu 0,3) và `gui12-sau-khi-sua-360.png` (xanh).
+
+## GUI-13 — Nhãn thời gian giao ở giỏ
+
+- Hằng số duy nhất `frontend/features/cart/deliveryEta.ts` (`DELIVERY_ETA`, `DELIVERY_ETA_TEXT`). Nhãn đặt ngay dưới dòng "Mua tối thiểu … kg mỗi món" trong `CartScreen.tsx`, icon `truck` có sẵn + chữ thật, token `--ink-3`/`--accent`. Giỏ trống không hiện. Không đổi API, không đo khoảng cách.
+- E2E `delivery_eta_label` (360 + 1280): giỏ trống không có nhãn; có hàng thì đúng câu, hiển thị, không cuộn ngang. Ảnh: `shots/gui-13/gui13-delivery-eta-{360,1280}.png`.
+
+### Ghi chú môi trường e2e
+- Các ca e2e mới nằm trong `shop_full_flow.py` (runner `run_shop_e2e.py` không nằm trong danh sách file được sửa nên không thêm suite mới).
+- Runner đôi khi chập chờn (`ERR_CONNECTION_RESET`/hết giờ chờ) vì server tĩnh bind `127.0.0.1` còn trình duyệt gọi `localhost`; chạy lại thì qua. Worktree cần symlink `backend/.venv` và `npm ci` ở `erp-console/` (không commit).
