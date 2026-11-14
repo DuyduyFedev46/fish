@@ -32,11 +32,25 @@ GUIDE_LINES = (
     "File chỉ có thông tin mặt hàng và giá bán, không có thông tin mua hàng hay tồn kho.",
 )
 
+GUIDE_LINES_NO_PRICE = (
+    "Cách đọc file này",
+    "Mỗi dòng là một mặt hàng. Đừng đổi tên các cột ở dòng đầu tiên.",
+    "Cột tô xám (Loại, Đơn vị) chỉ để xem. Sửa các cột này không đổi gì trong hệ thống.",
+    "Ô chữ để trống nghĩa là giữ nguyên chữ hiện có. File này không xoá được chữ đã nhập.",
+    "Cột Đang kinh doanh, Quản lý theo lô, Có hạn dùng ghi Có hoặc Không.",
+    "File chỉ có thông tin mặt hàng, không có thông tin mua hàng hay tồn kho.",
+)
+
+
+def clean_excel_text(value):
+    """Chuẩn hoá chữ trước khi ghi vào ô hoặc trước khi so khớp DB khi nhập lại (02b §13.2)."""
+    text = "" if value is None else str(value)
+    return ILLEGAL_CHARACTERS_RE.sub("", text)[:MAX_CELL_CHARS]
+
 
 def write_text_cell(cell, value):
     """Ghi chữ vào ô, luôn là ô chữ, chặn công thức độc."""
-    text = "" if value is None else str(value)
-    text = ILLEGAL_CHARACTERS_RE.sub("", text)[:MAX_CELL_CHARS]
+    text = clean_excel_text(value)
     if text == "":
         cell.value = None
         return
@@ -94,8 +108,10 @@ def build_items_workbook(columns, rows):
         if column.kind == FLAG:
             flag_validation.add(f"{letter}2:{letter}{max(last_row, 1001)}")
 
+    with_prices = any(c.needs_price_perm for c in columns)
+    guide_lines = GUIDE_LINES if with_prices else GUIDE_LINES_NO_PRICE
     guide = wb.create_sheet(SHEET_GUIDE)
-    for r, line in enumerate(GUIDE_LINES, start=1):
+    for r, line in enumerate(guide_lines, start=1):
         cell = guide.cell(row=r, column=1)
         write_text_cell(cell, line)
         if r == 1:

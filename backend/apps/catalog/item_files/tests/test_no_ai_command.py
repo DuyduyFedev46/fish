@@ -19,7 +19,13 @@ class NoAiCommandForItemFilesTests(TestCase):
     def test_item_file_views_are_plain_apiviews_without_json_parser(self):
         from apps.catalog.item_files import api
 
-        for name in ("ItemExportView", "ItemExportTemplateView"):
+        for name in (
+            "ItemExportView",
+            "ItemExportTemplateView",
+            "ItemImportLimitsView",
+            "ItemImportPreviewView",
+            "ItemImportCommitView",
+        ):
             view = getattr(api, name)
             self.assertTrue(issubclass(view, APIView))
             self.assertFalse(any(issubclass(p, JSONParser) for p in view.parser_classes), name)

@@ -50,11 +50,21 @@ describe("apiDownload chế độ thật", () => {
 
   it("thiếu header: dùng tên dự phòng, số món null", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK", "0");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("bytes", { status: 200 })));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("bytes", { status: 200, headers: { "Content-Type": XLSX } })));
     const { apiDownload } = await import("@/shared/lib/http");
     const file = await apiDownload("/x/", { fallbackName: "hang-ban.xlsx" });
     expect(file.filename).toBe("hang-ban.xlsx");
     expect(file.rowCount).toBeNull();
+  });
+
+  it("L3: 200 nhưng Content-Type là text/html (proxy lỗi) thì ném ApiError, không lưu file hỏng", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK", "0");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("<html>proxy error</html>", { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } })),
+    );
+    const { apiDownload, ApiError } = await import("@/shared/lib/http");
+    await expect(apiDownload("/x/")).rejects.toBeInstanceOf(ApiError);
   });
 
   it("500: ném ApiError, không trả blob (S3-AC9)", async () => {

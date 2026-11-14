@@ -6,9 +6,11 @@ chi phí phụ, lãi lỗ, mã lô, nhà cung cấp, tồn, ảnh). Thứ tự k
 """
 from dataclasses import dataclass
 
-# Quyền xem file: model perm `catalog.view_item`; ba cột giá chỉ khi có quyền xem giá bán.
+from apps.catalog.items.serializers import VIEW_ITEM_PRICE_PERM
+
+# Quyền xem file: model perm `catalog.view_item`; ba cột giá chỉ khi có quyền xem giá bán (L2: dùng chung 1 nguồn).
 VIEW_ITEMS_PERM = "catalog.view_item"
-VIEW_PRICES_PERM = "catalog.view_itemprice"
+VIEW_PRICES_PERM = VIEW_ITEM_PRICE_PERM
 
 # Quyền nhập (D4, dùng ở lô 3): đủ cả 4. Khai ở đây để FE và BE dùng cùng một nguồn.
 IMPORT_PERMS = (
@@ -60,3 +62,18 @@ ALL_COLUMNS = (
 def columns_for(*, with_prices):
     """Bộ cột theo quyền: 17 cột khi có quyền xem giá bán, 14 cột khi không (BR-DM-28)."""
     return tuple(c for c in ALL_COLUMNS if with_prices or not c.needs_price_perm)
+
+
+COLUMNS_BY_HEADER = {c.header: c for c in ALL_COLUMNS}
+COLUMNS_BY_KEY = {c.key: c for c in ALL_COLUMNS}
+REQUIRED_HEADERS = ("Mã hàng", "Tên", "Nhóm hàng", "Đang kinh doanh")
+PUBLIC_TEXT_KEYS = ("short_note", "spec", "storage", "origin", "description")
+EDITABLE_ITEM_KEYS = (
+    "name",
+    "item_group",
+    "is_active",
+    "shelf_life_in_days",
+    "has_batch_no",
+    "has_expiry_date",
+    *PUBLIC_TEXT_KEYS,
+)

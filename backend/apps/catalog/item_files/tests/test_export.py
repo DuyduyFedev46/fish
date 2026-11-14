@@ -60,6 +60,11 @@ class ExportContentTests(ItemFilesBase):
             self.assertEqual(len(row), 14)
             self.assertNotIn(int(SELL_PRICE), row)
             self.assertNotIn("278000", [str(c) for c in row])
+        guide_text = " ".join(
+            str(c) for r in open_xlsx(resp)["Hướng dẫn"].iter_rows(values_only=True) for c in r if c
+        )
+        self.assertNotIn("Giá bán hiện hành", guide_text)
+        self.assertNotIn("Giá mới", guide_text)
 
     def test_s3_ac5_no_cost_in_any_cell_for_any_role(self):
         allowed = {"owner": HEADERS_FULL, "manager": HEADERS_FULL, "warehouse_staff": HEADERS_NO_PRICE}
@@ -182,6 +187,8 @@ class ExportPermissionTests(ItemFilesBase):
 
     def test_s3_ac4_only_get_is_allowed(self):
         self.assertEqual(self.client_as(self.owner).post(EXPORT_URL, {}).status_code, 405)
+        self.assertEqual(self.client_as(self.owner).head(EXPORT_URL).status_code, 405)
+        self.assertFalse(AuditLog.objects.filter(action="export_items").exists())
 
 
 class ExportFormulaInjectionTests(ItemFilesBase):

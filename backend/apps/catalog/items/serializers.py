@@ -18,10 +18,13 @@ from .public_text import PUBLIC_TEXT_LIMITS, public_text_error
 VIEW_ITEM_PRICE_PERM = "catalog.view_itemprice"
 
 
+def user_can_view_item_price(user) -> bool:
+    return bool(user and user.has_perm(VIEW_ITEM_PRICE_PERM))
+
+
 def can_view_item_price(request) -> bool:
     """Không có request (gọi nội bộ) thì mặc định ẩn."""
-    user = getattr(request, "user", None)
-    return bool(user and user.has_perm(VIEW_ITEM_PRICE_PERM))
+    return user_can_view_item_price(getattr(request, "user", None))
 
 
 SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -115,6 +118,14 @@ class ItemSerializer(serializers.ModelSerializer):
         error = public_text_error(value)
         if error:
             raise serializers.ValidationError(error)
+        return value
+
+    def validate_name(self, value):
+        """FISH-66 Q-TL-2 = A, BR-DM-25: khi tạo mới hoặc đổi tên, không chứa SĐT, giá, mã lô, đầu mối/tàu."""
+        if self.instance is None or value != self.instance.name:
+            error = public_text_error(value)
+            if error:
+                raise serializers.ValidationError(error)
         return value
 
     def validate_short_note(self, value):

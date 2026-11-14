@@ -273,6 +273,10 @@ export async function apiDownload(
     throw new ApiError(MSG.network, 0);
   }
   if (res.status >= 200 && res.status < 300) {
+    const ct = (res.headers.get("Content-Type") || "").toLowerCase();
+    if (ct && !ct.includes("spreadsheetml") && !ct.includes("octet-stream")) {
+      throw new ApiError(MSG.server(res.status), res.status);
+    }
     let blob: Blob;
     try {
       blob = await res.blob();

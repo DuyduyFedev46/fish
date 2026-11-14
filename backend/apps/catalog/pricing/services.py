@@ -143,6 +143,40 @@ def _date_window_difference(old_start, old_end, new_start, new_end):
     return pieces
 
 
+def check_new_price(*, price_list, item, valid_from, valid_upto=None, existing_prices=None):
+    """Kiểm chồng lấn (BR-DM-03) và đơn hàng đã chốt giá (BR-DM-02) trước khi đặt giá mới. Không ghi DB.
+    Trả về danh sách dòng `ItemPrice` cần đóng ở `valid_from − 1 ngày`."""
+    rows = (
+        existing_prices
+        if existing_prices is not None
+        else (
+            list(ItemPrice.objects.filter(price_list=price_list, item=item))
+            if item is not None and item.pk is not None
+            else []
+        )
+    )
+    to_close = []
+    for other in rows:
+        if not _overlaps(valid_from, valid_upto, other.valid_from, other.valid_upto):
+            continue
+        if other.valid_from >= valid_from:
+            raise _overlap_error()
+        if valid_upto is not None and (other.valid_upto is None or other.valid_upto > valid_upto):
+            # Đóng giá cũ ở valid_from − 1 sẽ cắt mất đuôi của nó: sau valid_upto mới mặt hàng không còn giá.
+            raise _tail_gap_error()
+        to_close.append(other)
+
+    if (
+        item is not None
+        and item.pk is not None
+        and valid_from < timezone.localdate()
+        and _window_used_by_orders(price_list=price_list, item=item, start=valid_from, end=valid_upto)
+    ):
+        # Đặt giá lùi ngày sẽ đổi giá hiệu lực của những ngày đã có đơn chốt giá (BR-DM-02).
+        raise _price_used_error()
+    return to_close
+
+
 @transaction.atomic
 def set_item_price(*, price_list, item, rate, valid_from, valid_upto=None, actor):
     """Đặt giá mới cho mặt hàng trong một bảng giá (ED-31-AC1, BR-DM-02/03).
@@ -154,22 +188,9 @@ def set_item_price(*, price_list, item, rate, valid_from, valid_upto=None, actor
     """
     _lock_price_lists([price_list.pk])
     existing = _lock_item_prices(price_list=price_list, item=item)
-    to_close = []
-    for other in existing:
-        if not _overlaps(valid_from, valid_upto, other.valid_from, other.valid_upto):
-            continue
-        if other.valid_from >= valid_from:
-            raise _overlap_error()
-        if valid_upto is not None and (other.valid_upto is None or other.valid_upto > valid_upto):
-            # Đóng giá cũ ở valid_from − 1 sẽ cắt mất đuôi của nó: sau valid_upto mới mặt hàng không còn giá.
-            raise _tail_gap_error()
-        to_close.append(other)
-
-    if valid_from < timezone.localdate() and _window_used_by_orders(
-        price_list=price_list, item=item, start=valid_from, end=valid_upto
-    ):
-        # Đặt giá lùi ngày sẽ đổi giá hiệu lực của những ngày đã có đơn chốt giá (BR-DM-02).
-        raise _price_used_error()
+    to_close = check_new_price(
+        price_list=price_list, item=item, valid_from=valid_from, valid_upto=valid_upto, existing_prices=existing
+    )
 
     new_price = ItemPrice.objects.create(
         price_list=price_list, item=item, rate=rate, valid_from=valid_from, valid_upto=valid_upto

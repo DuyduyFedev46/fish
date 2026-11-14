@@ -155,3 +155,135 @@ Trùng L4 của techlead. Chưa tái hiện riêng; giữ ghi nhận.
 - Playwright (Python): đăng nhập 6 vai, tải danh sách/mẫu, lọc, bấm đúp, dừng máy chủ, mất quyền, 360 px; openpyxl `python -I` đọc từng file.
 - curl: token từng vai (có giới hạn tần suất đăng nhập, phải chờ giữa các lần), CORS, preflight, bộ lọc, HEAD, POST.
 - Đã dọn: tắt máy chủ `:8010`/`:3010` của QA, xoá `backend/db.sqlite3`. Không sửa code sản phẩm, không commit.
+
+
+---
+
+# Tự QA — Hàng bán Excel (FISH-66) · Lô 3 (S5 xem trước thay đổi, S6 xác nhận nhập) · 14/11/2026
+
+## Kết luận: ĐẠT — S5 và S6 chạy thật trên máy chủ Django + bản build tĩnh ERP Console, kiểm trên trình duyệt bằng Playwright ở 1280 px và 360 px.
+
+Môi trường tự QA:
+- Django local `:8012` (SQLite tạm qua `DATABASE_URL`, `DJANGO_DEBUG=1`, `CORS_ALLOWED_ORIGINS=http://localhost:3012`).
+- ERP Console build tĩnh với `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8012`, phục vụ ở `:3012`.
+- Ảnh chụp lưu tại `doc/features/2026-11-14-hang-ban-excel-dong-lanh/shots/lo3/` (thư mục `shots/` nằm trong `.gitignore`).
+
+## Kết quả kiểm trên trình duyệt (Playwright)
+
+| Màn / Tiêu chí | Cách kiểm | Kết quả | Ảnh chụp (1280 px & 360 px) |
+|---|---|---|---|
+| Phân quyền Quản lý (`quan_ly`) | Đăng nhập `quan_ly`, mở `/catalog/?tab=items` và `/catalog/import/` | Thấy nút `Tải file Excel`, **không** thấy nút `Nhập từ Excel`; vào thẳng `/catalog/import/` hiện màn chặn quyền `NoPermission`; API trả `403`. | `shots/lo3/lo3-quan-ly-m1-1280.png`, `shots/lo3/lo3-quan-ly-forbidden-1280.png` |
+| M1 — Thanh nút tab Mặt hàng (`chu_vua`) | Đăng nhập `chu_vua`, mở `/catalog/?tab=items` ở 1280 px và 360 px | Hiện đủ `[Tải file Excel] [Nhập từ Excel] [⋯] [+ Thêm combo] [+ Thêm mặt hàng]`. | `shots/lo3/lo3-m1-1280.png`, `shots/lo3/lo3-m1-360.png` |
+| M2 — Trang chọn file (`/catalog/import/`) | Bấm `Nhập từ Excel` từ M1 | Hiện vùng chọn/kéo thả file `.xlsx`, 2 nút tải danh sách hiện có & tải file mẫu, khối `Cách hệ thống đọc file` hiển thị đúng giới hạn `1.000 dòng, 2 MB` từ `GET /api/catalog/items/import/limits/`. | `shots/lo3/lo3-m2-1280.png`, `shots/lo3/lo3-m2-360.png` |
+| M4 — Bảng lỗi theo dòng (`IMPORT_INVALID_ROWS`) | Chọn file `error_import.xlsx` có giá âm `-50000`, SĐT `0901234567` trong Ghi chú ngắn, món mới thiếu Tên và Nhóm lạ | Hiện hộp báo đỏ `File có 5 lỗi ở 2 dòng. Chưa ghi gì.` kèm bảng lỗi sắp theo số dòng tăng dần (`Dòng`, `Mã hàng`, `Cột`, `Cách sửa`); không có nút `Xác nhận nhập`. | `shots/lo3/lo3-m4-errors-1280.png`, `shots/lo3/lo3-m4-errors-360.png` |
+| M3 — Xem trước thay đổi (`preview`) | Chọn file `valid_import.xlsx` (đổi giá `CA-01` từ `250.000 đ` → `25.000 đ`, bật kinh doanh `CA-02`, thêm món mới `CA-03` giá `320.000 đ`, sửa cột chỉ đọc `Loại`) | Hiện đúng thứ tự: Dải số tổng (`Đổi giá: 2`, `Món mới: 1`, `Món sửa: 1`, `Đổi ẩn/hiện: 1`, `Sẽ hiện trên Shop: 2`, `Giữ xem trước đến`) → Cảnh báo vàng W1 cho cột chỉ đọc `Loại` → Phần 1 `Đổi giá (2)` (mặc định sắp theo \|Chênh %\| giảm dần, dòng `CA-01` có vạch đỏ trái + chip `Kiểm lại số 0` & `Chênh lớn`) → Phần 2 `Ẩn/hiện trên Shop (1)` → Phần 3 `Món mới (1)` → Phần 4 `Món sửa (1)`. | `shots/lo3/lo3-m3-preview-1280.png`, `shots/lo3/lo3-m3-preview-360.png` |
+| M5 — Hộp Xác nhận nhập (`ImportConfirmModal`) | Bấm `Xác nhận nhập` ở thanh đáy M3 | Mở hộp thoại xác nhận, liệt kê dòng giá cần kiểm (`CA-01`), nút `Xác nhận nhập 2 giá mới` bị khoá cho tới khi đánh dấu ô `Tôi đã kiểm 1 giá cần xem`. | `shots/lo3/lo3-m5-confirm-1280.png`, `shots/lo3/lo3-m5-confirm-360.png` |
+| M6 — Ghi thành công & điều hướng | Đánh dấu ô xác nhận rồi bấm `Xác nhận nhập 2 giá mới` | Ghi thành công (`POST /api/catalog/items/import/commit/` → 200), điều hướng về `/catalog/?tab=items`, hiện toast `Đã nhập: 1 món mới, 1 món sửa, 2 giá mới.`, danh sách mặt hàng có thêm `CA-03`. Không có lỗi `pageerror`. | `shots/lo3/lo3-m6-done-1280.png`, `shots/lo3/lo3-m6-done-360.png` |
+
+
+---
+
+# QA — Hàng bán Excel (FISH-66) · Lô 3 (S5 xem trước, S6 xác nhận nhập) · lần 1 · 14/11/2026
+
+## Kết luận: APPROVED — không lỗi chặn; S5/S6 chạy thật trên API (file .xlsx tự tạo) và ERP (Playwright); còn 3 mục ⏸ không kiểm được ở máy (đua Postgres, thời gian trên staging, công thức có giá trị lưu sẵn) nhưng đã có test tự động hoặc bằng chứng gần nhất.
+## Tổng: 58 ca · ✅ 55 · ❌ 0 · ⏸ 3
+
+Nhánh `int/fish66-lo3` HEAD `18f2d78`. Dữ liệu giả hoàn toàn (SQLite tạm, tên món giả, không dữ liệu khách).
+
+## Số kiểm chứng
+| Lệnh | Kết quả |
+|---|---|
+| `manage.py test --parallel 1` (toàn backend) | `Ran 4062 tests in 254.8s` · `OK (skipped=18)` |
+| `manage.py test apps.catalog.item_files -v 2` | `Ran 82 tests` · `OK (skipped=1)`; ca bị bỏ: `test_concurrent_commits_of_same_preview_only_apply_once` ("Cần PostgreSQL") |
+| `npm ci` (erp-console, không `--legacy-peer-deps`) | exit 0 |
+| `tsc --noEmit` | exit 0 |
+| `npx vitest run` | `116 files · 1386 tests passed` |
+| `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build` | exit 0 (chỉ thử build). Bản dùng cho E2E build lại với cổng `:8047` |
+| `makemigrations --check --dry-run` | `No changes detected` |
+| `python3 scripts/check_naming.py` | OK, không vi phạm mới |
+
+Cách kiểm: Django `:8047` (SQLite tạm, `DJANGO_DEBUG=1`), 7 user giả (owner, owner2, manager, warehouse, delivery, customer_service, không nhóm), file `.xlsx` tạo bằng openpyxl, gọi API bằng token từng vai; ERP build tĩnh phục vụ `:3047`, Playwright Chromium 1280 px + 360 px. Ảnh chụp lưu ở `doc/features/2026-11-14-hang-ban-excel-dong-lanh/qa-lo3/` (12 ảnh; `*.png` nằm trong `.gitignore` nên không commit).
+
+## Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| S5-AC1 | ✅ | File sửa giá 3 món + đổi tên + món mới: summary đúng (created 4, updated 1, price_changed 6…), `changes` có trường cũ → mới, `price` có cũ/mới/ngày áp dụng. Đếm `catalog_item`/`catalog_itemprice`/`accounts_auditlog`/`inventory_*` trước và sau preview bằng nhau. Ảnh `e2e-06-preview-1280.png` |
+| S5-AC2 | ✅ | Dòng mới đang kinh doanh + có giá hôm nay = `will_show`, `will_show_on_shop` = 1; ERP hiện "Sẽ hiện trên Shop 2" |
+| S5-AC3 | ✅ | `GHE-XANH` Có → Không: `shop_state=will_hide`, `will_hide_from_shop=1` |
+| S5-AC4 | ✅ | File vừa tải ra: `has_changes=false`, `preview_token=null`; ERP "File không có gì mới", 0 nút Xác nhận (`e2e-05-no-change-1280.png`) |
+| S5-AC5 | ✅ | File chỉ có 1 món: 5 món còn lại không bị ẩn/đổi (chạy API); preview file đầy đủ không liệt kê món vắng |
+| S5-AC6 | ✅ | File 14 dòng lỗi: 15 lỗi ở 12 dòng, đủ (giá âm, nhóm lạ, mã lặp cả 2 dòng, combo, mã trống, cờ trống…), mỗi lỗi có dòng, cột, câu tiếng Việt; DB không đổi. ERP bảng lỗi + không có nút xác nhận (`e2e-04-row-errors-1280.png`). Ghi chú: luật chữ BR-DM-25 dựa trên mẫu câu ("nhà cung cấp", "tên tàu", "ngày nhập", giá, SĐT, mã lô), giống form ERP, nên **tên riêng** nhà cung cấp tự gõ (vd "Vựa Ba Hòn") không bị bắt; ca này là hành vi của luật chung, không phải lỗi lô 3 |
+| S5-AC7 | ✅ | Ngày áp dụng lùi ≤ ngày giá đã có đơn: lỗi "Giá này đã áp vào đơn hàng, không sửa được…" (6 ca, CA-THU -1/-2/-3, MUC-ONG, TOM-SU-1, GHE-XANH); ngày chồng giá tương lai: lỗi "Khoảng hiệu lực chồng lấn… (BR-DM-03)" |
+| S5-AC8 | ✅ | `Loại` = Combo, mã mới: "Tạo combo mới làm ở form combo ERP." |
+| S5-AC9 | ✅ | `.csv`, `.xls`, text đổi đuôi `.xlsx`, `.xlsm`, xlsx có `macroEnabled` + `vbaProject.bin` → `not_xlsx`; rỗng → `unreadable`; > 2 MB → `too_large`; 1.001 dòng → `too_many_rows`; ô `A1048576` → `too_many_rows` trong 0,0 s; zip bomb (300 MB giải nén) → `unreadable` trong 0,0 s. ERP csv: "Chỉ nhận file .xlsx…" (`e2e-03-bad-file-1280.png`) |
+| S5-AC10 | ✅ | Thiếu `Mã hàng` → `missing_columns`; `Gia moi` → `unknown_columns`; lặp `Tên` → `duplicate_columns`; không dòng dữ liệu → `empty` |
+| S5-AC11 | ✅ | `"278.000"` + ngày chữ `20/11/2026` + cờ `KHÔNG` đọc đúng (giá 278000, từ 2026-11-20, is_active Có → Không); `277000.5` và `abc` và `278.000,5` → "Giá phải là số nguyên đồng lớn hơn 0." |
+| S5-AC12 | ⏸ phần | Công thức `=1+1` không có giá trị lưu sẵn → "Ô có công thức, hãy dán giá trị." (chạy thật). Phần "có giá trị lưu sẵn" cần Excel thật để tạo; chỉ có test tự động `test_reader.py` (82 ca xanh). Macro không làm máy chủ gọi mạng: file macro bị chặn trước khi đọc |
+| S5-AC13 | ✅ | Bảng quyền dưới: 401/403 đủ; Quản lý được uỷ `add_itemprice` + `change_itemprice` → 403 "Thiếu quyền: catalog.add_item"; ERP Quản lý/NV kho/Gọi xác nhận không thấy nút "Nhập từ Excel", vào thẳng `/catalog/import/` ra màn "Bạn không có quyền" (`e2e-manager-import-blocked-1280.png`) |
+| S5-AC14 | ✅ | Quét JSON preview/lỗi/commit: không có `purchase_rate`, `landed_unit_cost`, `unit_cost`, `cost`, `profit`, hay 6 giá trị giá vốn của lô seed |
+| S5-AC15 | ✅ | Preview không ghi AuditLog (`export_items`/`import_items` không tăng sau preview); `server.log` không chứa tên file hay chữ trong ô (0 dòng khớp); test `test_s5_ac15_preview_and_commit_do_not_log_file_content` xanh |
+| S5-AC16 | ⏸ phần | Máy local: 1.000 dòng hợp lệ → 200 trong 0,3 s, 269 KB, DB không đổi. Mốc "≤ 10 giây trên staging" chưa đo (chưa deploy); số truy vấn do `assertNumQueries` trong test |
+| S5-AC17 | ✅ | `CA-HOI-NU` có Mô tả "Cá hồi tươi ngon" và Bảo quản; file để trống hai ô: "không có gì mới"; file đổi tên + trống chữ: ghi xong Mô tả/Bảo quản vẫn nguyên |
+| S6-AC1 | ✅ | Ghi đúng: 4 món mới, 1 sửa, 6 giá; giá cũ tự đóng `valid_upto` = ngày trước ngày áp dụng (`CA-THU 165000 → 2026-11-13`, mới từ 11-14). ERP toast "Đã nhập: 1 món mới, 2 món sửa, 1 giá mới." + tải lại danh sách (`e2e-09-done-1280.png`) |
+| S6-AC2 | ✅ | AuditLog: `create_item`/`update_item` chỉ ghi **tên trường** (`{"fields": ["name"]}`), `create_itemprice`/`close_itemprice` như đặt giá tay, 1 dòng `import_items` có `import_ref`, rows, created, updated, price_changed, visibility_changed. Không có tên món, mô tả, tên file, tên/SĐT/địa chỉ khách, không khoá nào tính ngược ra giá vốn (chỉ giá bán và số đếm) |
+| S6-AC3 | ✅ | Hash + đếm toàn bộ bảng `inventory_*`, `purchasing_*`, `sales_*`, `delivery_*` trước/sau commit: không đổi (7 lô, 10 dòng sổ kho, 6 đơn giữ nguyên) |
+| S6-AC4 | ✅ | ERP bấm Huỷ/Chọn file khác: không có request commit (đếm request mạng ở E2E); DB không đổi |
+| S6-AC5 | ✅ | `test_s6_ac5_error_mid_commit_rolls_back_all_items_prices_and_audit_logs` xanh (ghi nửa chừng không để lại gì) |
+| S6-AC6 | ✅ | Sửa tay tên món giữa preview và commit → 409 `IMPORT_DATA_CHANGED`, DB không đổi (API). ERP: banner "Mặt hàng vừa được sửa sau lúc bạn xem trước. Chưa ghi gì…" + nút **Xem trước lại**, bấm thì xem trước lại bằng file đang giữ, rồi xác nhận được (`e2e-08-data-changed-1280.png`, `e2e-08b-repreview-1280.png`) |
+| S6-AC7 | ✅ | Commit lần 2 cùng phiếu → 409 `IMPORT_ALREADY_APPLIED` kèm `created/updated/price_changed/visibility_changed` của lần đầu; `catalog_item`/`catalog_itemprice` không đổi, thêm đúng 0 `import_items`. ERP bấm đúp "Xác nhận nhập": chỉ 1 request commit |
+| S6-AC8 | ⏸ | Ca Postgres `test_concurrent_commits_of_same_preview_only_apply_once` bị bỏ ở máy (cần PostgreSQL; theo decisions 10/10 chạy ở cloud). Bằng chứng thay thế: 2 luồng commit cùng phiếu trên SQLite → đúng 1 lần ghi (item +4, price +6), luồng kia nhận lỗi khoá SQLite (500 do SQLite khoá cả DB, không phải hành vi Postgres). Chưa tính là đạt, đề nghị chạy ca đó ở cloud trước deploy |
+| S6-AC9 | ✅ | Quản lý, NV kho, NV giao, Gọi xác nhận, không nhóm: commit 403 kèm phiếu + file hợp lệ của Chủ; chưa đăng nhập 401; DB không đổi |
+| S6-AC10 | ✅ | Chủ thứ hai preview rồi bị gỡ khỏi nhóm owner → commit 403, DB không đổi |
+| S6-AC11 | ✅ | Gọi `/api/shop/catalog/`: món mới có giá hôm nay (`NEW-01`) hiện; món giá bắt đầu 17/11 (`NEW-02`), món không giá (`NEW-03`), món ẩn (`NEW-04`) và `GHE-XANH` sau khi bị ẩn đều không hiện; không có khoá giá vốn |
+| S6-AC12 | ✅ | Phản hồi commit chỉ có số đếm + mã món; quét không có giá vốn, SĐT, tên khách |
+| S6-AC13 | ✅ | Tải file lại sau khi ghi rồi chọn để nhập: `has_changes=false` |
+
+## Ngoại lệ & biên (ngoài đường thuận)
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Token hết hạn → 410 | ✅ | Server phụ `ITEM_IMPORT_PREVIEW_TTL_MINUTES=1`: preview 22:40:55, commit sau 75 s → 410 `IMPORT_PREVIEW_EXPIRED`; giá không đổi (vẫn 390000) |
+| Token dùng chéo người (Chủ 2) | ✅ | 400 `IMPORT_PREVIEW_INVALID` |
+| File khác 1 byte / token bị sửa / rỗng / thiếu | ✅ | cả 4 → 400 `IMPORT_PREVIEW_INVALID`, DB không đổi |
+| Hai commit đồng thời | ⏸ | xem S6-AC8 |
+| Có dòng lỗi thì không ghi dòng nào | ✅ | file lỗi: DB đếm bằng nhau; ERP không có nút Xác nhận |
+| Giá đổi mạnh có cảnh báo | ✅ | 420000 → 42000: `check_zeros` + `large_change`; ERP chip "Kiểm lại số 0", "Chênh lớn"; modal M5 yêu cầu đánh dấu "đã kiểm" mới bật nút |
+| Tên món vi phạm luật chữ công khai | ✅ | Tên có "150k" / "nhà cung cấp"; Mô tả có SĐT / mã lô; Quy cách có số tàu; Ghi chú có "giá vốn": đều lỗi dòng đúng cột; câu hợp lệ qua |
+| `valid_from` tương lai đếm "sẽ hiện trên Shop" | ✅ | `NEW-02` giá từ 17/11 → `hidden`, không tính vào `will_show_on_shop` (chỉ `NEW-01` tính) |
+| Món có giá bắt đầu hôm nay, đổi giá lần 2 trong ngày | ghi nhận | Chồng khoảng hiệu lực BR-DM-03 → lỗi dòng rõ ràng; giống luật đặt giá tay, không phải lỗi |
+| Chưa đăng nhập, không nhóm | ✅ | 401 / 403 |
+| File 1.000 dòng | ✅ | 0,3 s |
+| Mạng/CORS | ✅ | ERP gọi `:8047` từ `:3047` chạy bình thường, header `X-Row-Count`/`Content-Disposition` hiện |
+
+## Phân quyền (API thật, token từng vai)
+| Hành động | owner | manager | warehouse_staff | delivery_staff | customer_service | không nhóm | chưa đăng nhập |
+|---|---|---|---|---|---|---|---|
+| `GET import/limits/` | 200 | 403 | 403 | 403 | 403 | 403 | 401 |
+| `POST import/preview/` | 200 | 403 | 403 | 403 | 403 | 403 | 401 |
+| `POST import/commit/` | 200 | 403 | 403 | 403 | 403 | 403 | 401 |
+| Nút "Nhập từ Excel" ở ERP | hiện | ẩn | ẩn | (không xem Danh mục) | ẩn | — | — |
+Quản lý + `add_itemprice` + `change_itemprice` (mô phỏng uỷ "Sửa giá bán") → 403 "Thiếu quyền: catalog.add_item". Chỉ khi Quản lý có đủ cả 4 quyền nhập (không xảy ra qua việc uỷ hiện có) mới vào được; đúng thiết kế D4 và test `test_permissions.py`. Mọi 403/401 ở các lần thử đều không đổi DB, có `Cache-Control: no-store`.
+
+## Rò giá vốn
+Quét đệ quy mọi response preview, lỗi, commit, và file tải về (Chủ, Quản lý 17 cột, NV kho 14 cột không cột giá; NV giao, Gọi xác nhận 403): không có `purchase_rate`, `landed_unit_cost`, `unit_cost`, `cost`, `profit`, và không ô nào bằng 6 giá vốn lô seed (285000, 168000, 342000, 124000, 218000, 196000). Phản hồi Shop catalog cũng sạch. ✅
+
+## Rò dữ liệu cá nhân
+Phản hồi, AuditLog, file xlsx và `server.log` không có tên/SĐT/địa chỉ khách (dữ liệu test chỉ là mặt hàng giả). AuditLog chỉ tên trường + số đếm + mã nhập. `localStorage`/`sessionStorage` chỉ có `cave_erp_token`, `cave_erp_last_user`, `cave_erp_signed_in_at`; không có `preview_token`, không có dữ liệu file; URL luôn `/catalog/import/` không query. Console chỉ có 1 lỗi đỏ là 409 chủ ý của ca "dữ liệu đổi giữa chừng". ✅
+
+## Hồi quy
+- Xuất Excel lô 2 vẫn theo vai: Chủ/Quản lý 17 cột (có `Giá bán hiện hành`, `Giá mới`), NV kho 14 cột không cột giá, NV giao/Gọi xác nhận 403. ✅
+- Toàn bộ backend 4.062 test xanh, ERP 1.386 test vitest xanh, `tsc` và build sạch. ✅
+- Màn `Mặt hàng` ở ERP vẫn đủ nút "Tải file Excel", "⋯", "Thêm combo", "Thêm mặt hàng" cạnh nút mới (`e2e-01-items-owner-1280.png`). ✅
+
+## Lỗi
+Không có lỗi Critical, High hay Medium.
+
+Ghi nhận (Low, không chặn):
+- **L1** — Test đua Postgres của S6-AC8 chưa chạy được ở máy; cần chạy ở cloud trước khi deploy. Trên SQLite, hai luồng đồng thời cho một lần ghi và một lỗi 500 do khoá SQLite (đặc thù SQLite).
+- **L2** — S5-AC16 mốc 10 giây trên staging chưa đo; local 0,3 s.
+- **L3** — Luật chữ công khai dựa trên mẫu câu nên không bắt tên riêng nhà cung cấp tự gõ; giống form ERP hiện có.
+
+## Lệnh đã chạy (tóm tắt)
+- Backend `manage.py test --parallel 1` (OK), `makemigrations --check`, `check_naming.py`; ERP `npm ci`, `tsc --noEmit`, `vitest run`, `npm run build` (2 bản: `:8000` theo yêu cầu, `:8047` cho E2E).
+- `migrate` + `seed_demo` + tạo 7 user giả (SQLite tạm), `runserver 127.0.0.1:8047` (và `:8048` với TTL 1 phút), `python3 -m http.server 3047` trong `erp-console/out`.
+- Script Python (`urllib` + `openpyxl`) cho ca API; Playwright (Python) cho ERP: 3 vai bị chặn, Chủ chọn file csv / lỗi / không đổi / hợp lệ / dữ liệu đổi giữa chừng / bấm đúp / 360 px.
+- Đã dọn: tắt máy chủ `:8047`, `:8048`, `:3047`, xoá `backend/db.sqlite3`. Máy chủ `:8000` có sẵn không phải của QA, không đụng. Không sửa code sản phẩm.

@@ -633,7 +633,7 @@ QA lô 2–3: mở file xlsx thật do Chủ, Quản lý, NV kho tải trên sta
 | 1 | **REVIEW PASS** (14/11, nhánh `feat/fish66-lo1-gop` đến `f4b7d66`) | Không Critical, High hay Medium. Điều kiện gộp: AC11 phải chạy xanh trên CI Postgres. Còn 4 lỗi Low, xem dưới. |
 | 1b | **REVIEW PASS** (14/11) | Không lỗi. Còn chờ dán kết quả script S2-AC3 trên staging, và Duy duyệt bản production (S2-AC6). |
 | 2 | **REVIEW PASS** (APPROVED, 0 Critical/High/Medium, 5 Low) | §13.2 |
-| 3 | — | |
+| 3 | **REVIEW PASS** (APPROVED sau khi sửa ở `989e199`; lần đầu `a669ddf` REJECTED vì 2 Medium) | §13.3, mục "Soát lại" |
 
 ### 13.1 Lô 1 + 1b: kết quả soát (techlead 14/11)
 
@@ -735,6 +735,81 @@ Techlead tự chạy lại: `manage.py test apps.catalog.item_files apps.catalog
 
 Lưu ý cho lô 3 (không phải lỗi lô 2): `write_text_cell` bỏ ký tự cấm của XML (`ILLEGAL_CHARACTERS_RE`). Món có ký tự điều khiển trong chữ sẽ
 khác DB sau khi tải về, nên vòng "tải về → nhập lại → không có gì mới" (S6-AC13) cần so sau khi bỏ cùng bộ ký tự đó, hoặc chấp nhận đổi.
+
+### 13.3 Review lô 3 (S5, S6) — techlead 14/11
+
+```mermaid
+flowchart TD
+  A["Soát code lô 3 do Gemini viết"] --> B["Giá vốn, quyền, ghi một lần, đọc file an toàn"]
+  B --> C{"Có lỗi phải sửa trước khi gộp?"}
+  C -- "có 2 lỗi vừa" --> D["Trả lại dev sửa 2 lỗi vừa"]
+  D --> E["Techlead soát lại phần sửa"]
+  C -- "không" --> F["Cho QA kiểm và gộp"]
+  E --> F
+```
+
+Nhánh `int/fish66-lo3`, commit `a669ddf`. Diff `origin/main...HEAD`: 39 file.
+Techlead tự chạy lại:
+- `manage.py test apps.catalog --parallel 1` cho kết quả Ran 391, **1 fail, 1 skip**.
+  - Ca fail là `vouchers/tests/test_api.py::test_s3b_01_ac1_create_stores_utc_times_and_audits`. Test này cài cứng ngày 15–31/10/2026, nên từ 01/11 nó luôn ra `expired`. Lô 3 không đụng `vouchers`, nên lỗi này **có sẵn trước lô 3**. Điều phối cần giao sửa riêng.
+  - Ca skip là `test_commit_race` (cần Postgres, chạy trên CI cloud).
+- `makemigrations --check --dry-run` → No changes.
+- `python3 scripts/check_naming.py` → OK, không phát sinh vi phạm mới.
+- `erp-console`: `tsc --noEmit` sạch, `vitest run` 116 file / 1386 test xanh.
+- Có chạy thêm một test dò riêng để tái hiện M1, M2 và L1. Test dò để ở scratchpad, không thêm vào repo.
+
+**Kết luận: REVIEW FAIL (REJECTED).** Không có lỗi Critical hay High. Có 2 lỗi Medium cần sửa trước khi gộp. Cả hai đều nhỏ và khoanh vùng được.
+
+#### Điểm soát
+
+| Điểm soát | Kết quả |
+|---|---|
+| Giá vốn | Đạt. `reader`/`plan`/`services` chỉ đọc `Item`, `ItemGroup`, `ItemPrice`, `PriceList`. Phản hồi được dựng tay, không dùng serializer. Câu lỗi lấy nguyên câu của `check_new_price` (không có số). `create_itemprice` vẫn ghi `sell_rate` như cũ, đó là giá bán, không phải giá vốn. Test quét `find_cost_keys` + `COST_SENTINEL` ở preview, commit và AuditLog |
+| `check_new_price` | Không đổi hành vi. `set_item_price` vẫn khoá bảng giá → khoá dòng giá → kiểm cùng 3 lỗi. Nhánh `item.pk is None` chỉ dùng cho món mới lúc xem trước. Test `pricing` xanh |
+| `items/serializers.py` | `user_can_view_item_price` tách ra, `can_view_item_price` gọi lại hàm này, hành vi giữ nguyên. Thêm `validate_name` theo Q-TL-2 = A: chỉ kiểm khi tạo hoặc đổi tên. PATCH không gửi `name` thì không kiểm. Có test |
+| Phân quyền | Đạt. Ba view kiểm đủ 4 `IMPORT_PERMS` trước khi đọc `request.FILES`. Mỗi request đọc lại quyền. Quản lý có thêm quyền giá vẫn 403, Chủ bị gỡ quyền giữa chừng cũng 403 (`test_permissions.py`) |
+| Phiếu xem trước | Đạt. Phiếu ký bằng `signing` + salt riêng. Server so `u` (phiếu người khác → 400), so `h` (đổi file → 400) và kiểm hạn `t` (410), theo đúng thứ tự §5.3. Phiếu đã ghi rồi → 409 `IMPORT_ALREADY_APPLIED` kèm số đếm. Phiếu không chứa giá hay dữ liệu cá nhân |
+| Ghi một lần, nguyên tử | Đạt. Toàn bộ chạy trong một `atomic`. Các bước: khoá `PriceList` mặc định, tra `import_ref`, khoá `Item` theo `pk` (không `select_related`), dựng lại kế hoạch và so vân tay, rồi mới ghi. Dòng lỗi, `BusinessError` của `set_item_price` hay `IntegrityError` đều thành 409 và rollback hết. Test mock lỗi giữa chừng → không đổi `Item`, `ItemPrice`, `AuditLog` |
+| AuditLog | Đạt. `create_item`/`update_item` chỉ ghi tên trường, `note` là hằng. `import_items` ghi `import_ref` + số đếm. Xem trước không ghi gì (có test) |
+| Đọc file | Phần lớn đạt. Có `defusedxml` (chặn ở runtime nếu tắt), test assert `LXML is False` (L5). Chặn `vbaProject`/`macroEnabled`, tổng giải nén tối đa 25 MB, tối đa 2.000 mục zip, `keep_links=False`. Ô công thức không có giá trị lưu sẵn → lỗi dòng. Không log `str(exc)`. **Lỗi M1 ở dưới** |
+| Dữ liệu cá nhân, log | Đạt. `item_files` không có `logger`/`print`. FE không lưu `File` hay token vào storage hay URL (`localStorage` chỉ có trong mock để chọn tình huống). Test dùng SĐT giả `0900000001` |
+| Low lô 2 + B2 | L1 đạt (HEAD → 405, không ghi `export_items`, có test). L2 đạt (`VIEW_PRICES_PERM = VIEW_ITEM_PRICE_PERM`, `can_see_prices` gọi hàm chung). L3 đạt (`apiDownload` kiểm `Content-Type`). L4 đạt (`blockedReason`). L5 đạt. B2 đạt (`GUIDE_LINES_NO_PRICE`, có test) |
+| Phạm vi file | Đạt. 36 file code đều nằm trong danh sách được phép của `02c-giao-viec-gemini.md`. Không đụng model, migration, `apps/ai`, `settings.py`, `frontend/` |
+| Contract BE ↔ FE | Khớp đường dẫn, mã lỗi, `reason`, 400/409/410. FE coi 409 `IMPORT_ALREADY_APPLIED` là thành công (T5), và nút "Xem trước lại" gửi lại `File` đang giữ. Lệch nhỏ ở L1 và L4 bên dưới |
+
+#### Lỗi
+
+| # | Mức | File:dòng | Mô tả + cách tái hiện | Cách sửa |
+|---|---|---|---|---|
+| **M1** | Medium | `backend/apps/catalog/item_files/reader.py:222-223`, `:240-262` | Dòng trống được bỏ qua và **không bị đếm**. `iter_rows` chạy không giới hạn dòng, cũng không giới hạn cột (02b §6.1 ghi `iter_rows(max_col=…)`). openpyxl ở chế độ `read_only` tự lấp dòng thiếu bằng dòng rỗng. Tái hiện: file 5 KB có 1 dòng thật và một ô ở `A1048576` → `read_import_workbook` mất **11,3 giây**. Mỗi lần xem trước tốn một lần đọc, xác nhận tốn thêm một lần nữa. File Excel thật có ô rác ở xa bên dưới cũng gây chậm như vậy, có thể chạm timeout của Cloud Run. Chỉ Chủ gọi được, nên xếp Medium | Đếm **mọi** dòng đã quét, kể cả dòng trống, vào một trần cứng (ví dụ `ITEM_IMPORT_MAX_ROWS × 2` hoặc thêm hằng). Vượt trần → `too_many_rows`. Truyền thêm `max_col=max_col` cho cả hai `iter_rows`. Thêm test: ô ở `A1048576` → 400 `too_many_rows`, chạy dưới 1 giây |
+| **M2** | Medium | `backend/apps/catalog/item_files/plan.py:735`, `:742` | `shop_state` và `will_show_on_shop` sai ở hai ca, trái 02b §3.5 T-8: "Đang bán" = `is_active` và có giá hiệu lực hôm nay. (a) Món mới có giá mới từ ngày mai ra `will_show`. Đúng phải là `hidden`, vì dòng 735 không xét `valid_from`. (b) Món cũ đang ẩn chuyển sang "Có" mà không có giá ra `will_show`. Đúng phải là `hidden`, vì `has_visibility_change` ở dòng 742 luôn `True` trong nhánh này. Tái hiện: hai ca trên cho `summary.will_show_on_shop = 2`, số đúng là 0. Chủ đọc câu "x món sẽ hiện trên Shop" (S5-AC2) với số sai | Dòng 735: `will_show` khi `is_active_val and price_entry and valid_from_date <= today`. Dòng 742: bỏ `or has_visibility_change`. Thêm 2 test cho hai ca trên. Nên thêm cả ca giá tương lai của món đang ẩn |
+| L1 | Low | `backend/apps/catalog/item_files/api.py:69`, `:82`, `:101` | 02b §3 ghi "mọi response của 5 API có `Cache-Control: no-store`". Ba API JSON (limits, preview, commit) chưa có header này. Phản hồi preview chứa giá bán. Tái hiện: `GET import/limits/` và `POST import/preview/` trả `Cache-Control: None` | Dùng `NoStoreMixin` có sẵn ở `apps/common/api.py`. Thêm assert header vào test |
+| L2 | Low | `backend/apps/catalog/item_files/services.py:196-198` | Khoá ở bước 6 tính mã bằng `str(value).strip().lower()`. Kế hoạch lại dùng `_norm_text` (NFC, bỏ ký tự cấm, `500.0` → "500"). Nếu ô mã là số thực hoặc có ký tự điều khiển, món đó **không bị khoá** nhưng vẫn được sửa. Vân tay vẫn bắt được phần lớn các ca, nên rủi ro thấp | Lấy mã từ `plan["_lower_codes"]`: dựng kế hoạch nhẹ trước, hoặc tách hàm chuẩn hoá mã dùng chung với `plan.build_import_plan` |
+| L3 | Low | `backend/apps/catalog/item_files/tests/test_commit_race.py:89-92` | Test đua chỉ bắn 2 luồng cùng lúc. Chưa có ca "luồng chính giữ khoá bảng giá rồi mới commit" như skill và 02b §9 yêu cầu, nên không chắc luồng thứ hai thật sự **chờ khoá** | Thêm ca: luồng chính mở `atomic`, `select_for_update` bảng giá mặc định. Luồng phụ gọi `commit_import`. Luồng chính ghi `import_items` cùng `import_ref` rồi commit. Luồng phụ phải nhận 409 `IMPORT_ALREADY_APPLIED`. Chạy trên CI Postgres |
+| L4 | Low | `backend/apps/catalog/item_files/tests/test_commit.py` | Thiếu ca 02b §9: "đơn phát sinh sau preview cho dòng lùi ngày → 409, không ghi". Code đã xử lý (kế hoạch dựng lại báo lỗi dòng, chuyển thành 409) nhưng chưa có test giữ hành vi này. Cũng chưa có `assertNoLogs` cho file lỗi (S5-AC15) | Thêm 2 test |
+| L5 | Low | `erp-console/features/catalog/components/ItemImportScreen.tsx:243-246` | `extractAlreadyAppliedCounts` lấy số đếm nhưng toast T5 dùng câu cố định. Câu này khớp 02a §5, nên số đếm thành thừa (T-10 định dùng số) | Hoặc bỏ biến, chỉ xét `code`. Hoặc dùng `formatImportSuccessToast(counts)`. Nên chọn một cách, tránh code nửa vời |
+
+**Để gộp:** sửa M1 và M2 kèm test. Nên sửa L1 luôn vì chỉ cần thêm một mixin. L2–L5 có thể để lô sau. Sau khi sửa, techlead chỉ soát lại `reader.py`, `plan.py` và test mới. Sau đó QA kiểm các ca ngoài đường thuận ở §11, và CI Postgres phải chạy `test_commit_race`.
+
+#### Soát lại sau khi sửa (commit `989e199`), techlead 14/11
+
+Đã soát `git diff a669ddf..989e199`. Techlead tự chạy lại, không tạo `.env`:
+- `manage.py test apps.catalog.item_files apps.catalog.items apps.catalog.pricing --parallel 1` → Ran 280, OK (skipped=1, là `test_commit_race` chờ CI Postgres).
+- `check_naming.py` → OK.
+- Chạy lại test dò: ô ở `A1048576` → 400 `too_many_rows` sau 0,03 giây (trước là 11,3 giây). Hai ca của M2 ra `hidden`, `will_show_on_shop = 0`. Ba API JSON đều có `Cache-Control: no-store`.
+
+| # | Kết quả |
+|---|---|
+| M1 | **Đã sửa.** Hai `iter_rows` đều có `max_col = len(ALL_COLUMNS) + 8`. Mọi dòng đã quét, kể cả dòng trống, tính vào trần `ITEM_IMPORT_MAX_ROWS × 2 + 10`. Có test thời gian và test kiểm có truyền `max_col` |
+| M2 | **Đã sửa.** Món mới chỉ `will_show` khi giá có `valid_from <= hôm nay`. Món bật lại chỉ `will_show` khi có giá hiệu lực, đã bỏ `or has_visibility_change`. Có 5 test mới cho các ca: giá tương lai, giá từ hôm nay, bật lại không giá, bật lại chỉ có giá tương lai, bật lại có giá hiệu lực |
+| Đổi test cũ | **Đúng theo T-8.** Trong `test_s5_ac1_ac2_ac3_ac14_...`, MUC01 là món mới có giá từ **ngày mai**, còn TOM01 (`item_b`) bật lại mà **chưa có giá nào** trong bảng mặc định (fixture chỉ đặt giá cho `item_a` và combo). Hôm nay cả hai chưa hiện trên Shop, nên `will_show_on_shop = 0` và MUC01 = `hidden` là đúng. Giá trị 2 cũ khẳng định đúng lỗi M2 |
+| L1 | Đã sửa. `NoStoreMixin` cho limits, preview, commit. Có test cả đường lỗi 400/403 |
+| L2 | Đã sửa. `plan.normalize_item_code` là nguồn chuẩn hoá mã duy nhất, dùng cho cả kế hoạch và khoá bước 6. Có bỏ mã rỗng, có test |
+| L4 | Đã sửa. Có test "đơn phát sinh sau xem trước → 409, không ghi ItemPrice hay AuditLog" và test log không chứa dữ liệu file. Dữ liệu trong test là dữ liệu giả |
+| L3, L5 | Còn nợ, không chặn gộp. L3 phải xong trước khi lên production: thêm ca giữ khoá trên CI Postgres |
+| **L6 (mới)** | Low. `reader.py`: `max_col` cố định ở 25 nên tiêu đề lạ nằm ngoài cột 25 bị bỏ qua mà không báo lỗi `unknown_columns`. Ví dụ cột "Gia moi" ở cột AD sẽ bị bỏ qua, ngược với ý S5-AC10. Thực tế ít gặp vì cột thường sát bên phải mẫu. Hướng sửa: đọc riêng dòng tiêu đề không giới hạn cột (chỉ 1 dòng), còn các dòng dữ liệu vẫn dùng `max_col`. Để lô sau |
+
+**Kết luận sau khi soát lại: REVIEW PASS (APPROVED).** Không còn lỗi Critical, High hay Medium. Bước tiếp: QA kiểm các ca ngoài đường thuận ở §11, CI Postgres chạy `test_commit_race`. Ca fail `vouchers` (ngày cài cứng) có sẵn trước lô 3, cần giao sửa riêng.
 
 ## Duy trả lời câu hỏi 🔴 (14/11)
 - **Q-TL-1:** "là 0,5 mọi chỗ luôn, không cần hard". Đổi mặc định `SHOP_MIN_QTY_KG` = 0,5 trong code, **không** đặt env khoá 1 kg trên production. Lần deploy production kế tiếp sẽ bật 0,5 kg; điều phối viên gom S1 + S2 (nội dung) + GUI-08 (chữ Shop) lên cùng đợt khi có thể.
