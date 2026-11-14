@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.api import require_perm
+from apps.common.api import NoStoreMixin, require_perm
 
 from . import services
 from .columns import IMPORT_PERMS, VIEW_ITEMS_PERM
@@ -57,7 +57,7 @@ class ItemExportTemplateView(APIView):
         return _file_response(content, services.TEMPLATE_FILENAME, row_count)
 
 
-class ItemImportLimitsView(APIView):
+class ItemImportLimitsView(NoStoreMixin, APIView):
     """GET /api/catalog/items/import/limits/ — trả các ngưỡng nhập Excel từ settings (02b §3.4)."""
 
     permission_classes = [IsAuthenticated]
@@ -69,7 +69,7 @@ class ItemImportLimitsView(APIView):
         return Response(services.get_import_limits())
 
 
-class ItemImportPreviewView(APIView):
+class ItemImportPreviewView(NoStoreMixin, APIView):
     """POST /api/catalog/items/import/preview/ — đọc file .xlsx và trả bảng xem trước + preview_token (02b §3.5)."""
 
     permission_classes = [IsAuthenticated]
@@ -82,7 +82,7 @@ class ItemImportPreviewView(APIView):
         return Response(data)
 
 
-class ItemImportCommitView(APIView):
+class ItemImportCommitView(NoStoreMixin, APIView):
     """POST /api/catalog/items/import/commit/ — xác nhận và ghi thay đổi theo file + preview_token (02b §3.6)."""
 
     permission_classes = [IsAuthenticated]

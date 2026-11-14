@@ -207,3 +207,12 @@ Chạy Playwright trên bản build mock (`NEXT_PUBLIC_USE_MOCK=1`), đều PASS
    $ python3 scripts/check_naming.py
    check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
    ```
+
+## 4. Lô 3 — sửa theo review techlead (02b §13.3), BE, 14/11
+
+- **M1** `reader.py`: `iter_rows(max_col=len(ALL_COLUMNS)+8)` cho cả hai bản đọc; mọi dòng đã quét (kể cả dòng trống) tính vào trần cứng `ITEM_IMPORT_MAX_ROWS × 2 + 10`, vượt thì `too_many_rows` (cùng câu với ca quá số dòng). Ô ở `A1048576` bị từ chối nhanh. Dư 8 cột để vẫn bắt được cột lạ sát bên phải mẫu.
+- **M2** `plan.py`: món mới chỉ `will_show` khi có giá `valid_from <= hôm nay`; món bật lại chỉ `will_show` khi có giá hiệu lực (bỏ `or has_visibility_change`). Test cũ `test_s5_ac1_...` từng khẳng định `will_show_on_shop == 2` theo hành vi sai; đã đổi thành 0 và MUC01 thành `hidden`.
+- **L1** `api.py`: ba view JSON dùng `NoStoreMixin`.
+- **L2** `plan.normalize_item_code` là hàm duy nhất chuẩn hoá mã, dùng ở kế hoạch và ở khoá bước 6 của `services.commit_import`.
+- **L4** test đơn phát sinh sau xem trước → commit 409 `IMPORT_DATA_CHANGED`, không ghi; test log không chứa dữ liệu file.
+- Test mới: xem commit. Còn nợ: L3 (test đua giữ khoá) và L5 (FE) của review chưa làm trong đợt này.

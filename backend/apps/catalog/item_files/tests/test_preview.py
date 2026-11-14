@@ -146,7 +146,8 @@ class PreviewPlanTests(ItemFilesBase):
         self.assertEqual(summary["visibility_changed"], 1)
         self.assertEqual(summary["price_changed"], 3)
         self.assertEqual(summary["unchanged"], 0)
-        self.assertEqual(summary["will_show_on_shop"], 2)  # TOM01 + MUC01
+        # M2: MUC01 có giá từ ngày mai, TOM01 bật lại nhưng chưa có giá → chưa món nào hiện thật trên Shop
+        self.assertEqual(summary["will_show_on_shop"], 0)
 
         rows_by_code = {r["code"]: r for r in body["rows"]}
         self.assertEqual(rows_by_code["CA01"]["price"]["flags"], ["check_zeros", "large_change"])
@@ -154,7 +155,7 @@ class PreviewPlanTests(ItemFilesBase):
         self.assertEqual(set(rows_by_code["CB01"]["price"]["flags"]), {"large_change", "backdated"})
         self.assertEqual(rows_by_code["CB01"]["price"]["change_percent"], "37.5")
         self.assertEqual(rows_by_code["MUC01"]["action"], "create")
-        self.assertEqual(rows_by_code["MUC01"]["shop_state"], "will_show")
+        self.assertEqual(rows_by_code["MUC01"]["shop_state"], "hidden")
         self.assertEqual(rows_by_code["TOM01"]["changes"][0]["field"], "is_active")
         self.assertEqual(rows_by_code["TOM01"]["changes"][0]["old"], "Không")
         self.assertEqual(rows_by_code["TOM01"]["changes"][0]["new"], "Có")
@@ -318,3 +319,52 @@ class PreviewPlanTests(ItemFilesBase):
 
         self.assertEqual(len(q_small), len(q_large))
         self.assertLessEqual(len(q_large), 10)
+
+
+class ShopStateTests(ItemFilesBase):
+    def _row(self, code, **extra):
+        base = {
+            "code": code, "name": f"Món {code}", "item_group": "Tôm", "item_type": "Mặt hàng thường",
+            "stock_uom": "Kg", "is_active": True, "shelf_life_in_days": 90,
+            "has_batch_no": True, "has_expiry_date": True,
+        }
+        base.update(extra)
+        return base
+
+    def _preview(self, rows):
+        resp = self.post_preview(self.owner, self.make_xlsx_file(rows))
+        self.assertEqual(resp.status_code, 200, resp.content)
+        return resp.json()
+
+    def test_t8_new_item_with_future_price_is_hidden_not_will_show(self):
+        body = self._preview([self._row("MUC02", new_price=195000, new_price_from=today() + datetime.timedelta(days=1))])
+        self.assertEqual(body["rows"][0]["shop_state"], "hidden")
+        self.assertEqual(body["summary"]["will_show_on_shop"], 0)
+
+    def test_t8_new_item_with_price_from_today_is_will_show(self):
+        body = self._preview([self._row("MUC03", new_price=195000, new_price_from=today())])
+        self.assertEqual(body["rows"][0]["shop_state"], "will_show")
+        self.assertEqual(body["summary"]["will_show_on_shop"], 1)
+
+    def test_t8_reactivated_item_without_effective_price_is_hidden(self):
+        # TOM01 đang ẩn và chưa có giá nào
+        body = self._preview([self._row("TOM01", name="Tôm sú")])
+        row = body["rows"][0]
+        self.assertEqual(row["shop_state"], "hidden")
+        self.assertEqual(body["summary"]["will_show_on_shop"], 0)
+
+    def test_t8_reactivated_item_with_only_future_price_is_hidden(self):
+        body = self._preview([
+            self._row("TOM01", name="Tôm sú", new_price=310000, new_price_from=today() + datetime.timedelta(days=3))
+        ])
+        self.assertEqual(body["rows"][0]["shop_state"], "hidden")
+        self.assertEqual(body["summary"]["will_show_on_shop"], 0)
+
+    def test_t8_reactivated_item_with_effective_price_is_will_show(self):
+        ItemPrice.objects.create(
+            item=self.item_b, price_list=self.price_list, rate=Decimal("310000"),
+            valid_from=today() - datetime.timedelta(days=5),
+        )
+        body = self._preview([self._row("TOM01", name="Tôm sú")])
+        self.assertEqual(body["rows"][0]["shop_state"], "will_show")
+        self.assertEqual(body["summary"]["will_show_on_shop"], 1)

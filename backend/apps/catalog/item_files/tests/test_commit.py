@@ -2,6 +2,7 @@
 import datetime
 from decimal import Decimal
 import json
+import logging
 import time
 from unittest import mock
 
@@ -262,3 +263,86 @@ class CommitImportTests(ItemFilesBase):
         self.assertEqual(resp_other.status_code, 400)
         self.assertEqual(resp_other.json()["code"], "IMPORT_PREVIEW_INVALID")
         self.assertEqual(self.client_as(self.owner).get(COMMIT_URL).status_code, 405)
+
+
+class CommitReviewFollowupTests(ItemFilesBase):
+    def test_s6_ac6_order_created_after_preview_makes_backdated_price_commit_409_and_writes_nothing(self):
+        from django.utils import timezone
+        from apps.sales.models import Customer
+
+        rows = [{
+            "code": "CA01", "name": "Cá thu", "item_group": "Cá", "is_active": True,
+            "new_price": 300000, "new_price_from": today() - datetime.timedelta(days=2),
+        }]
+        xlsx_file = self.make_xlsx_file(rows)
+        prev = self.post_preview(self.owner, xlsx_file)
+        self.assertEqual(prev.status_code, 200, prev.content)
+        self.assertTrue(prev.json()["has_changes"])
+        token = prev.json()["preview_token"]
+
+        # Đơn chốt giá phát sinh SAU lúc xem trước, trong khoảng ngày lùi
+        customer = Customer.objects.create(name="Khách giả", phone="0900000001")
+        order = SalesOrder.objects.create(
+            code="SO261114-AFTER1", customer=customer, status=SalesOrder.Status.PAID,
+            delivery_address="Địa chỉ giả", phone="0900000001",
+        )
+        SalesOrder.objects.filter(pk=order.pk).update(created_at=timezone.now() - datetime.timedelta(days=1))
+        SalesOrderLine.objects.create(
+            order=order, item=self.item_a, qty=Decimal("1.0"), rate=Decimal("278000"), amount=Decimal("278000"),
+        )
+        prices_before = ItemPrice.objects.count()
+        audits_before = AuditLog.objects.count()
+
+        resp = self.post_commit(self.owner, xlsx_file, token)
+        self.assertEqual(resp.status_code, 409, resp.content)
+        self.assertEqual(resp.json()["code"], "IMPORT_DATA_CHANGED")
+        self.assertEqual(ItemPrice.objects.count(), prices_before)
+        self.assertEqual(AuditLog.objects.count(), audits_before)
+
+    def test_s5_ac15_preview_and_commit_do_not_log_file_content(self):
+        marker = "Mực-dò-log-xyz"
+        xlsx_file = self.make_xlsx_file([
+            {"code": "MUC09", "name": marker, "item_group": "Cá", "is_active": True, "new_price": 150000},
+            {"code": "BAD01", "name": "Lỗi nhóm", "item_group": "Nhóm Ma", "is_active": True},
+        ])
+        # File có dòng lỗi: Django có thể ghi 1 dòng "Bad Request: <đường dẫn>", nhưng không được chứa dữ liệu của file.
+        records = []
+
+        class _Collect(logging.Handler):
+            def emit(self, record):
+                records.append(record.getMessage())
+
+        handler = _Collect(level=logging.DEBUG)
+        root = logging.getLogger()
+        old_level = root.level
+        root.addHandler(handler)
+        root.setLevel(logging.DEBUG)
+        try:
+            resp = self.post_preview(self.owner, xlsx_file)
+        finally:
+            root.removeHandler(handler)
+            root.setLevel(old_level)
+        self.assertIn(resp.status_code, (200, 400))
+        for line in records:
+            self.assertNotIn(marker, line)
+            self.assertNotIn("MUC09", line)
+            self.assertNotIn("Nhóm Ma", line)
+
+        ok_file = self.make_xlsx_file([
+            {"code": "MUC09", "name": marker, "item_group": "Cá", "is_active": True, "new_price": 150000},
+        ])
+        prev = self.post_preview(self.owner, ok_file)
+        with self.assertNoLogs(level="DEBUG"):
+            commit = self.post_commit(self.owner, ok_file, prev.json()["preview_token"])
+        self.assertEqual(commit.status_code, 200, commit.content)
+        self.assertEqual(self.post_commit(self.owner, ok_file, prev.json()["preview_token"]).status_code, 409)
+
+
+class NormalizeItemCodeTests(ItemFilesBase):
+    def test_l2_lock_code_normalization_is_shared_with_plan(self):
+        from apps.catalog.item_files.plan import normalize_item_code
+
+        self.assertEqual(normalize_item_code(500.0), "500")
+        self.assertEqual(normalize_item_code(" CA01 "), "ca01")
+        self.assertEqual(normalize_item_code("CA\x0701"), "ca01")
+        self.assertEqual(normalize_item_code(None), "")

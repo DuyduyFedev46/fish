@@ -17,11 +17,16 @@ import openpyxl.xml
 
 from apps.common.exceptions import BusinessError
 
-from .columns import COLUMNS_BY_HEADER, REQUIRED_HEADERS
+from .columns import ALL_COLUMNS, COLUMNS_BY_HEADER, REQUIRED_HEADERS
 from .workbook import SHEET_ITEMS
 
 MAX_ZIP_ENTRIES = 2000
 ZIP_MAGIC = b"PK\x03\x04"
+# Chỉ quét tối đa số cột của mẫu cộng chút dư (để vẫn bắt được cột lạ sát bên phải), không quét cột rác xa hơn (M1).
+SCAN_EXTRA_COLS = 8
+# Trần cứng số dòng đã quét (kể cả dòng trống) tính theo bội của số dòng tối đa (M1, 02b §13.3).
+SCAN_ROWS_FACTOR = 2
+SCAN_ROWS_SLACK = 10
 
 NOT_XLSX_MSG = "Chỉ nhận file .xlsx. Trong Excel chọn Lưu thành → Sổ làm việc Excel (.xlsx)."
 UNREADABLE_MSG = "Không đọc được file này. Mở lại bằng Excel, lưu thành .xlsx rồi chọn lại."
@@ -112,6 +117,14 @@ def _check_zip_container(raw_bytes: bytes) -> None:
         raise
     except Exception as exc:
         raise invalid_file_error("unreadable", UNREADABLE_MSG) from exc
+
+
+def _too_many_rows_error(max_rows):
+    rows_str = format_vn_int(max_rows)
+    return invalid_file_error(
+        "too_many_rows",
+        f"File quá {rows_str} dòng. Tách thành nhiều file, mỗi file tối đa {rows_str} dòng.",
+    )
 
 
 def _parse_headers(header_cells):
@@ -219,8 +232,9 @@ def read_import_workbook(uploaded_file) -> ParsedWorkbook:
         ws_val = wb_val[sheet_name]
         ws_raw = wb_raw[sheet_name]
 
-        val_iter = ws_val.iter_rows(values_only=False)
-        raw_iter = ws_raw.iter_rows(values_only=False)
+        scan_max_col = len(ALL_COLUMNS) + SCAN_EXTRA_COLS
+        val_iter = ws_val.iter_rows(values_only=False, max_col=scan_max_col)
+        raw_iter = ws_raw.iter_rows(values_only=False, max_col=scan_max_col)
         first_val = next(val_iter, None)
         first_raw = next(raw_iter, None)
         if first_val is None or first_raw is None:
@@ -235,9 +249,12 @@ def read_import_workbook(uploaded_file) -> ParsedWorkbook:
         headers = tuple(col.header for _, col in indexed_columns)
         max_col = max(idx for idx, _ in indexed_columns) + 1
         max_rows = settings.ITEM_IMPORT_MAX_ROWS
+        scan_ceiling = max_rows * SCAN_ROWS_FACTOR + SCAN_ROWS_SLACK
 
         parsed_rows = []
         for row_number, (v_row, r_row) in enumerate(zip(val_iter, raw_iter), start=2):
+            if row_number - 1 > scan_ceiling:
+                raise _too_many_rows_error(max_rows)
             cells = {}
             for col_idx, column in indexed_columns:
                 v_cell = v_row[col_idx] if col_idx < len(v_row) and col_idx < max_col else None
@@ -260,11 +277,7 @@ def read_import_workbook(uploaded_file) -> ParsedWorkbook:
                 continue
             parsed_rows.append(ParsedRow(row_number=row_number, cells=cells))
             if len(parsed_rows) > max_rows:
-                rows_str = format_vn_int(max_rows)
-                raise invalid_file_error(
-                    "too_many_rows",
-                    f"File quá {rows_str} dòng. Tách thành nhiều file, mỗi file tối đa {rows_str} dòng.",
-                )
+                raise _too_many_rows_error(max_rows)
     finally:
         if wb_val is not None:
             wb_val.close()

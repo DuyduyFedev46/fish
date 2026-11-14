@@ -82,3 +82,21 @@ class ImportPermissionTests(ItemFilesBase):
         resp = self.post_commit(self.owner, f, token)
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(AuditLog.objects.filter(action="import_items").exists())
+
+
+class ImportNoStoreHeaderTests(ItemFilesBase):
+    def test_l1_limits_preview_commit_responses_have_cache_control_no_store(self):
+        limits = self.get(self.owner, LIMITS_URL)
+        self.assertEqual(limits["Cache-Control"], "no-store")
+        f = self.make_xlsx_file([
+            {"code": "MUC01", "name": "Mực thử", "item_group": "Cá", "is_active": True, "new_price": 150000}
+        ])
+        prev = self.post_preview(self.owner, f)
+        self.assertEqual(prev.status_code, 200)
+        self.assertEqual(prev["Cache-Control"], "no-store")
+        commit = self.post_commit(self.owner, f, prev.json()["preview_token"])
+        self.assertEqual(commit.status_code, 200)
+        self.assertEqual(commit["Cache-Control"], "no-store")
+        # cả đường lỗi (403, 400) cũng no-store
+        self.assertEqual(self.get(self.manager, LIMITS_URL)["Cache-Control"], "no-store")
+        self.assertEqual(self.post_preview(self.owner, None)["Cache-Control"], "no-store")

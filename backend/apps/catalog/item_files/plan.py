@@ -78,6 +78,11 @@ def _norm_text(value: object) -> str:
     return unicodedata.normalize("NFC", cleaned)
 
 
+def normalize_item_code(value: object) -> str:
+    """Mã hàng đã chuẩn hoá, dạng chữ thường: nguồn DUY NHẤT để so và khoá mã (kế hoạch bước 7 và khoá bước 6)."""
+    return _norm_text(value).lower()
+
+
 def _norm_group_key(name: str) -> str:
     return " ".join(_norm_text(name).split()).casefold()
 
@@ -323,7 +328,7 @@ def build_import_plan(parsed: ParsedWorkbook, *, today: datetime.date | None = N
         code_str = "" if _is_blank(c_code) else _norm_text(c_code.value)
         raw_codes_by_row[row.row_number] = code_str
         if code_str and code_str.upper() != TEMPLATE_EXAMPLE_CODE:
-            rows_by_lower_code.setdefault(code_str.lower(), []).append(row.row_number)
+            rows_by_lower_code.setdefault(normalize_item_code(code_str), []).append(row.row_number)
 
         c_group = row.cells.get("item_group")
         if not _is_blank(c_group):
@@ -732,14 +737,18 @@ def build_import_plan(parsed: ParsedWorkbook, *, today: datetime.date | None = N
         # Tính shop_state (T-8, 02b §3.5): selling | hidden | will_show | will_hide
         if existing is None:
             # S5-AC2 & 02b §3.5: món mới đang kinh doanh và có giá mới → will_show
-            shop_state = "will_show" if (is_active_val and price_entry is not None) else "hidden"
+            # Giá mới có hiệu lực từ ngày mai trở đi thì hôm nay món chưa hiện trên Shop (T-8: cần giá hiệu lực hôm nay).
+            price_effective_today = (
+                price_entry is not None and valid_from_date is not None and valid_from_date <= today
+            )
+            shop_state = "will_show" if (is_active_val and price_effective_today) else "hidden"
         elif existing.is_active and not is_active_val:
             shop_state = "will_hide"
         elif not existing.is_active and is_active_val:
             has_price_after = (cur_price_obj is not None) or (
                 price_entry is not None and valid_from_date is not None and valid_from_date <= today
             )
-            shop_state = "will_show" if has_price_after or has_visibility_change else "hidden"
+            shop_state = "will_show" if has_price_after else "hidden"
         else:
             if not is_active_val:
                 shop_state = "hidden"

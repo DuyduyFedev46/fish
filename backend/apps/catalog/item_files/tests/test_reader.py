@@ -1,6 +1,7 @@
 """FISH-66 S5, S6: kiểm đọc file .xlsx an toàn (reader.py, 02b §3.5, §6.1, §9). Dữ liệu giả."""
 import io
 import socket
+import time
 from unittest import mock
 import zipfile
 
@@ -177,3 +178,41 @@ class ReaderSecurityAndStructureTests(ItemFilesBase):
         cols = {e["column"]: e["message"] for e in body["errors"]}
         self.assertEqual(cols["Mô tả"], "Ô có công thức, hãy dán giá trị.")
         self.assertEqual(cols["Giá mới"], "Ô có công thức, hãy dán giá trị.")
+
+
+class ReaderScanCeilingTests(ItemFilesBase):
+    def test_s5_ac9_cell_at_a1048576_is_rejected_fast_as_too_many_rows(self):
+        """M1 (02b §13.3): dòng trống cũng được đếm vào trần cứng, ô rác ở tận cuối sheet không kéo dài việc đọc."""
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Hàng bán"
+        ws.append(list(HEADERS_FULL))
+        ws.append(["CA01", "Cá thu", "Cá", "Mặt hàng thường", "Kg", "Có", 365, "Có", "Có", "", "", "", "", "", None, None, None])
+        ws["A1048576"] = "rác"
+        buf = io.BytesIO()
+        wb.save(buf)
+        started = time.monotonic()
+        resp = self.post_preview(self.owner, SimpleUploadedFile("rac.xlsx", buf.getvalue()))
+        elapsed = time.monotonic() - started
+        self.assertEqual(resp.status_code, 400, resp.content)
+        body = resp.json()
+        self.assertEqual(body["code"], "IMPORT_INVALID_FILE")
+        self.assertEqual(body["reason"], "too_many_rows")
+        self.assertLess(elapsed, 3.0)  # trước khi sửa: hơn 10 giây
+
+    def test_s5_ac9_iter_rows_is_limited_to_template_column_count(self):
+        """M1: truyền max_col cho iter_rows, cột rác xa bên phải không bị quét."""
+        from apps.catalog.item_files import reader
+
+        calls = []
+        real = openpyxl.worksheet._read_only.ReadOnlyWorksheet.iter_rows
+
+        def spy(self, *args, **kwargs):
+            calls.append(kwargs.get("max_col"))
+            return real(self, *args, **kwargs)
+
+        content = _workbook_bytes(HEADERS_FULL, [["CA01", "Cá thu", "Cá", "Mặt hàng thường", "Kg", "Có", 365, "Có", "Có", "", "", "", "", "", None, None, None]])
+        with mock.patch.object(openpyxl.worksheet._read_only.ReadOnlyWorksheet, "iter_rows", spy):
+            reader.read_import_workbook(SimpleUploadedFile("a.xlsx", content))
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all(isinstance(c, int) and c >= 1 for c in calls), calls)

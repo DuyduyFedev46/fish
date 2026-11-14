@@ -21,7 +21,7 @@ from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError, ConflictError
 
 from .columns import PUBLIC_TEXT_KEYS, columns_for
-from .plan import TEMPLATE_EXAMPLE_CODE, build_import_plan
+from .plan import TEMPLATE_EXAMPLE_CODE, build_import_plan, normalize_item_code
 from .reader import read_import_workbook
 from .token import (
     check_preview_token_expiry,
@@ -194,10 +194,11 @@ def commit_import(
 
         # Bước 6: Khoá các Item liên quan theo thứ tự pk tăng dần, KHÔNG select_related (luật khoá Postgres).
         lower_codes = {
-            str(r.cells["code"].value).strip().lower()
+            normalize_item_code(r.cells["code"].value)
             for r in parsed.rows
             if r.cells.get("code") is not None and r.cells["code"].value is not None
         }
+        lower_codes.discard("")
         if lower_codes:
             list(
                 Item.objects.annotate(code_lower=Lower("code"))
