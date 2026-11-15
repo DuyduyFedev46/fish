@@ -108,3 +108,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/sync_ai_workspace.py --check
+      - run: python3 scripts/test_ai_guard.py

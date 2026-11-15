@@ -1,0 +1,1 @@
+{"ai_guard":{"PreToolUse":[{"matcher":"run_command","hooks":[{"command":"python3 ../scripts/ai_guard.py"}]}]}}
