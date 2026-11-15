@@ -14,7 +14,10 @@ from .lookup_token import make_token
 
 
 def lines_payload(order):
-    """`amount` là thành tiền GỘP (qty × đơn giá, trước giảm) — khớp 02b §3.3."""
+    """
+    `amount` là thành tiền GỘP (qty × đơn giá, trước giảm) — khớp 02b §3.3.
+    `rate` (TD-05) là đơn giá BÁN niêm yết đã đóng băng trên dòng đơn (`SalesOrderLine.rate`), không phải giá vốn.
+    """
     rows = []
     for line in order.lines.select_related("item").order_by("pk"):
         rows.append(
@@ -23,6 +26,7 @@ def lines_payload(order):
                 "name": line.item.name,
                 "unit": sale_unit(line.item),
                 "qty": money_str(line.qty),
+                "rate": money_str(money_vnd(line.rate)),
                 "amount": money_str(money_vnd(line.amount + line.discount_amount)),
             }
         )

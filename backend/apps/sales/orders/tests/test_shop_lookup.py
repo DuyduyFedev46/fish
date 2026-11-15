@@ -7,6 +7,7 @@ import datetime
 import json
 import logging
 import time
+from decimal import Decimal
 from unittest import mock
 
 from django.core.cache import cache
@@ -14,6 +15,7 @@ from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
+from apps.catalog.models import ItemPrice
 from apps.delivery.models import DeliveryNote
 from apps.sales.models import PaymentTransaction, SalesOrder
 from apps.sales.orders import lookup_token, services
@@ -273,19 +275,13 @@ class LookupThrottleTests(LookupBase):
         self.assertEqual(lookup({"order_code": order.code, "token": token}, REMOTE_ADDR="10.9.2.2").status_code, 200)
 
     def test_s3_02_default_rates_are_defined(self):
-        from django.conf import settings as real_settings
+        # CAVEVE_THROTTLE_RATES tắt khi TESTING; kiểm bảng mặc định, không phụ thuộc env THROTTLE_* của máy (TD-04).
+        from apps.common.tests.throttle_defaults import default_throttle_rates
 
-        # CAVEVE_THROTTLE_RATES tắt khi TESTING; kiểm hằng mặc định bằng cách đọc lại module
-        import importlib
-        import os
-
-        import config.settings as cfg
-
-        self.assertTrue(hasattr(cfg, "_DEFAULT_THROTTLE_RATES"))
-        self.assertEqual(cfg._DEFAULT_THROTTLE_RATES["shop_lookup_token"], "60/min")
-        self.assertEqual(cfg._DEFAULT_THROTTLE_RATES["shop_lookup_order"], "10/hour")
-        self.assertEqual(cfg._DEFAULT_THROTTLE_RATES["shop_lookup_ip"], "20/min")
-        del real_settings, importlib, os
+        rates = default_throttle_rates()
+        self.assertEqual(rates["shop_lookup_token"], "60/min")
+        self.assertEqual(rates["shop_lookup_order"], "10/hour")
+        self.assertEqual(rates["shop_lookup_ip"], "20/min")
 
     @override_settings(CAVEVE_THROTTLE_RATES={"shop_lookup_ip": "1/min"})
     def test_s3_02_malformed_json_body_does_not_crash_throttle(self):
@@ -328,11 +324,51 @@ class LookupTimesTests(LookupBase):
         order = self._order(phone=PHONE, qty="2")
         data = self.by_phone(order).json()
         self.assertEqual(
-            data["lines"], [{"item_code": "TOM-SU-1", "name": "Tôm sú loại 1", "unit": "kg", "qty": "2", "amount": "540000"}]
+            data["lines"], [{"item_code": "TOM-SU-1", "name": "Tôm sú loại 1", "unit": "kg", "qty": "2", "rate": "270000", "amount": "540000"}]
         )
         self.assertEqual(data["subtotal"], "540000")
         self.assertEqual(data["total_amount"], "540000")
         self.assertEqual(data["discount"], {"source": None, "code": None, "amount": "0"})
+
+
+    def test_td05_lines_carry_list_rate_and_never_cost_keys_or_cost_values(self):
+        """TD-05: `rate` = đơn giá bán niêm yết lúc đặt; lô nhập giá 180000 (giá vốn) không được lộ ra."""
+        from apps.common.cost_keys import COST_KEYS
+
+        order = self._order(phone=PHONE, qty="2")
+        # Giá bán đổi sau khi đặt: `rate` vẫn là giá đã đóng băng trên dòng đơn.
+        ItemPrice.objects.filter(item=self.item).update(rate=Decimal("999000"))
+        body = self.by_phone(order).json()
+        self.assertEqual(body["lines"][0]["rate"], "270000")
+
+        def keys_of(value):
+            found = set()
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    found.add(k)
+                    found |= keys_of(v)
+            elif isinstance(value, list):
+                for v in value:
+                    found |= keys_of(v)
+            return found
+
+        self.assertEqual(keys_of(body) & (COST_KEYS - {"rate"}), set())
+        self.assertEqual(set(body["lines"][0]), {"item_code", "name", "unit", "qty", "rate", "amount"})
+        text = json.dumps(body)
+        for secret in ("180000", "purchase_rate", "landed_unit_cost", "unit_cost", NAME, PHONE, ADDRESS):
+            self.assertNotIn(secret, text)
+
+    def test_td05_promo_line_keeps_list_rate_while_amount_stays_gross(self):
+        from apps.catalog.models import PricingRule
+
+        PricingRule.objects.create(
+            name="Giảm 10%", apply_on=PricingRule.ApplyOn.ITEM, item=self.item,
+            discount_type=PricingRule.DiscountType.PERCENT, discount_value=10,
+        )
+        order = self._order(phone=PHONE, qty="2")
+        line = self.by_phone(order).json()["lines"][0]
+        self.assertEqual(line["rate"], "270000")
+        self.assertEqual(line["amount"], "540000")
 
 
 class StateTableTests(LookupBase):
