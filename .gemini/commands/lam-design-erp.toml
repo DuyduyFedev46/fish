@@ -1,0 +1,7 @@
+# Sinh tự động bởi scripts/sync_ai_workspace.py từ .claude/commands/lam-design-erp.md. Đừng sửa file này.
+description = "Tự chạy hết các lô 'ERP theo design' (doc/features/2026-10-01-erp-theo-design) theo quy trình đội Claude"
+
+prompt = """
+Đọc toàn bộ `.claude/commands/lam-design-erp.md` rồi làm đúng theo đó, tuân thủ `AGENTS.md` và `GEMINI.md`.
+Lời Duy gõ kèm lệnh: {{args}}
+"""

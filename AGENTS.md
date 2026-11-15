@@ -1,108 +1,168 @@
-# Cá Về — hướng dẫn cho agent lập trình (Gemini CLI, Antigravity và các agent khác)
+# Cá Về — luật chung cho mọi AI (Claude Code, Gemini CLI, Antigravity)
 
-Vựa cá B2C: mua lô tại cảng → bán online → quản lý kho và giá vốn theo lô. Chủ dự án là **Duy** (PO),
-trao đổi bằng tiếng Việt. Nghiệp vụ và bất biến nằm ở skill `caveve-domain`: **đọc skill này trước khi
-đụng vào bất kỳ code nào.**
+```mermaid
+flowchart TD
+  Y["Duy nhờ bằng lời thường"] --> B["AI nhận việc ở bảng việc chung"]
+  B --> L{"Loại việc?"}
+  L -- "hỏi, tra cứu, vận hành" --> TT["Làm trực tiếp, không qua đội"]
+  L -- "tính năng mới, đổi nghiệp vụ" --> BA["BA phân tích yêu cầu"]
+  L -- "lỗi rõ, chỉnh nhỏ" --> AC["Viết vài tiêu chí ngắn"]
+  BA --> D1{"Duy duyệt phân tích?"}
+  D1 -- "sửa lại" --> BA
+  D1 -- "duyệt" --> PO["PO viết story và tiêu chí nghiệm thu"]
+  PO --> D2{"Duy duyệt story?"}
+  D2 -- "duyệt" --> TL["Tech Lead thiết kế kỹ thuật"]
+  TL --> DEV["Dev BE và FE làm song song"]
+  AC --> DEV
+  DEV --> KC["Điều phối tự chạy lại kiểm chứng"]
+  KC --> RV["Soát code và giao diện"]
+  RV --> QA{"QA kiểm thật, đạt?"}
+  QA -- "chưa đạt" --> DEV
+  QA -- "đạt" --> GIT["Commit, gộp main, lên staging"]
+  GIT --> D4{"Duy duyệt lên thật?"}
+  D4 -- "duyệt" --> PRD["Lên production"]
+```
 
-> **TẠM DỪNG (Duy chốt 2026-09-30):** từ P8, đội Claude Code tự hiện thực, QA và commit. Gemini CLI /
-> Antigravity **không** chạy `/lam-tiep` hay `/lam-tinh-nang`. Nếu được gọi, báo Duy một dòng "AGY đang tạm
-> dừng theo AGENTS.md" rồi dừng, trừ khi Duy nói rõ trong lượt đó rằng bật lại AGY.
+Vựa cá B2C (mua lô tại cảng → bán online → quản lý kho/giá vốn). Người dùng là **Duy** (PO), trao đổi bằng tiếng
+Việt; AI xưng "em", gọi Duy là "anh", báo cáo ngắn kiểu tổng quan. Nghiệp vụ và bất biến: skill `caveve-domain`
+(**đọc trước khi đụng code**).
 
-## Chia việc (Duy chốt 2026-09-28, tạm dừng từ 30/09)
+File này là **luật chung duy nhất**. Claude đọc qua `CLAUDE.md` (`@AGENTS.md`), Gemini/Antigravity đọc trực tiếp.
+`CLAUDE.md` và `GEMINI.md` chỉ ghi phần riêng của từng công cụ. Sửa luật chung thì sửa ở đây.
 
-| Ai | Làm gì | Đầu ra |
-|---|---|---|
-| **Claude Code** (phân tích cùng Duy) | BA → PO → Tech Lead (+ pháp lý) | `01-analysis.md`, `02-stories.md`, `02b-tech-design.md`, `02c-giao-viec.md` |
-| **Bạn** (Gemini CLI / Antigravity) | Hiện thực: BE ∥ FE → QA → commit | code, `03-dev-notes.md`, `04-qa-report.md` |
-| **Duy** | Duyệt ở từng điểm dừng, quyết định deploy | — |
+## Làm chung Claude và Gemini (Duy chốt 2026-11-15)
 
-Hồ sơ mỗi tính năng nằm ở `doc/features/<YYYY-MM-DD>-<slug>/`. **Bạn chỉ làm tính năng có
-`02c-giao-viec.md` ở trạng thái `SẴN SÀNG CODE`**. File đó ghi lô nào làm trước, story nào, được sửa
-file nào, lệnh kiểm chứng và điều kiện xong. Thiếu file này, hoặc `02-stories.md`/`02b-tech-design.md`
-chưa `ĐÃ DUYỆT` → dừng và báo Duy, không tự viết yêu cầu hay tự thiết kế.
+Hai bên **ngang quyền**: cùng bộ agent, cùng skill, cùng workflow, cùng luật. Duy giao việc cho bên nào thì bên đó là
+**điều phối viên** (phiên chính) của việc đó.
 
-Workflow chạy việc: `/lam-tiep` (làm phase kế tiếp theo **`doc/ke-hoach-tong.md`** — thứ tự các phase, điều
-kiện bắt đầu, việc của Duy) hoặc `/lam-tinh-nang <slug>` (một hồ sơ cụ thể). File ở `.agents/workflows/` cho
-Antigravity, `.gemini/commands/` cho Gemini CLI.
+| Thứ | Nguồn duy nhất | Claude đọc ở | Gemini/Antigravity đọc ở |
+|---|---|---|---|
+| Luật chung | `AGENTS.md` | `CLAUDE.md` → `@AGENTS.md` | `AGENTS.md` (+ `GEMINI.md`) |
+| Agent (vai trong đội) | `.claude/agents/<tên>.md` | như nguồn | `.agents/agents/<tên>.md` (sinh tự động), `.gemini/agents` trỏ tới |
+| Skill | `.claude/skills/<tên>/` | như nguồn | `.agents/skills/<tên>` (liên kết), `.gemini/skills` trỏ tới |
+| Workflow đội | skill `feature` | skill `feature` | skill `feature`, lệnh `/feature` |
+| Lệnh | `.claude/commands/<tên>.md` | `/<tên>` | skill `/<tên>` trong `.agents/skills/`, `.gemini/commands/<tên>.toml` |
 
-## Agent
+- **Sửa agent, skill hay lệnh: chỉ sửa trong `.claude/`**, rồi chạy `python3 scripts/sync_ai_workspace.py` và commit cả
+  bản sinh ra. CI chạy `--check`, lệch là đỏ. Không sửa tay file trong `.agents/agents/`, `.gemini/commands/`.
+- **Nhận việc trước khi code** ở `doc/ops/bang-viec.md` (ai, nhánh, phạm vi file), commit bảng lên `main` rồi push.
+  Hai việc đang làm không được trùng phạm vi file; trùng thì dừng, hỏi Duy.
+- **Mỗi việc một worktree riêng**, nhánh `<ai>/<slug>` (vd `claude/shop-facebook`, `gemini/shop-ui`) tách từ `main`.
+  **Không `git switch` ở checkout chính** (bên kia có thể đang làm ở đó). Gộp `main` và push cũng làm từ worktree.
+- Trước khi gộp `main`: `git fetch` rồi gộp lên `origin/main` mới nhất. Không force-push, không viết lại lịch sử `main`.
+- e2e dùng cổng cố định 8000/3000/3100. Runner tự dừng nếu cổng bận; **không kill tiến trình của bên kia**, chờ hoặc hỏi Duy.
+- Tiến độ theo dõi ở hồ sơ `doc/features/`, bảng việc chung và sheet FIX WEB của Lộc. **Không dùng Jira nữa** (Duy 15/11).
 
-Định nghĩa ở `.agents/agents/` (Antigravity) — `.gemini/agents` là đường dẫn trỏ tới cùng thư mục
-(Gemini CLI). Subagent không gọi được subagent khác: phiên chính là điều phối viên, giao việc, kiểm
-kết quả.
+## Workflow đội — tự nhận diện, Duy không gõ lệnh
 
-| Agent | Việc | Được sửa |
-|---|---|---|
-| `be-dev` | story BE theo TDD | `backend/`, `adapter/`, mục BE của `03-dev-notes.md` |
-| `fe-dev` | story FE, bám contract API, có mock | `frontend/`, `erp-console/`, mục FE của `03-dev-notes.md` |
-| `qa-tester` | kiểm từng AC, phân quyền, rò giá vốn, rò dữ liệu cá nhân, hồi quy | test mới + `04-qa-report.md`, không sửa code sản phẩm |
+Duy chỉ nhờ bằng lời thường. **Mọi yêu cầu làm thay đổi sản phẩm** (thêm/sửa chức năng, sửa lỗi, đổi giao diện, đổi quy
+tắc, viết yêu cầu/story, test thử, review, deploy) → **chạy skill `feature` trước khi làm gì khác**, để nó chọn luồng và
+báo Duy một dòng:
 
-Skill dùng chung ở `.agents/skills/` (trỏ về `.claude/skills/`, một nguồn duy nhất cho mọi công cụ;
-chưa có thì chạy `sh scripts/lien-ket-skill.sh` một lần để tạo liên kết):
-`caveve-domain`, `django-drf-patterns`, `nextjs-shop-patterns`, `tdd-workflow`, `e2e-playwright`,
-`caveve-ui` và các skill UI nó chỉ định.
+```
+ĐẦY ĐỦ  (tính năng mới / đổi nghiệp vụ)  BA → [Duy duyệt] → PO → [Duy duyệt] → Tech Lead → BE ∥ FE → UI review → QA → Review → Deploy
+NHANH   (lỗi rõ / chỉnh nhỏ)             AC ngắn → BE/FE → QA → tổng kết
+CHỈ BA · CHỈ PO · CHỈ QA · REVIEW · DEPLOY · TIẾP TỤC (việc đang dở, lệnh /lam-tiep)
+```
+Trong luồng ĐẦY ĐỦ: `product-manager` chạy trước BA khi tính năng còn ở mức ý tưởng/prototype; `ux-designer` chạy sau PO,
+song song Tech Lead; `mkt-brand` được gọi khi đụng thương hiệu hoặc copy. Không chạy workflow cho câu hỏi thuần giải
+thích/tra cứu, hoặc việc vận hành không đổi code (xem log, seed dữ liệu, đổi mật khẩu) — làm trực tiếp.
+
+| Vai | Agent | Skill nạp sẵn | Đầu ra |
+|---|---|---|---|
+| PM | `product-manager` | caveve-domain, requirement-elicitation | `doc/features/<ngày>-<slug>/00-product-brief.md` |
+| BA | `ba-analyst` | requirement-elicitation | `01-analysis.md` |
+| PO | `po-owner` | user-story-writing | `02-stories.md` (+ nghiệm thu) |
+| UX | `ux-designer` | caveve-ui, impeccable (chỉ đọc), web-design-guidelines, fixing-accessibility, baseline-ui | `02a-ux-flow.md` + prototype |
+| Marketing/Brand (full stack) | `mkt-brand` | caveve-domain, caveve-ui, django-drf-patterns, nextjs-shop-patterns, tdd-workflow | `0X-marketing.md` + code nội dung/CMS |
+| Tech Lead | `techlead` | caveve-domain, django-drf-patterns, nextjs-shop-patterns | `02b-tech-design.md` + review code |
+| Pháp lý | `legal-vn` | caveve-domain (+ tìm web) | `0X-phap-ly.md` |
+| BE | `be-dev` | django-drf-patterns, tdd-workflow | code `backend/` `adapter/` + `03-dev-notes.md` |
+| FE | `fe-dev` | nextjs-shop-patterns, caveve-ui, impeccable, emil-design-eng, baseline-ui, fixing-accessibility | code `frontend/` `erp-console/` + `03-dev-notes.md` |
+| QA | `qa-tester` | e2e-playwright, tdd-workflow | `04-qa-report.md` |
+| Shop UI dev / QA / ảnh | `shop-ui-dev`, `shop-ui-qa`, `image-scout` | caveve-ui, nextjs-shop-patterns, e2e-playwright | việc GUI-xx theo lệnh `/lam-shop-ui` |
+
+**Model:** lập kế hoạch (điều phối, PM, BA, PO, UX, mkt-brand, techlead, legal-vn) dùng model mạnh nhất của công cụ; code
+và test (be-dev, fe-dev, qa-tester, shop-ui-*) dùng model nhanh. Claude ghi model ở frontmatter agent; Gemini dùng
+`model: inherit`.
+
+**Quy trình một lô:**
+1. Điều phối viên nhận việc ở bảng việc chung, tạo worktree, đọc dòng lô trong `02c-giao-viec.md`, chạy lệnh kiểm chứng để ghi số gốc.
+2. Giao `be-dev` ∥ `fe-dev` (song song khi lô ghi BE ∥ FE), kèm mã story, danh sách file được sửa và không được đụng, contract 02b.
+3. Điều phối viên **tự chạy lại** lệnh kiểm chứng. Không tin báo cáo của subagent khi chưa chạy.
+4. `techlead` review diff (giá vốn, dữ liệu cá nhân, phân quyền, migration, lệch 02b).
+5. `qa-tester` kiểm theo luật đã siết: không PASS bằng đọc code, có ca ngoài đường thuận, `npm ci` sạch.
+6. REJECTED → giao lại dev, quay về bước 3 (tối đa 2 vòng). APPROVED → commit tiếng Việt có mã lô/story **theo pathspec**
+   (không `git add -A`), gộp `main`, chạy lại test tuần tự, `git push origin main`, đánh ☑ ở 02c và bảng việc.
+7. QA đạt + gộp main → tự deploy **staging** (UAT) cho Duy test. **Production chỉ khi Duy duyệt.**
+
+Subagent không gọi được subagent khác: mọi lượt giao việc đi qua điều phối viên. Subagent không làm git (trừ khi điều
+phối viên giao rõ), không deploy, không đụng DB thật.
 
 ## Luật bắt buộc (vi phạm = dừng lại hỏi Duy)
 
-- **Không lật quyết định** trong `doc/decisions.md` hay trong hồ sơ đã duyệt. Code không khớp thiết kế,
-  hoặc thiết kế sai → ghi vào `03-dev-notes.md` mục "Lệch thiết kế" và dừng lô đó, không tự quyết.
+- **Tài liệu quy trình luôn có sơ đồ Mermaid ở đầu** (Duy chốt 11/10): spec, 00/01/02/02a/02b/02c, PLAN, runbook
+  `doc/ops/`, `doc/he-thong/`, skill/agent/lệnh có khối ` ```mermaid ` ngay dưới tiêu đề. Nhãn tiếng Việt đời thường, ngắn,
+  không mã kỹ thuật; điểm Duy duyệt vẽ hình thoi; nhãn có dấu câu đặt trong ngoặc kép. Sửa quy trình thì sửa sơ đồ.
+- **Không lật quyết định** trong `doc/decisions.md` hay hồ sơ đã duyệt. Code lệch thiết kế → ghi "Lệch thiết kế" trong
+  `03-dev-notes.md` và dừng lô đó. Rule nghiệp vụ mới → đề xuất cập nhật `doc/business-process-spec.md`, hỏi Duy trước.
 - **Không rò giá vốn** (bất biến 1): serializer tách theo quyền, test bằng token từng Group.
-- **Không rò dữ liệu cá nhân khách** (tên, SĐT, địa chỉ — bất biến 9, lỗi **Critical**): API công khai
-  không trả, không ghi log, không đưa vào prompt AI, test/doc/commit chỉ dùng dữ liệu giả.
+- **Không rò dữ liệu cá nhân khách** (tên, SĐT, địa chỉ — bất biến 9, lỗi **Critical**): API công khai không trả, không
+  ghi log, không đưa vào prompt AI, không gửi bên thứ ba khi Duy chưa duyệt; test/doc/commit chỉ dùng dữ liệu giả.
 - **Không xoá chứng từ** (chỉ huỷ bằng trạng thái). Migration chỉ thêm, không đổi nghĩa field cũ.
-- **Không deploy**, không `gcloud`/`firebase deploy`, không đụng DB staging/production. Deploy chỉ khi Duy
-  nói rõ, theo `doc/ops/moi-truong.md`.
-- **Không commit `.env`, khoá, mật khẩu** — repo đang công khai.
+- **Không deploy production** khi Duy chưa duyệt. Deploy theo `doc/ops/moi-truong.md`, luôn staging trước. Build frontend
+  truyền `NEXT_PUBLIC_*` trực tiếp (vì `.env.local` đè lên `.env.production`).
+- **Không commit `.env`, khoá, mật khẩu, số điện thoại thật** — repo đang công khai.
 - **Không báo "xong" / "test xanh"** khi chưa chạy lệnh kiểm chứng trong lượt đó và dán kết quả.
-- **QA không chấm PASS bằng đọc code** (review 30/09 phát hiện nhiều AC FE PASS mà thực tế sai): AC FE cần
-  Playwright hoặc ảnh chụp trình duyệt; mỗi AC nghiệp vụ có ca ngoài đường thuận (xem `.agents/agents/qa-tester.md`).
+- **QA không chấm PASS bằng đọc code**: AC giao diện cần Playwright hoặc ảnh 360 + 1280; mỗi AC nghiệp vụ có ca ngoài đường thuận.
+- **Pháp lý, thủ tục, tài khoản kinh doanh là việc của Lộc**; IT (Duy + AI) chỉ soạn khung và nhắc.
+- Sheet feedback của Lộc: chỉ sửa giá trị, không phá format Duy đã làm; việc đã lên staging thì cột Tình Trạng ghi "Xong".
 
 ## Lệnh kiểm chứng
 
 ```bash
-cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+cd backend && DJANGO_SECRET_KEY=test DJANGO_DEBUG=1 .venv/bin/python manage.py collectstatic --noinput   # một lần
+cd backend && DJANGO_SECRET_KEY=test .venv/bin/python manage.py test --parallel 1 && .venv/bin/python manage.py makemigrations --check --dry-run
 cd adapter && pytest                                    # khi có sửa adapter
-cd frontend && npm ci && npx tsc --noEmit && npm run build
-cd erp-console && npm ci && npx tsc --noEmit && npm run build && npm test   # npm ci phải sạch, không --legacy-peer-deps
-# Test admin cần static: DJANGO_DEBUG=1 .venv/bin/python manage.py collectstatic --noinput (một lần)
+cd frontend && npm ci && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build
+cd erp-console && npm ci && npx tsc --noEmit && npm test && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build
+python3 frontend/e2e/run_shop_e2e.py --suite general_rules --suite full_flow   # e2e Shop + ERP
+python3 scripts/check_naming.py && python3 scripts/sync_ai_workspace.py --check
 ```
+`npm ci` phải sạch (không `--legacy-peer-deps`). Phải thấy dòng `Ran N tests … OK` mới tính là xanh (test song song có thể
+sập im lặng). Test Postgres chạy trên GitHub Actions khi push nhánh. Worktree không symlink `.env`.
 
 ## Git
 
-- Làm trên nhánh chứa hồ sơ (hiện là `wip/autosave`, xem `02c-giao-viec.md`). `git pull` trước khi bắt đầu.
-- Commit **sau khi lô đã QA APPROVED**, message tiếng Việt có mã story, rồi `git push`. Không force-push.
-- Trước khi commit: `git status` không có `.env`, DB, ảnh chụp test, bí mật.
+- Commit **theo pathspec**: `git add <file>` rồi `git commit -m "…" -- <file>`. Không `git add -A` / `git add .`.
+- Message tiếng Việt có mã lô/story. Dòng cuối ghi AI viết cùng: `Co-Authored-By: <tên model> <noreply@…>`.
+- Trước khi push: `git status` không có `.env`, DB, ảnh chụp test, bí mật.
 
 ## Môi trường
 
-Staging (SePay sandbox) và Production (SePay live) — chi tiết ở `doc/ops/moi-truong.md`. Build frontend
-luôn truyền `NEXT_PUBLIC_*` trực tiếp vì `.env.local` đè lên `.env.production`.
+**Staging** (SePay sandbox, DB `cangca_staging`) và **Production** (SePay live, DB `postgres` trên Supabase). URL, secret,
+lệnh build và migrate ở `doc/ops/moi-truong.md`. Bí mật đọc bằng `gcloud secrets versions access` gán thẳng vào biến môi
+trường, không in ra, không ghi file.
 
-## Đặt tên (P8b, Duy chốt 01/10)
+## Đặt tên (Duy chốt 01/10)
 
 Định danh trong code (hàm, biến, class, module, thư mục, file, test, script, route API, khoá JSON, biến env, Group,
-`data-testid`, id lệnh AI, khoá lưu trình duyệt) là **tiếng Anh chuẩn, không viết tắt tiếng Việt**. Chữ hiển thị cho người
-dùng, comment, docstring và tài liệu vẫn tiếng Việt. Viết tắt chỉ dùng khi là chuẩn quốc tế: `VN`, `VND`, `pnl`, `id`, `url`.
-Không đưa mã lô giao việc (`lo7`, `l8`, `p8_lo5`) vào tên; mã lô/story ghi trong docstring.
+`data-testid`, id lệnh AI, khoá lưu trình duyệt) là **tiếng Anh chuẩn, không viết tắt tiếng Việt**. Chữ hiển thị, comment,
+docstring và tài liệu vẫn tiếng Việt có dấu. Viết tắt chỉ dùng khi là chuẩn quốc tế: `VN`, `VND`, `pnl`, `id`, `url`.
+Không đưa mã lô giao việc (`lo7`, `l8`) vào tên; mã lô/story ghi trong docstring.
 
 | Khái niệm | Dùng | Không dùng |
 |---|---|---|
 | Vai (Group) | `owner` `manager` `warehouse_staff` `delivery_staff` `customer_service` | `chu` `quan_ly` `nv_kho` `nv_giao` `cskh` |
 | Người giao trên một phiếu | `courier` | `nv_giao` |
-| Việc gọi xác nhận đơn | `confirmation` | `cskh` (module, route, khoá JSON, env) |
+| Việc gọi xác nhận đơn | `confirmation` | `cskh` |
 | Nhập lô | `receive_batches`, `ReceiveBatches*` | `nhap_lo`, `NhapLo*` |
 | Lệnh AI: nhóm / mức nhạy cảm | `purchasing` `sales` `customer_service` / `high` `medium` `low` | `thu_mua` `ban_hang` / `cao` `trung_binh` `thap` |
 | Giờ Việt Nam | `VN_TIME_ZONE`, `todayInVietnam()`, `today_in_vietnam()` | `VN_TZ`, `todayVn`, `vn_today` |
-| Bản rà soát QA / bổ sung | `review_*` / `extra`, `followup` | `ra_soat_*` / `bosung` |
 
-Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, URL công khai Shop
-`/bai-viet/` `/trang/` `?chuyen-muc=`, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
-Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1.
+Giữ nguyên: migration đã chạy, `AuditLog.action` đã ghi, URL công khai Shop `/bai-viet/` `/trang/` `?chuyen-muc=`, dữ liệu
+demo (username `kho1`, `chu_vua`…, slug, mã hàng), keyword AI có dấu, chuỗi `cangca`. Bảng đầy đủ:
+`doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1. Kiểm bằng `python3 scripts/check_naming.py`
+(exit 1 khi file mới có định danh tiếng Việt hoặc số vi phạm tăng so với `scripts/naming_baseline.json`).
 
-**Kiểm bằng máy** (Python 3 stdlib, chạy từ gốc repo, dưới 10 giây, không cần venv):
-`python3 scripts/check_naming.py`. Exit 1 khi file MỚI có định danh tiếng Việt, hoặc số vi phạm của một file TĂNG so với
-`scripts/naming_baseline.json`; in file, dòng, token. Script không xét chuỗi hiển thị, comment, docstring. Danh sách từ chặn và
-allowlist ở `scripts/naming_blocklist.txt`. Chạy lệnh này trước khi báo xong mọi việc có sửa code.
-
-Mọi agent (Gemini CLI / Antigravity) chạy `python3 scripts/check_naming.py` cùng với bộ lệnh kiểm chứng ở mục "Lệnh kiểm chứng",
-trong đúng lượt báo xong; phải exit 0. Cách dùng `--update`, `git mv`, `naming: allow - <lý do>`: xem skill `tdd-workflow`, mục "Đặt tên".
+Tiền VNĐ; giờ hiển thị luôn Asia/Ho_Chi_Minh, DB lưu UTC. Báo cáo kỳ đã qua không sửa số, điều chỉnh ghi vào kỳ hiện tại.

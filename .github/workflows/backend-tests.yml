@@ -99,3 +99,12 @@ jobs:
             echo "### Test backend trên SQLite"
             grep -E "^(Ran [0-9]+ tests|OK|FAILED)" test-output.txt || echo "Không thấy dòng 'Ran N tests' (test sập giữa chừng)"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  ai-workspace:
+    # Claude và Gemini dùng chung agent, skill, lệnh (Duy chốt 15/11). Nguồn ở .claude/, bản Gemini sinh bằng script.
+    name: Kiểm đồng bộ bộ agent Claude và Gemini
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/sync_ai_workspace.py --check
