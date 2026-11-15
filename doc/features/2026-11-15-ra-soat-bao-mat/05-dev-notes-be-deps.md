@@ -52,4 +52,5 @@ Sau: backend `No known vulnerabilities found`; adapter `No known vulnerabilities
 Image `python:3.12-slim` vẫn được hỗ trợ, không đổi. Máy không có docker nên **chưa thêm user không root** (rủi ro với `collectstatic` và quyền ghi lúc chạy chưa kiểm). Khuyến nghị: thêm `RUN useradd -r app && chown -R app /app` + `USER app` sau bước collectstatic và thử `docker build` + chạy thử trước khi deploy.
 
 ## CI
-(ghi bên dưới sau khi chạy)
+Lần 1 (run 43707994749): SQLite xanh; PostgreSQL 16 đỏ `Ran 4052 tests ... FAILED (errors=9)`: 9 lớp test đua lỗi `PostgresRaceFixtureMixin._fixture_setup() missing 1 required positional argument` (Django 5.2 đổi `_fixture_setup` thành classmethod). Sửa `apps/common/tests/postgres_race.py` thành classmethod.
+Lần 2 (run 43719509602): cả 3 job xanh (SQLite, PostgreSQL 16 với test đua không bị skip, đồng bộ agent).
