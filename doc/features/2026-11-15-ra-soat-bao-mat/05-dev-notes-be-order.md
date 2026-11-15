@@ -66,4 +66,7 @@ sửa 5 ca cũ cần nâng trần (`test_shop_api`, `test_shop_create`, `test_vo
 
 ## Còn nợ
 - Mốc "1 lượt mã mỗi SĐT" (M-2, đề xuất thêm) và rút TTL khi chưa sang cổng thanh toán: ngoài phạm vi, chờ Duy/techlead.
-- CI Postgres: xem mục dưới.
+- Không còn nợ CI.
+
+## CI (run 43707934256, commit 802934f)
+Success: Test backend (SQLite), Test backend (PostgreSQL 16), Kiểm đồng bộ bộ agent.
