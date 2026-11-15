@@ -42,7 +42,10 @@ from apps.sales.orders.shop_errors import (
     LEVEL_OUT,
     LEVEL_SHORT,
     InvalidQtyError,
+    OrderLineTooLargeError,
+    OrderTooLargeError,
     OutOfStockError,
+    TooManyOpenOrdersError,
     VoucherInvalidError,
     validation_error,
 )
@@ -205,6 +208,36 @@ def _check_line_quantities(resolved):
         raise InvalidQtyError(bad)
 
 
+def _check_order_caps(resolved, today):
+    """
+    BR-BH-31: trần mỗi dòng (kg / combo) và tổng tạm tính trước giảm của đơn đặt online. Chạy TRƯỚC kiểm tồn, trước mọi
+    ghi DB hay giữ chỗ, để lỗi thiếu hàng không còn dùng dò số tồn. Món lạ/không giá bỏ qua (đã đi đường "hết hàng").
+    """
+    too_big, total = [], ZERO
+    for _raw, item, qty in resolved:
+        if item is None:
+            continue
+        cap = Decimal(settings.SHOP_MAX_LINE_COMBO) if item.is_bundle else Decimal(settings.SHOP_MAX_LINE_KG)
+        if qty > cap:
+            too_big.append({"item_code": item.code, "max_qty": money_str(cap)})
+        rate = listed_price(item, today)
+        if rate is not None:
+            total += qty * rate
+    if too_big:
+        raise OrderLineTooLargeError(too_big)
+    if total > Decimal(settings.SHOP_MAX_ORDER_VND):
+        raise OrderTooLargeError()
+
+
+def _check_open_order_caps(*, phone, client_ip_hash, now):
+    """BR-BH-31: số đơn đang giữ chỗ (BOOKED, còn hạn) cùng SĐT / cùng dấu vân IP không vượt trần."""
+    open_orders = SalesOrder.objects.filter(status=SalesOrder.Status.BOOKED, booked_expires_at__gt=now)
+    if open_orders.filter(phone=phone).count() >= settings.SHOP_MAX_OPEN_ORDERS_PER_PHONE:
+        raise TooManyOpenOrdersError()
+    if client_ip_hash and open_orders.filter(client_ip_hash=client_ip_hash).count() >= settings.SHOP_MAX_OPEN_ORDERS_PER_IP:
+        raise TooManyOpenOrdersError()
+
+
 def _demand_parts(item, qty):
     """[(thành phần, kg cần)] của một dòng; None nếu combo chưa có công thức (không bán được)."""
     if not item.is_bundle:
@@ -332,6 +365,8 @@ def create_order(
     privacy_consent=None,
     client_request_id=None,
     voucher_code=None,
+    client_ip_hash="",
+    enforce_caps=False,
 ):
     """
     Tạo đơn ở trạng thái BOOKED — do Hệ thống tạo (BR-PQ-11). TẤT CẢ trong 1 transaction:
@@ -358,11 +393,18 @@ def create_order(
     resolved = _resolve_lines(lines)
     _check_line_quantities(resolved)
 
+    today = timezone.localdate()
+    now = _now()
+    order_phone = phone or customer_phone
+
     # Kiểm tra đồng ý chính sách bảo mật trước khi giữ chỗ hoặc ghi DB (GL-03, BR-BH-17)
     policy_version = resolve_privacy_consent(privacy_consent)
 
-    today = timezone.localdate()
-    now = _now()
+    # BR-BH-31: trần đặt online (chỉ đường Shop công khai), sau POLICY_CHANGED, trước voucher/tồn/ghi DB.
+    if enforce_caps:
+        _check_order_caps(resolved, today)
+        _check_open_order_caps(phone=order_phone, client_ip_hash=client_ip_hash, now=now)
+
     code = voucher_services.normalize_code(voucher_code)
     if code:
         _precheck_voucher(resolved, code, today, now)
@@ -377,6 +419,10 @@ def create_order(
         customer = customers.get_or_create_by_phone(
             phone=customer_phone, name=customer_name, default_address=delivery_address,
         )
+        if enforce_caps:
+            # Hai request song song cùng SĐT: khoá khách rồi đếm lại để không lọt trần (BR-BH-31).
+            type(customer).objects.select_for_update().get(pk=customer.pk)
+            _check_open_order_caps(phone=order_phone, client_ip_hash="", now=now)
 
         order = SalesOrder.objects.create(
             code=_gen_code("SO", SalesOrder),
@@ -390,6 +436,7 @@ def create_order(
             privacy_consent_at=timezone.now() if policy_version else None,
             privacy_policy_version=policy_version,
             client_request_id=client_request_id,
+            client_ip_hash=client_ip_hash or "",
         )
 
         # Bước 1: dựng dữ liệu dòng + giá (đóng băng), chưa áp ưu đãi.

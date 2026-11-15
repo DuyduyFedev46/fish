@@ -7,6 +7,7 @@ Shop API công khai — đặt hàng & tra cứu đơn (guest checkout). Contrac
 - Lập tham số thanh toán cổng SePay: `apps.sales.payments.shop_api.ShopOrderCheckoutView`.
 KHÔNG có phí giao hàng (BR-BH-10). Không log `request.data` (bất biến 9): chỉ mã đơn và SĐT đã che.
 """
+import hashlib
 import hmac
 import logging
 import re
@@ -50,6 +51,14 @@ PHONE_RULE = "Số điện thoại cần 10 chữ số, bắt đầu bằng 0"
 _PHONE_RE = re.compile(r"0\d{9}")
 NAME_MAX = 100
 ADDRESS_MAX = 500
+
+
+def client_ip_fingerprint(request) -> str:
+    """BR-BH-31: HMAC-SHA256(SECRET_KEY, IP) — cùng cách lấy IP với throttle; không lưu, không log IP thô (bất biến 9)."""
+    ip = ShopOrderCreateThrottle().get_ident(request) or ""
+    if not ip:
+        return ""
+    return hmac.new(settings.SECRET_KEY.encode(), ip.encode(), hashlib.sha256).hexdigest()
 
 
 def _loggable_code(code: str) -> str:
@@ -158,6 +167,8 @@ class ShopOrderCreateView(NoStoreMixin, APIView):
             lines=parsed["lines"],
             privacy_consent=parsed["privacy_consent"],
             voucher_code=parsed["voucher_code"],
+            client_ip_hash=client_ip_fingerprint(request),
+            enforce_caps=True,  # BR-BH-31: chỉ đường Shop công khai
         )
         logger.info("shop order %s created=%s", order.code, created)
         body = shop_payload.create_payload(order, now=timezone.now())

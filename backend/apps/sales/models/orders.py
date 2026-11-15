@@ -58,6 +58,11 @@ class SalesOrder(models.Model):
         "Mã yêu cầu tạo đơn (chống trùng)", null=True, blank=True, unique=True, editable=False,
     )
 
+    # BR-BH-31: dấu vân IP khách lúc đặt (HMAC với khoá bí mật, KHÔNG lưu IP thô) để đếm số đơn đang giữ chỗ cùng IP.
+    client_ip_hash = models.CharField(
+        "Dấu vân IP lúc đặt (HMAC)", max_length=64, blank=True, default="", db_index=True, editable=False,
+    )
+
     # Khung go-live pháp lý (GL-03, BR-BH-17, bất biến 9)
     privacy_consent_at = models.DateTimeField(
         "Đồng ý xử lý dữ liệu lúc",

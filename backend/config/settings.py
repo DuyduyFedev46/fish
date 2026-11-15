@@ -408,6 +408,12 @@ SHOP_QTY_STEP_KG = Decimal(os.getenv("SHOP_QTY_STEP_KG", "0.5"))
 SHOP_LOW_STOCK_KG = Decimal(os.getenv("SHOP_LOW_STOCK_KG", "3"))
 SHOP_LOW_STOCK_COMBO = int(os.getenv("SHOP_LOW_STOCK_COMBO", "3"))
 SHOP_MAX_ORDER_LINES = int(os.getenv("SHOP_MAX_ORDER_LINES", "30"))
+# BR-BH-31 (rà soát bảo mật 15/11): trần đặt hàng online, chống đơn ảo giữ hết tồn và lượt mã giảm giá.
+SHOP_MAX_LINE_KG = Decimal(os.getenv("SHOP_MAX_LINE_KG", "20"))
+SHOP_MAX_LINE_COMBO = int(os.getenv("SHOP_MAX_LINE_COMBO", "10"))
+SHOP_MAX_ORDER_VND = Decimal(os.getenv("SHOP_MAX_ORDER_VND", "10000000"))
+SHOP_MAX_OPEN_ORDERS_PER_PHONE = int(os.getenv("SHOP_MAX_OPEN_ORDERS_PER_PHONE", "2"))
+SHOP_MAX_OPEN_ORDERS_PER_IP = int(os.getenv("SHOP_MAX_OPEN_ORDERS_PER_IP", "5"))
 # Tra đơn, thanh toán, huỷ (BR-BH-25, BR-TT-19, BR-HT-12) — lô 3+4 dùng.
 SHOP_LOOKUP_TOKEN_DAYS = int(os.getenv("SHOP_LOOKUP_TOKEN_DAYS", "30"))
 SHOP_PAYMENT_PENDING_MINUTES = int(os.getenv("SHOP_PAYMENT_PENDING_MINUTES", "5"))
