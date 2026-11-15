@@ -151,6 +151,13 @@ def describe_user(user) -> dict:
 
 
 @transaction.atomic
+@transaction.atomic
+def issue_token(*, user) -> Token:
+    """M-3/B12: đăng nhập cấp token MỚI, thu mọi token cũ của người này (token hết hạn không tồn tại mãi)."""
+    Token.objects.filter(user=user).delete()
+    return Token.objects.create(user=user)
+
+
 def logout(*, user) -> int:
     """Thu token của người đang đăng nhập (C8: mọi máy văng). Trả số token đã xoá."""
     revoked, _ = Token.objects.filter(user=user).delete()

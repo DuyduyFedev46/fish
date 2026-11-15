@@ -12,7 +12,11 @@ hoặc mọi `permission_classes` là `AllowAny` (Shop, public, internal).
 
 Ghi chú test: `APIClient.force_authenticate` bỏ qua lớp xác thực → test S48 dùng token thật.
 """
-from rest_framework import authentication
+import datetime
+
+from django.conf import settings
+from django.utils import timezone
+from rest_framework import authentication, exceptions
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny
 
@@ -81,7 +85,15 @@ class _EnforceAccessMixin:
 
 
 class TokenAuthentication(_EnforceAccessMixin, authentication.TokenAuthentication):
-    pass
+    """Token có hạn `AUTH_TOKEN_TTL_HOURS` kể từ lúc cấp (M-3). Quá hạn -> 401, ERP về trang đăng nhập."""
+
+    def authenticate_credentials(self, key):
+        user, token = super().authenticate_credentials(key)
+        ttl = datetime.timedelta(hours=settings.AUTH_TOKEN_TTL_HOURS)
+        if token.created + ttl < timezone.now():
+            token.delete()
+            raise exceptions.AuthenticationFailed("Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.")
+        return user, token
 
 
 class SessionAuthentication(_EnforceAccessMixin, authentication.SessionAuthentication):
