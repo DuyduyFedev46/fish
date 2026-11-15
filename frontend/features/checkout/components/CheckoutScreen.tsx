@@ -182,7 +182,7 @@ function CheckoutForm() {
   );
   const voucher = useVoucher(voucherItems, cart.ready);
   const quote = voucher.quote;
-  const pendingVoucher = pendingVoucherText(voucher.code, Boolean(quote), voucher.error !== null);
+  const pendingVoucher = pendingVoucherText(voucher.code, Boolean(quote), voucher.error !== null && !voucher.checking);
   const localTotal = String(Math.round(cart.totalAmount));
   const total = quote ? quote.total_after : localTotal;
   const itemCount = cart.lines.length;

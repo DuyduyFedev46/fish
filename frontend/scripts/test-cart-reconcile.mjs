@@ -96,5 +96,13 @@ eq("tìm đ", text.foldVietnamese("Đông Lạnh"), "dong lanh");
 eq("giống SĐT", text.looksLikePhone("0900000001"), true);
 eq("từ khoá thường", text.looksLikePhone("cá thu 2"), false);
 
+// TD-06: mã món không có trong danh mục -> tên "Món không còn bán", vẫn là "out", mã giữ nguyên để bỏ khỏi giỏ.
+r = mod.reconcileCart([entry("KHONG-CO", "1000", 1)], [item("A", "1", "in")]);
+eq("món lạ hiện tên chung", r.lines[0].entry.name, "Món không còn bán");
+eq("món lạ giữ mã", r.lines[0].entry.item_code, "KHONG-CO");
+eq("món lạ coi như hết", r.lines[0].status, "out");
+r = mod.reconcileCart([entry("KHONG-CO", "1000", 1)], null);
+eq("chưa có danh mục giữ tên cũ", r.lines[0].entry.name, "KHONG-CO");
+
 console.log(`test-cart-reconcile: ${n - fail}/${n} đạt, ${fail} sai`);
 process.exit(fail ? 1 : 0);

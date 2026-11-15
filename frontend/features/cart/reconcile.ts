@@ -4,6 +4,9 @@
  */
 import { isValidQty, parseQtyRule, snapUp, type QtyRule } from "@/lib/quantity";
 
+/** Tên hiện cho món có mã không còn trong danh mục (giỏ bị sửa tay); không hiện mã thô làm tên (TD-06). */
+export const MISSING_ITEM_NAME = "Món không còn bán";
+
 export type ReconcileEntry = { item_code: string; name: string; unit: "kg" | "combo"; price: string; qty: number };
 export type ReconcileItem = {
   item_code: string;
@@ -56,9 +59,11 @@ export function reconcileCart(entries: ReconcileEntry[], catalog: ReconcileItem[
     let status: ReconciledLine["status"] = "ok";
     let unitPrice = entry.price;
     let previousUnitPrice: string | undefined;
+    let shown = entry;
     if (catalog) {
       if (!item || item.stock_level === "out") {
         status = "out";
+        if (!item) shown = { ...entry, name: MISSING_ITEM_NAME };
       } else {
         unitPrice = item.price;
         if (Number(item.price) !== Number(entry.price)) {
@@ -70,7 +75,7 @@ export function reconcileCart(entries: ReconcileEntry[], catalog: ReconcileItem[
     if (status === "out") outCount += 1;
     else subtotal += Math.round((Number(unitPrice) || 0) * qty);
     if (status === "price-changed") priceChangedCount += 1;
-    return { entry, qty, qtyAdjusted, status, unitPrice, previousUnitPrice, rule };
+    return { entry: shown, qty, qtyAdjusted, status, unitPrice, previousUnitPrice, rule };
   });
 
   return { lines, adjustedCount, outCount, priceChangedCount, subtotal };
