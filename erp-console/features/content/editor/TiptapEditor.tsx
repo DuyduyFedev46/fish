@@ -26,31 +26,43 @@ export interface TiptapEditorProps {
   disabled?: boolean;
 }
 
+// Khai báo một lần ngoài component: mảng extension mới mỗi lần render làm Tiptap 3 dựng lại lược đồ.
+const EDITOR_EXTENSIONS = [
+  StarterKit.configure({
+    heading: { levels: [2, 3] },
+    codeBlock: false,
+    code: false,
+    strike: false,
+    horizontalRule: false,
+    hardBreak: false,
+    // Tiptap 3 đã gộp sẵn Link và Underline: tắt để dùng Link cấu hình riêng bên dưới (tránh đăng ký trùng)
+    // và giữ lược đồ cũ (không có gạch chân). trailingNode sẽ tự thêm đoạn rỗng cuối bài, làm đổi body.blocks.
+    link: false,
+    underline: false,
+    trailingNode: false,
+  }),
+  Link.configure({
+    protocols: ["https", "http", "mailto", "tel"],
+    autolink: false,
+    openOnClick: false,
+    validate: (href) => isSafeHref(href),
+  }),
+  CaveImageExtension,
+  ItemCardExtension,
+];
+
 const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(({ value, onChange, disabled }, ref) => {
   const [dialog, setDialog] = useState<"item" | "link" | null>(null);
   const valueRef = useRef<BodyDoc>(value);
   valueRef.current = value;
 
   const editor = useEditor({
+    // Tiptap 3: xuất tĩnh (static export) nên chỉ dựng editor ở trình duyệt; và phải render lại thanh công cụ
+    // mỗi giao dịch để nút Đậm/Nghiêng/... sáng đúng trạng thái (mặc định v3 là không render lại).
+    immediatelyRender: false,
+    shouldRerenderOnTransaction: true,
     editable: !disabled,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [2, 3] },
-        codeBlock: false,
-        code: false,
-        strike: false,
-        horizontalRule: false,
-        hardBreak: false,
-      }),
-      Link.configure({
-        protocols: ["https", "http", "mailto", "tel"],
-        autolink: false,
-        openOnClick: false,
-        validate: (href) => isSafeHref(href),
-      }),
-      CaveImageExtension,
-      ItemCardExtension,
-    ],
+    extensions: EDITOR_EXTENSIONS,
     content: bodyToTiptap(value),
     onUpdate: ({ editor }) => {
       const next = tiptapToBody(editor.getJSON());
@@ -93,7 +105,7 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(({ value,
     const currentBody = tiptapToBody(editor.getJSON());
     if (JSON.stringify(currentBody) !== JSON.stringify(value)) {
       // emitUpdate = false: đồng bộ từ ngoài vào không phải việc người dùng gõ.
-      editor.commands.setContent(bodyToTiptap(value), false);
+      editor.commands.setContent(bodyToTiptap(value), { emitUpdate: false });
     }
   }, [value, editor]);
 
