@@ -643,7 +643,7 @@ def ph_draft_submit(browser):
     env["PY"] = os.environ.get("BACKEND_PY") or os.path.join(wt, ".venv", "bin", "python")
     if not os.path.exists(env["PY"]):
         env["PY"] = sys.executable
-    out = subprocess.run([env["PY"], "manage.py", "shell", "-c", script], cwd=wt, env=env, capture_output=True, text=True)
+    out = subprocess.run([env["PY"], "manage.py", "shell", "--no-imports", "-c", script], cwd=wt, env=env, capture_output=True, text=True)
     m = re.search(r"DRAFTID (\d+)", out.stdout)
     ok("(chuẩn bị) tạo phiếu Nháp bằng ORM", bool(m), out.stderr[-300:] + out.stdout[-200:])
     if not m:
@@ -674,7 +674,7 @@ def ph_draft_submit(browser):
     st, det, _ = call("GET", f"/api/purchasing/receipts/{did}/", "loc")
     ok("Ghi nhận phiếu đã ghi nhận lần 2 (API): không sinh thêm lô (vẫn 1 lô)", sum(1 for l in det["lines"] if l["batch"]) == 1 and st2 == 400 and "RECEIPT_NOT_DRAFT" in raw, (st2, [l["batch"] for l in det["lines"]]))
     # Màn cũ: tải trang phiếu Nháp, tab khác huỷ phiếu, rồi bấm Ghi nhận trên màn cũ
-    out2 = subprocess.run([env["PY"], "manage.py", "shell", "-c", script], cwd=wt, env=env, capture_output=True, text=True)
+    out2 = subprocess.run([env["PY"], "manage.py", "shell", "--no-imports", "-c", script], cwd=wt, env=env, capture_output=True, text=True)
     m2 = re.search(r"DRAFTID (\d+)", out2.stdout)
     did2 = int(m2.group(1))
     s.go(f"/purchasing/detail/?id={did2}")

@@ -215,6 +215,8 @@ else:
             "BACKEND": "django.core.cache.backends.db.DatabaseCache",
             "LOCATION": "django_cache",
             "OPTIONS": {"MAX_ENTRIES": 100000, "CULL_FREQUENCY": 10},
+            # Tách bộ đếm khi nhiều tiến trình dùng chung DB mà cần giới hạn riêng (vd BE phụ của e2e). Mặc định rỗng.
+            "KEY_PREFIX": os.getenv("DJANGO_CACHE_KEY_PREFIX", ""),
         }
     }
 

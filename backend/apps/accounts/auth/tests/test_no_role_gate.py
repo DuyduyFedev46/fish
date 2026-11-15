@@ -102,7 +102,7 @@ class NoRoleGateTests(TestCase):
         resp = self.client_no_role.post(CHANGE, {"old_password": "sai", "new_password": "Moi-mat-khau-2026"}, format="json")
         self.assertNotEqual(resp.status_code, 403)
         self.assertEqual(self.client_no_role.post(LOGOUT).status_code, 204)
-        # M-3 (15/11): đăng nhập cấp token mới và thu token cũ, nên thử đăng nhập SAU khi đăng xuất.
+        # thử đăng nhập SAU khi đăng xuất (đăng xuất thu token).
         login = APIClient().post(LOGIN, {"username": "no_role_fake", "password": "x"}, format="json")
         self.assertEqual(login.status_code, 200)
 

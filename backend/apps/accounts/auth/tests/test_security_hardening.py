@@ -53,14 +53,16 @@ class TokenExpiryTests(TestCase):
         self.assertEqual(self._me(token.key).status_code, 200)
 
     @override_settings(AUTH_TOKEN_TTL_HOURS=12)
-    def test_login_again_issues_new_token_and_revokes_old(self):
+    def test_login_again_within_ttl_reuses_token(self):
+        # máy thứ hai đăng nhập cùng tài khoản không làm văng máy thứ nhất; hạn vẫn tính từ lúc cấp lần đầu
         api = APIClient()
         first = api.post(LOGIN_URL, {"username": "kho_sec", "password": PASSWORD}, format="json").json()["token"]
         second = api.post(LOGIN_URL, {"username": "kho_sec", "password": PASSWORD}, format="json").json()["token"]
-        self.assertNotEqual(first, second)
-        self.assertEqual(self._me(first).status_code, 401)
-        self.assertEqual(self._me(second).status_code, 200)
+        self.assertEqual(first, second)
+        self.assertEqual(self._me(first).status_code, 200)
         self.assertEqual(Token.objects.filter(user=self.user).count(), 1)
+        self._age(Token.objects.get(key=first), 13)
+        self.assertEqual(self._me(first).status_code, 401)
 
     @override_settings(AUTH_TOKEN_TTL_HOURS=12)
     def test_login_replaces_expired_token(self):

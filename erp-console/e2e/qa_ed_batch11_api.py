@@ -83,7 +83,7 @@ def keys_deep(o, acc=None):
 
 def shell(code):
     env = dict(os.environ, DATABASE_URL="sqlite:///" + DB)
-    p = subprocess.run([BACKEND_PY, "manage.py", "shell", "-c", code], cwd=BACKEND_DIR, env=env, capture_output=True, text=True)
+    p = subprocess.run([BACKEND_PY, "manage.py", "shell", "--no-imports", "-c", code], cwd=BACKEND_DIR, env=env, capture_output=True, text=True)
     return p.stdout.strip().splitlines()[-1] if p.stdout.strip() else p.stderr[-300:]
 
 

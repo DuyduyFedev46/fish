@@ -169,7 +169,7 @@ def main():
     run(mg + ["migrate", "-v0"], env=env, cwd=BACKEND, label="migrate")
     run(mg + ["seed_demo"], env=env, cwd=BACKEND, label="seed_demo")
     run(mg + ["seed_qa", "--manifest", str(workdir / "qa_ids.json")], env=env, cwd=BACKEND, label="seed_qa")
-    run(mg + ["shell"], env=env, cwd=BACKEND, stdin=open(Path(__file__).parent / "shop_seed.py"), label="shop_seed.py")
+    run(mg + ["shell", "--no-imports"], env=env, cwd=BACKEND, stdin=open(Path(__file__).parent / "shop_seed.py"), label="shop_seed.py")
     run(mg + ["load_shop_content", "--author", "qa_owner", "--publish"], env=env, cwd=BACKEND, label="load_shop_content")
     (workdir / "env.json").write_text(json.dumps({"be_env": env, "internal_token": env["INTERNAL_SERVICE_TOKEN"]}))
 

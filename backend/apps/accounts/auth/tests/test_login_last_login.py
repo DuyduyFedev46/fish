@@ -50,7 +50,7 @@ class LoginLastLoginTests(TestCase):
         self.kho.refresh_from_db()
         self.assertIsNone(self.kho.last_login)
 
-    def test_login_lan_hai_cap_token_moi(self):  # M-3 (15/11): đăng nhập lại cấp token mới, thu token cũ
+    def test_login_lan_hai_dung_lai_token(self):  # C8 + M-3: token còn hạn thì dùng lại, máy khác không văng
         k1 = login("kho1", PW).json()["token"]
         k2 = login("kho1", PW).json()["token"]
-        self.assertNotEqual(k1, k2)
+        self.assertEqual(k1, k2)

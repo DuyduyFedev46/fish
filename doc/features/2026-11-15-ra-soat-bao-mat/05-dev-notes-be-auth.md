@@ -37,7 +37,7 @@ không đổi contract API (chỉ thêm mã 429/409/401 ở chỗ trước đây
   dò mật khẩu một tài khoản từ rất nhiều IP khác nhau chỉ bị giới hạn theo từng IP. Nếu muốn thêm trần toàn cục theo username thì phải chấp nhận
   nó lại khoá được Chủ, nên chưa làm.
 - Throttle đổi mật khẩu: 10 lần/giờ/người.
-- Token: 12 giờ, không gia hạn trượt. Đăng nhập thiết bị thứ hai thu token của thiết bị đầu (đúng yêu cầu "xoá token cũ").
+- Token: 12 giờ, không gia hạn trượt. **Điều phối đổi sau khi gộp (15/11):** token còn hạn thì đăng nhập lại dùng lại token đó, giữ C8 (nhiều máy cùng tài khoản, vd kho dùng chung, không văng nhau); chỉ thu và cấp mới khi đã hết hạn. Đăng xuất, đổi mật khẩu vẫn thu mọi token.
 
 ## Env cần đặt khi deploy
 

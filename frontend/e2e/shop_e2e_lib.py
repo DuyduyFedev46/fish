@@ -118,7 +118,7 @@ def manage_shell(code):
     """Chạy một đoạn Python trong `manage.py shell` của DB tạm. Trả stdout."""
     info = env_info()
     env = {**os.environ, **info["be_env"]}
-    out = subprocess.run([str(BACKEND / ".venv/bin/python"), "manage.py", "shell", "-c", code], cwd=BACKEND, env=env,
+    out = subprocess.run([str(BACKEND / ".venv/bin/python"), "manage.py", "shell", "--no-imports", "-c", code], cwd=BACKEND, env=env,
                          capture_output=True, text=True, timeout=120)
     if out.returncode != 0:
         raise RuntimeError(out.stderr[-1500:])
@@ -296,7 +296,8 @@ def cancel_paid(order_code, note="Hết hàng lúc soạn (giả)"):
 def spawn_be(port, extra_env):
     """BE thứ hai (cùng DB tạm) với giới hạn tần suất riêng, để thấy 429 thật. Gọi `.terminate()` khi xong."""
     info = env_info()
-    env = {**os.environ, **info["be_env"], **extra_env}
+    # cache throttle nằm trong DB dùng chung: BE phụ cần tiền tố khoá riêng để có bộ đếm của nó
+    env = {**os.environ, **info["be_env"], "DJANGO_CACHE_KEY_PREFIX": f"be{port}", **extra_env}
     p = subprocess.Popen([str(BACKEND / ".venv/bin/python"), "manage.py", "runserver", str(port), "--noreload"],
                          cwd=BACKEND, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     import time

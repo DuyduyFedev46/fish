@@ -5,10 +5,14 @@ Nghiệp vụ "tôi là ai, có quyền gì" (S6, S47 · BR-PQ-09, UC-01) và ph
 Console chỉ đọc kết quả này để dựng menu/nút; backend vẫn là lớp chặn (BR-PQ-12).
 C8: DRF cấp **một token mỗi người** → đăng xuất / đổi mật khẩu thu token là văng mọi máy.
 """
+import datetime
+
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
 from apps.accounts import roles
@@ -151,9 +155,13 @@ def describe_user(user) -> dict:
 
 
 @transaction.atomic
-@transaction.atomic
 def issue_token(*, user) -> Token:
-    """M-3/B12: đăng nhập cấp token MỚI, thu mọi token cũ của người này (token hết hạn không tồn tại mãi)."""
+    """M-3/B12: token còn hạn thì dùng lại (nhiều máy cùng tài khoản không văng nhau, như C8); hết hạn
+    `AUTH_TOKEN_TTL_HOURS` thì thu và cấp token mới. Đăng xuất / đổi mật khẩu vẫn thu mọi token."""
+    ttl = datetime.timedelta(hours=settings.AUTH_TOKEN_TTL_HOURS)
+    token = Token.objects.select_for_update().filter(user=user).first()
+    if token is not None and token.created + ttl >= timezone.now():
+        return token
     Token.objects.filter(user=user).delete()
     return Token.objects.create(user=user)
 
