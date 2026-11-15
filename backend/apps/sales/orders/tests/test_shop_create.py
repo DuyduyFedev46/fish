@@ -59,6 +59,7 @@ class ShopCreateBase(SalesServiceBase):
 
 
 class ValidQtyTests(ShopCreateBase):
+    @override_settings(SHOP_MAX_OPEN_ORDERS_PER_PHONE=50, SHOP_MAX_OPEN_ORDERS_PER_IP=50)  # BR-BH-31: nhiều đơn liên tiếp cùng SĐT
     def test_s2_02_ac1_valid_kg_quantities_create_order(self):
         self._stocked_batch(self._item("MUC-ONG", price="278000"), "50")
         for qty in ("1", "1.5", "2", "10.5"):

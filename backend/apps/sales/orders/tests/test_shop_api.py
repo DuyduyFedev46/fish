@@ -2,7 +2,7 @@
 import datetime
 from decimal import Decimal
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -58,6 +58,7 @@ class ShopOrderAPITests(TestCase):
         bad = self.lookup(code, "0900000000")
         self.assertEqual(bad.status_code, 404)
 
+    @override_settings(SHOP_MAX_LINE_KG=Decimal("100000"), SHOP_MAX_ORDER_VND=Decimal("1000000000"))  # BR-BH-31: ca này kiểm thứ tự lỗi tồn, nên nâng trần
     def test_shop_order_insufficient_stock_returns_400(self):
         resp = self.client.post(
             "/api/shop/orders/",

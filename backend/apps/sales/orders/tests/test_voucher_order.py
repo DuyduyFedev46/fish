@@ -9,6 +9,7 @@ from decimal import Decimal
 from unittest import mock
 
 from django.core.cache import cache
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -76,6 +77,7 @@ class ApplyTests(VoucherOrderBase):
     def test_code_is_normalized(self):
         self.assertEqual(self.order_with("cave 10").json()["discount"]["code"], "CAVE10")
 
+    @override_settings(SHOP_MAX_OPEN_ORDERS_PER_PHONE=50, SHOP_MAX_OPEN_ORDERS_PER_IP=50)  # BR-BH-31: nhiều đơn liên tiếp cùng SĐT
     def test_empty_or_missing_code_means_no_voucher(self):
         for body in ({"voucher_code": ""}, {"voucher_code": None}, {}):
             with self.subTest(body=body):
@@ -210,10 +212,12 @@ class InvalidAtOrderTests(VoucherOrderBase):
 
         return make_order("0900000999")
 
+    @override_settings(SHOP_MAX_LINE_KG=Decimal("100000"), SHOP_MAX_ORDER_VND=Decimal("1000000000"))  # BR-BH-31: ca này kiểm thứ tự lỗi tồn, nên nâng trần
     def test_voucher_invalid_comes_before_out_of_stock(self):
         response = self.order_with("KHONGCO1", cart=[("MUC-A", "500")])  # vừa mã sai vừa hết hàng
         self.assertEqual(response.json()["code"], "VOUCHER_INVALID")
 
+    @override_settings(SHOP_MAX_LINE_KG=Decimal("100000"), SHOP_MAX_ORDER_VND=Decimal("1000000000"))  # BR-BH-31: ca này kiểm thứ tự lỗi tồn, nên nâng trần
     def test_out_of_stock_with_valid_voucher_holds_nothing(self):
         response = self.order_with(cart=[("MUC-A", "500"), ("MUC-B", "2")])
         self.assertEqual(response.json()["code"], "OUT_OF_STOCK")

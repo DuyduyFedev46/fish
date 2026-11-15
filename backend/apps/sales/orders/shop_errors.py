@@ -15,6 +15,9 @@ INVALID_QTY = "INVALID_QTY"
 OUT_OF_STOCK = "OUT_OF_STOCK"
 VALIDATION = "VALIDATION"
 VOUCHER_INVALID = "VOUCHER_INVALID"
+ORDER_LINE_TOO_LARGE = "ORDER_LINE_TOO_LARGE"
+ORDER_TOO_LARGE = "ORDER_TOO_LARGE"
+TOO_MANY_OPEN_ORDERS = "TOO_MANY_OPEN_ORDERS"
 
 LEVEL_OUT = "out"      # hết hàng, hoặc món không còn bán
 LEVEL_SHORT = "short"  # còn hàng nhưng không đủ số khách đặt
@@ -69,6 +72,36 @@ class VoucherInvalidError(ShopValidationError):
         if missing_amount is not None:
             extra["missing_amount"] = money_str(missing_amount)
         super().__init__(extra=extra)
+
+
+class _HotlineError(ShopValidationError):
+    """BR-BH-31: vượt trần đặt online -> từ chối cả đơn, mời gọi hotline. Không có số tồn, không dữ liệu khách."""
+
+    def __init__(self, message, *, extra=None):
+        super().__init__(f"{message} Vui lòng gọi hotline {settings.SHOP_HOTLINE} để được hỗ trợ.", extra=extra)
+
+
+class OrderLineTooLargeError(_HotlineError):
+    """`lines`: [{item_code, max_qty}] — trần là tham số cấu hình, không phải tồn kho."""
+
+    default_code = ORDER_LINE_TOO_LARGE
+
+    def __init__(self, lines):
+        super().__init__("Số lượng một món vượt mức đặt trực tuyến.", extra={"lines": list(lines)})
+
+
+class OrderTooLargeError(_HotlineError):
+    default_code = ORDER_TOO_LARGE
+
+    def __init__(self):
+        super().__init__("Giá trị đơn vượt mức đặt trực tuyến.")
+
+
+class TooManyOpenOrdersError(_HotlineError):
+    default_code = TOO_MANY_OPEN_ORDERS
+
+    def __init__(self):
+        super().__init__("Đang có quá nhiều đơn chưa thanh toán. Hãy thanh toán hoặc chờ đơn cũ hết hạn giữ chỗ.")
 
 
 def validation_error(**fields):
