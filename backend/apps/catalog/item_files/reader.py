@@ -22,7 +22,7 @@ from .workbook import SHEET_ITEMS
 
 MAX_ZIP_ENTRIES = 2000
 ZIP_MAGIC = b"PK\x03\x04"
-# Chỉ quét tối đa số cột của mẫu cộng chút dư (để vẫn bắt được cột lạ sát bên phải), không quét cột rác xa hơn (M1).
+# Dòng DỮ LIỆU chỉ quét tối đa số cột của mẫu cộng chút dư, không quét cột rác xa hơn (M1). Dòng tiêu đề đọc đủ cột (TD-02).
 SCAN_EXTRA_COLS = 8
 # Trần cứng số dòng đã quét (kể cả dòng trống) tính theo bội của số dòng tối đa (M1, 02b §13.3).
 SCAN_ROWS_FACTOR = 2
@@ -232,12 +232,13 @@ def read_import_workbook(uploaded_file) -> ParsedWorkbook:
         ws_val = wb_val[sheet_name]
         ws_raw = wb_raw[sheet_name]
 
+        # TD-02 (02b §13.3 L6): dòng tiêu đề đọc riêng, không giới hạn cột, để bắt cột lạ nằm xa bên phải.
+        # Chỉ 1 dòng nên không tốn; các dòng dữ liệu vẫn giới hạn max_col (M1).
         scan_max_col = len(ALL_COLUMNS) + SCAN_EXTRA_COLS
-        val_iter = ws_val.iter_rows(values_only=False, max_col=scan_max_col)
-        raw_iter = ws_raw.iter_rows(values_only=False, max_col=scan_max_col)
-        first_val = next(val_iter, None)
-        first_raw = next(raw_iter, None)
-        if first_val is None or first_raw is None:
+        first_val = next(ws_val.iter_rows(min_row=1, max_row=1, values_only=False), None)
+        val_iter = ws_val.iter_rows(min_row=2, values_only=False, max_col=scan_max_col)
+        raw_iter = ws_raw.iter_rows(min_row=2, values_only=False, max_col=scan_max_col)
+        if first_val is None:
             missing = list(REQUIRED_HEADERS)
             raise invalid_file_error(
                 "missing_columns",
