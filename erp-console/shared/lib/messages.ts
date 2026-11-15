@@ -24,7 +24,7 @@ export const MSG = {
   loginFailed: "Sai tài khoản/mật khẩu hoặc tài khoản đã ngừng hoạt động.",
   meLoadFailed: "Không tải được thông tin tài khoản.",
   /** S7-AC6: bị đưa về đăng nhập vì 401. */
-  sessionExpired: "Phiên đăng nhập đã hết. Đăng nhập lại để làm tiếp — nội dung đang gõ dở vẫn được giữ.",
+  sessionExpired: "Phiên đăng nhập đã hết hạn, anh/chị đăng nhập lại. Nội dung đang gõ dở vẫn được giữ.",
   /** S47-AC3: 403 rồi tải lại `me` thấy quyền khác trước. */
   permChanged: "Quyền của bạn vừa thay đổi. Menu và nút đã cập nhật theo quyền mới.",
   /** S7-AC3: mở màn không có quyền. */

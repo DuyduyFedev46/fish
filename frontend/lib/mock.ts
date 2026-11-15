@@ -783,6 +783,17 @@ export async function mockCreateOrder(payload: CreateOrderPayload): Promise<Crea
     throw new ApiError("Một số món vừa hết hàng.", 400, "OUT_OF_STOCK", { code: "OUT_OF_STOCK", lines: short });
   }
 
+  // Giới hạn đơn (đợt bảo mật 15/11): SOLUONGLON mô phỏng dòng quá lớn, DONLON đơn quá lớn, NHIEUDON quá nhiều đơn đang mở.
+  const limitProbe = String(payload.delivery_address ?? "").toUpperCase();
+  const limits: Record<string, [string, string]> = {
+    "[GIOI-HAN-DONG]": ["ORDER_LINE_TOO_LARGE", "Một món đặt quá nhiều so với mức đặt online. Bạn giảm số lượng hoặc gọi hotline để được hỗ trợ."],
+    "[GIOI-HAN-DON]": ["ORDER_TOO_LARGE", "Đơn vượt giới hạn đặt online, vui lòng gọi hotline để được hỗ trợ."],
+    "[GIOI-HAN-NHIEU-DON]": ["TOO_MANY_OPEN_ORDERS", "Bạn đang có nhiều đơn chưa hoàn tất. Hoàn tất hoặc đợi đơn cũ hết hạn rồi đặt tiếp."],
+  };
+  for (const [marker, [limitCode, limitText]] of Object.entries(limits)) {
+    if (limitProbe.includes(marker)) throw new ApiError(limitText, 400, limitCode, { code: limitCode, detail: limitText });
+  }
+
   // Mã giảm giá (3b): server kiểm lại lúc đặt. HETLUC mô phỏng mã vừa hết hiệu lực giữa lúc khách đang điền form (B8).
   let voucher: MockOrder["voucher"] = null;
   if (payload.voucher_code) {
