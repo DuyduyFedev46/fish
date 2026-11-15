@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "@/shared/lib/http";
 import {
   countPriceFlags,
-  extractAlreadyAppliedCounts,
   extractRowErrors,
   formatActionBarSummary,
   formatConfirmSubmitLabel,
@@ -13,6 +12,7 @@ import {
   formatPriceDiffPercent,
   formatPriceHeaderSummary,
   groupReadonlyWarnings,
+  isImportAlreadyApplied,
   groupValidFromSummary,
   shopStateLabel,
   sortPriceRows,
@@ -21,6 +21,7 @@ import {
 } from "./itemFilesModel";
 import {
   IMPORT_ALREADY_APPLIED,
+  IMPORT_DATA_CHANGED,
   IMPORT_INVALID_ROWS,
   type ImportPreviewRow,
   type ImportSummary,
@@ -255,11 +256,8 @@ describe("định dạng hiển thị chênh lệch giá, ngày áp dụng, câu
       price_changed: 3,
       visibility_changed: 0,
     });
-    expect(extractAlreadyAppliedCounts(dupErr)).toEqual({
-      created: 1,
-      updated: 2,
-      price_changed: 3,
-      visibility_changed: 0,
-    });
+    expect(isImportAlreadyApplied(dupErr)).toBe(true);
+    expect(isImportAlreadyApplied(new ApiError("Khác", 409, IMPORT_DATA_CHANGED))).toBe(false);
+    expect(isImportAlreadyApplied(new Error("x"))).toBe(false);
   });
 });

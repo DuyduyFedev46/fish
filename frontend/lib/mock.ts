@@ -506,6 +506,7 @@ function toWireLookup(o: MockOrder, now: number): OrderLookupResult {
       unit: l.unit,
       qty: String(l.qty),
       amount: String(l.amount),
+      rate: String(Math.round(l.amount / l.qty)),
     })),
     subtotal: String(o.lines.reduce((sum, l) => sum + l.amount, 0)),
     discount,

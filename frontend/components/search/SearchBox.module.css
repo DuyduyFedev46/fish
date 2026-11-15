@@ -140,6 +140,7 @@
   }
 }
 
+/* Dưới 1024px giữ 16px để iOS không tự phóng to khi chạm vào ô (TD-06). */
 @media (min-width: 1024px) {
   .brand .input {
     font-size: 14px;

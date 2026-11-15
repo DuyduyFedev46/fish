@@ -23,17 +23,16 @@ import {
   previewImport,
 } from "../itemFilesApi";
 import {
-  extractAlreadyAppliedCounts,
   extractRowErrors,
   formatActionBarSummary,
   formatImportSuccessToast,
   formatMaxMb,
   formatMaxRows,
   groupReadonlyWarnings,
+  isImportAlreadyApplied,
   validateImportFile,
 } from "../itemFilesModel";
 import {
-  IMPORT_ALREADY_APPLIED,
   IMPORT_DATA_CHANGED,
   IMPORT_INVALID_FILE,
   IMPORT_PREVIEW_EXPIRED,
@@ -240,8 +239,7 @@ function ItemImportBody() {
       toast.success(formatImportSuccessToast(res));
       router.push("/catalog/?tab=items");
     } catch (err) {
-      const alreadyCounts = extractAlreadyAppliedCounts(err);
-      if (alreadyCounts || (err instanceof ApiError && err.code === IMPORT_ALREADY_APPLIED)) {
+      if (isImportAlreadyApplied(err)) {
         setConfirmOpen(false);
         toast.success(M.toastAlreadyApplied);
         router.push("/catalog/?tab=items");

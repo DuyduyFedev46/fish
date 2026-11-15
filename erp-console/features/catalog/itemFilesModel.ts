@@ -297,19 +297,7 @@ export function extractRowErrors(err: unknown): ImportRowErrorsDetails | null {
   };
 }
 
-/** Trích xuất số đếm từ 409 `IMPORT_ALREADY_APPLIED` (T5, S6-AC7). */
-export function extractAlreadyAppliedCounts(err: unknown): {
-  created: number;
-  updated: number;
-  price_changed: number;
-  visibility_changed: number;
-} | null {
-  if (!(err instanceof ApiError) || err.code !== IMPORT_ALREADY_APPLIED) return null;
-  const d = (err.details || {}) as Record<string, unknown>;
-  return {
-    created: typeof d.created === "number" ? d.created : 0,
-    updated: typeof d.updated === "number" ? d.updated : 0,
-    price_changed: typeof d.price_changed === "number" ? d.price_changed : 0,
-    visibility_changed: typeof d.visibility_changed === "number" ? d.visibility_changed : 0,
-  };
+/** 409 `IMPORT_ALREADY_APPLIED` (T5, S6-AC7): file đã được ghi rồi, coi như thành công. Chỉ xét `code`; toast dùng câu cố định (02a §5). */
+export function isImportAlreadyApplied(err: unknown): boolean {
+  return err instanceof ApiError && err.code === IMPORT_ALREADY_APPLIED;
 }
