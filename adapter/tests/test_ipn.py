@@ -378,7 +378,8 @@ def _docs_probe(env_value):
     )
     out = subprocess.run([sys.executable, "-c", code], cwd=Path(__file__).resolve().parents[1],
                          env=env, capture_output=True, text=True, timeout=60)
-    return out.stdout.strip() + out.stderr
+    # stdout trước; stderr (cảnh báo của starlette 1.x) chỉ đưa vào khi lỗi để dễ đọc
+    return out.stdout.strip() if out.returncode == 0 else out.stdout + out.stderr
 
 
 def test_docs_disabled_by_default():

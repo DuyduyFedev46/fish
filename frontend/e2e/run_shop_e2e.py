@@ -59,6 +59,10 @@ def be_env(workdir):
         "THROTTLE_SHOP_ORDER_CREATE": "5000/hour", "THROTTLE_SHOP_CHECKOUT": "5000/hour",
         "THROTTLE_SHOP_LOOKUP_TOKEN": "5000/min", "THROTTLE_SHOP_VOUCHER_CHECK": "5000/min",
         "THROTTLE_LOGIN_IP": "5000/min", "THROTTLE_LOGIN_USER": "5000/hour", "THROTTLE_PUBLIC_CONTENT": "50000/min",
+        "THROTTLE_CHANGE_PASSWORD": "5000/hour", "THROTTLE_CUSTOMER_SEARCH": "5000/min",
+        # BR-BH-31: e2e đặt nhiều đơn cùng SĐT giả và cùng IP máy, nên nâng giới hạn đơn chưa trả
+        "SHOP_MAX_OPEN_ORDERS_PER_PHONE": "1000", "SHOP_MAX_OPEN_ORDERS_PER_IP": "1000",
+        "SECURE_SSL_REDIRECT": "0",
         # như staging/production: có ô đồng ý, có thông tin người bán (giả)
         "PRIVACY_CONSENT_REQUIRED": "1",
         "SELLER_NAME": "Cá Về (dữ liệu giả)", "SELLER_BUSINESS_TYPE": "Hộ kinh doanh", "SELLER_REG_NO": "00A-000000",
