@@ -110,6 +110,9 @@ phối viên giao rõ), không deploy, không đụng DB thật.
 - **Không rò dữ liệu cá nhân khách** (tên, SĐT, địa chỉ — bất biến 9, lỗi **Critical**): API công khai không trả, không
   ghi log, không đưa vào prompt AI, không gửi bên thứ ba khi Duy chưa duyệt; test/doc/commit chỉ dùng dữ liệu giả.
 - **Không xoá chứng từ** (chỉ huỷ bằng trạng thái). Migration chỉ thêm, không đổi nghĩa field cũ.
+- **Chốt chặn lệnh nguy hiểm** (`scripts/ai_guard.py`, hook của Claude ở `.claude/settings.json`, của Antigravity ở
+  `.agents/hooks.json`): chặn hẳn force-push, xoá project/bucket/DB, `rm -rf /`; hỏi Duy khi đọc secret production, deploy
+  production, `DROP TABLE`, `git reset --hard`. Không tìm cách lách; sửa luật thì chạy `python3 scripts/test_ai_guard.py`.
 - **Không deploy production** khi Duy chưa duyệt. Deploy theo `doc/ops/moi-truong.md`, luôn staging trước. Build frontend
   truyền `NEXT_PUBLIC_*` trực tiếp (vì `.env.local` đè lên `.env.production`).
 - **Không commit `.env`, khoá, mật khẩu, số điện thoại thật** — repo đang công khai.
@@ -127,7 +130,7 @@ cd adapter && pytest                                    # khi có sửa adapter
 cd frontend && npm ci && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build
 cd erp-console && npm ci && npx tsc --noEmit && npm test && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build
 python3 frontend/e2e/run_shop_e2e.py --suite general_rules --suite full_flow   # e2e Shop + ERP
-python3 scripts/check_naming.py && python3 scripts/sync_ai_workspace.py --check
+python3 scripts/check_naming.py && python3 scripts/sync_ai_workspace.py --check && python3 scripts/test_ai_guard.py
 ```
 `npm ci` phải sạch (không `--legacy-peer-deps`). Phải thấy dòng `Ran N tests … OK` mới tính là xanh (test song song có thể
 sập im lặng). Test Postgres chạy trên GitHub Actions khi push nhánh. Worktree không symlink `.env`.
