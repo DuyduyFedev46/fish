@@ -77,3 +77,7 @@ manage.py check --deploy (env production giả) -> chỉ còn W005, W021 (cố �
 
 Trước khi sửa, bộ test `main` là 4062 test; thêm khoảng 52 test mới, sửa 3 test cũ mã hoá hành vi cũ (`test_s03_ac2_login_user_throttle`,
 `test_login_lan_hai_cap_token_moi`, thứ tự đăng xuất trong `test_no_role_gate`).
+
+## CI (GitHub Actions, run 43707872153, commit e9ad02a)
+
+Test backend PostgreSQL 16: xanh. Test backend SQLite: xanh. Kiểm đồng bộ bộ agent: xanh.
