@@ -76,6 +76,7 @@ export function useVoucher(items: CreateOrderItemInput[], enabled: boolean): Use
           if (mine !== seq.current) return;
           if (res.valid) {
             setQuote({ key, result: res });
+            setError(null);
           } else {
             clearVoucherCode();
             setCode(null);

@@ -29,6 +29,7 @@ import json
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -98,9 +99,30 @@ class StaticHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
 
+class StaticServer(http.server.ThreadingHTTPServer):
+    """TD-09: `socketserver` mặc định listen(5). Chromium mở cả loạt kết nối khi tải chunk JS, vượt hàng đợi 5 thì
+    nhân hệ điều hành reset (ERR_CONNECTION_RESET) làm kịch bản chập chờn. Nâng hàng đợi (nhân tự cắt theo somaxconn)."""
+    request_queue_size = 512
+    daemon_threads = True
+
+
+def port_in_use(port):
+    """True nếu đã có tiến trình lắng nghe cổng (thử kết nối, không bind để khỏi bị SO_REUSEADDR đánh lừa)."""
+    for host in ("127.0.0.1", "::1"):
+        fam = socket.AF_INET if host == "127.0.0.1" else socket.AF_INET6
+        try:
+            with socket.socket(fam, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                if s.connect_ex((host, port)) == 0:
+                    return True
+        except OSError:
+            pass
+    return False
+
+
 def serve_static(root, port):
     handler = type("H", (StaticHandler,), {"root": str(root)})
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
+    srv = StaticServer(("127.0.0.1", port), handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     return srv
 
@@ -124,6 +146,10 @@ def main():
     ap.add_argument("--suite", action="append", choices=SUITES)
     ap.add_argument("--workdir")
     args = ap.parse_args()
+
+    busy = [f"{name} {port}" for name, port in (("backend", BE_PORT), ("Shop", SHOP_PORT), ("ERP", ERP_PORT)) if port_in_use(port)]
+    if busy:  # TD-09: dừng trước khi dựng gì, kẻo nói chuyện nhầm với tiến trình cũ
+        sys.exit("Cổng đã bị chiếm, dừng ngay: " + ", ".join(busy) + ". Tắt tiến trình đang giữ cổng rồi chạy lại.")
 
     workdir = Path(args.workdir or tempfile.mkdtemp(prefix="shop_e2e_")).resolve()
     workdir.mkdir(parents=True, exist_ok=True)

@@ -28,6 +28,9 @@ tok = login_token()
 STOCK_KEYS = {"sellable" + "_qty", "available_qty", "stock_qty", "qty_available", "on_hand", "qty_on_hand", "stock", "available", "remaining", "qty_reserved"}
 COST_KEYS = {"purchase_rate", "landed_unit_cost", "unit_cost", "rate", "batch_id", "batch_code", "batch", "margin", "profit", "cost", "cogs",
              "purchase_cost"}
+# TD-05: dòng đơn công khai có `rate` = đơn giá BÁN niêm yết đã đóng băng (không phải giá vốn). Chỉ cho phép đúng đường dẫn này;
+# `rate` ở chỗ khác vẫn bị coi là rò giá nhập.
+ALLOWED_COST_PATHS = {"/lines/rate"}
 PII_KEYS = {"phone", "address", "delivery_address", "customer", "recipient", "full_name", "email"}
 STOCK_TEXT = re.compile(r"còn\s*[\d.,]+\s*(kg|combo)", re.I)
 
@@ -50,7 +53,7 @@ def scan(label, body, *, stock=True, cost=True, pii=True, text=None):
     if stock:
         bad += [p for p, k in flat if k in STOCK_KEYS]
     if cost:
-        bad += [p for p, k in flat if k in COST_KEYS]
+        bad += [p for p, k in flat if k in COST_KEYS and p not in ALLOWED_COST_PATHS]
     if pii:
         bad += [p for p, k in flat if k in PII_KEYS and "/seller" not in p and "/fields" not in p]
     dump = json.dumps(body, ensure_ascii=False) if not isinstance(body, str) else body

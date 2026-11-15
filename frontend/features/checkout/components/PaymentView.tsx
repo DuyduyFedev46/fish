@@ -23,8 +23,12 @@ export interface PaymentViewProps {
   reordering: boolean;
 }
 
-function unitText(qty: string, unit: string, amount: string): string | undefined {
+function unitText(qty: string, unit: string, amount: string, rate?: string): string | undefined {
   const q = Number(qty);
+  // Máy chủ trả đơn giá niêm yết (TD-05) thì dùng; dòng có ưu đãi vẫn hiện đúng đơn giá niêm yết.
+  if (rate !== undefined && rate !== null && rate !== "" && q > 0 && Number.isFinite(Number(rate))) {
+    return `${formatQty(q)} ${unit} × ${formatPriceVnd(Number(rate))}`;
+  }
   const price = Number(amount) / q;
   return q > 0 && Number.isInteger(price) ? `${formatQty(q)} ${unit} × ${formatPriceVnd(price)}` : undefined;
 }
@@ -36,8 +40,8 @@ export default function PaymentView({ order, mode, paying, payError, onPay, onEx
   const summaryLines = order.lines.map((l) => ({
     name: l.name,
     qtyText: `${formatQty(Number(l.qty))} ${l.unit}`,
-    // Đơn giá = thành tiền gộp / số lượng, chỉ hiện khi chia đúng số đồng (không làm tròn ngầm).
-    unitText: unitText(l.qty, l.unit, l.amount),
+    // Đơn giá: ưu tiên `rate` của máy chủ; không có thì suy từ thành tiền, chỉ hiện khi chia đúng đồng.
+    unitText: unitText(l.qty, l.unit, l.amount, l.rate),
     amount: l.amount,
   }));
   return (

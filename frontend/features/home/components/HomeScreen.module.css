@@ -175,11 +175,12 @@
   border-radius: var(--radius-full);
   background-color: var(--on-brand-muted);
   transition:
-    width var(--dur-swap) var(--ease-out),
+    transform var(--dur-swap) var(--ease-out),
     background-color var(--dur-color) var(--ease-out);
 }
+/* Chấm đang chọn dài ra 18 px bằng scaleX (18/8), không đổi bố cục (TD-06). */
 .dot[aria-current="true"] .dotMark {
-  width: 18px;
+  transform: scaleX(2.25);
   background-color: var(--on-accent);
 }
 .dot:focus-visible {

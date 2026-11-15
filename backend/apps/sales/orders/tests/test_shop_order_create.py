@@ -43,8 +43,8 @@ class CreateContractTests(ShopCreateBase):
         self.assertEqual(
             data["lines"],
             [
-                {"item_code": "MUC-ONG", "name": "MUC-ONG", "unit": "kg", "qty": "1.5", "amount": "417000"},
-                {"item_code": "COMBO-LAU", "name": "COMBO-LAU", "unit": "combo", "qty": "1", "amount": "450000"},
+                {"item_code": "MUC-ONG", "name": "MUC-ONG", "unit": "kg", "qty": "1.5", "rate": "278000", "amount": "417000"},
+                {"item_code": "COMBO-LAU", "name": "COMBO-LAU", "unit": "combo", "qty": "1", "rate": "450000", "amount": "450000"},
             ],
         )
         order = SalesOrder.objects.get(code=data["order_code"])
@@ -75,6 +75,15 @@ class CreateContractTests(ShopCreateBase):
         self.assertEqual(data["discount"], {"source": "promo", "code": None, "amount": "55600"})
         self.assertEqual(data["total_amount"], "500400")
         self.assertEqual(data["lines"][0]["amount"], "556000")  # thành tiền gộp, trước giảm
+
+    def test_td05_create_response_lines_carry_list_rate(self):
+        """TD-05: dòng trả về có `rate` (giá bán niêm yết lúc đặt), không giá vốn."""
+        data = self.post([("MUC-ONG", "2")]).json()
+        line = data["lines"][0]
+        self.assertEqual(line["rate"], "278000")
+        self.assertEqual(set(line), {"item_code", "name", "unit", "qty", "rate", "amount"})
+        for secret in ("purchase_rate", "landed_unit_cost", "unit_cost", "batch"):
+            self.assertNotIn(secret, json.dumps(data))
 
     def test_s3_01_ac2_same_client_request_id_returns_same_order_once(self):
         first = self.post([("MUC-ONG", "2")], client_request_id=REQUEST_ID)

@@ -50,6 +50,7 @@ from apps.content.images.services import upload_content_image
 from apps.content.management.content_markup import lines_to_blocks
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry
+from apps.sales.utils import kg_vn_str
 
 DEFAULT_SOURCE = Path(__file__).resolve().parents[1] / "shop_content"
 LOAD_ACTION = "content_load"
@@ -71,13 +72,6 @@ class EntrySkipped(Exception):
 
 def _nfc_lower(text: str) -> str:
     return unicodedata.normalize("NFC", str(text or "")).lower()
-
-
-def _format_kg(value) -> str:
-    """Decimal('0.5') -> '0,5'; Decimal('1') -> '1' (số kiểu Việt Nam)."""
-    number = Decimal(str(value)).normalize()
-    text = format(number, "f")
-    return text.replace(".", ",")
 
 
 class Command(BaseCommand):
@@ -150,8 +144,8 @@ class Command(BaseCommand):
         return {
             "{hotline}": hotline,
             "{hold_minutes}": str(settings.SALES_ORDER_TTL_MINUTES),
-            "{min_qty_kg}": _format_kg(settings.SHOP_MIN_QTY_KG),
-            "{qty_step_kg}": _format_kg(getattr(settings, "SHOP_QTY_STEP_KG", Decimal("0.5"))),
+            "{min_qty_kg}": kg_vn_str(settings.SHOP_MIN_QTY_KG),
+            "{qty_step_kg}": kg_vn_str(getattr(settings, "SHOP_QTY_STEP_KG", Decimal("0.5"))),
             "{cancel_callback_within}": str(getattr(settings, "SHOP_CANCEL_CALLBACK_WITHIN", "1 ngày làm việc")),
         }
 
