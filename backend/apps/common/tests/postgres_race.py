@@ -14,7 +14,9 @@ class PostgresRaceFixtureMixin:
 
     serialized_rollback = True
 
-    def _fixture_setup(self):
+    # Django 5.2: `_fixture_setup` là classmethod (gọi từ setUpClass), nên mixin cũng phải là classmethod.
+    @classmethod
+    def _fixture_setup(cls):
         ContentType.objects.all().delete()
         super()._fixture_setup()
         ContentType.objects.clear_cache()

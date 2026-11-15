@@ -119,7 +119,8 @@ else:
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    # Bản kế thừa: bản dịch vi của Django 5.2 không khớp msgid (xem apps/common/password_validators.py).
+    {"NAME": "apps.common.password_validators.VietnameseMinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
@@ -200,6 +201,9 @@ REST_FRAMEWORK = {
     # Đổi BusinessError (service layer) -> HTTP 400 (apps/common/api.py).
     "EXCEPTION_HANDLER": "apps.common.api.exception_handler",
     "NUM_PROXIES": int(os.getenv("DRF_NUM_PROXIES", "1")),
+    # DRF 3.18 đổi lỗi lines[] thành {"1": {...}} (dạng dict thưa). Giữ dạng danh sách cũ để FE không vỡ
+    # (lines[i].rate); DRF sẽ bỏ dạng này ở 3.20 → nợ: FE đọc dạng dict rồi bỏ dòng này.
+    "LIST_SERIALIZER_ERRORS_AS_DICT": False,
 }
 
 # --- Giới hạn tần suất throttle (S03 / L-5, doc/features/2026-09-28-sua-loi-bao-mat) ----
