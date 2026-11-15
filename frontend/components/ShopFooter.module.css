@@ -271,3 +271,14 @@
     transition: none;
   }
 }
+
+/* FB-01: dòng Facebook ở điện thoại (danh sách liên hệ chỉ hiện từ 768px). */
+.facebookMobile {
+  margin: 0;
+}
+
+@media (min-width: 768px) {
+  .facebookMobile {
+    display: none;
+  }
+}

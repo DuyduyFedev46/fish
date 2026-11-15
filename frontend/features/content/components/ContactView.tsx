@@ -1,7 +1,8 @@
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import { telHref } from "@/components/shopLinks";
-import { pickHotline, zaloUrlOf } from "@/lib/phone";
+import { facebookHrefOf, facebookPlainTextOf } from "@/lib/facebook";
+import { pickHotline, zaloNumberOf, zaloUrlOf } from "@/lib/phone";
 import type { SiteInfoResponse } from "@/features/site/types";
 import type { PublicBlock, PublicEntryDetail } from "../types";
 import { BodyBlock } from "./ArticleBody";
@@ -74,8 +75,10 @@ export default function ContactView({
   const { intro, hours: cmsHours, rest } = splitBody(entry.body?.blocks ?? []);
   const seller = siteInfo?.seller;
   const hotline = pickHotline(seller?.phone, siteInfo?.confirmation_policy?.hotline);
-  const zaloNumber = filled(seller?.zalo);
-  const zaloUrl = zaloUrlOf(zaloNumber);
+  const zaloNumber = zaloNumberOf(filled(seller?.zalo));
+  const zaloUrl = zaloUrlOf(seller?.zalo);
+  const facebookHref = facebookHrefOf(seller?.facebook);
+  const facebookText = facebookPlainTextOf(seller?.facebook);
   const email = validEmail(seller?.email);
   const address = filled(seller?.address);
   const hours = filled(seller?.working_hours) ?? cmsHours;
@@ -84,6 +87,9 @@ export default function ContactView({
   if (hotline) cards.push({ key: "hotline", icon: "phone", label: "Hotline", value: hotline, href: telHref(hotline), action: "Gọi ngay" });
   if (zaloUrl && zaloNumber)
     cards.push({ key: "zalo", icon: "chat", label: "Zalo", value: zaloNumber, href: zaloUrl, external: true, action: "Nhắn Zalo" });
+  if (facebookHref)
+    cards.push({ key: "facebook", icon: "chat", label: "Facebook", value: "Facebook", href: facebookHref, external: true, action: "Mở Facebook" });
+  else if (facebookText) cards.push({ key: "facebook", icon: "chat", label: "Facebook", value: facebookText });
   if (email) cards.push({ key: "email", icon: "mail", label: "Email", value: email, href: `mailto:${email}`, action: "Gửi email" });
   if (address) cards.push({ key: "address", icon: "map-pin", label: "Địa chỉ kinh doanh", value: address });
   if (hours) cards.push({ key: "hours", icon: "clock", label: "Giờ làm việc", value: hours });

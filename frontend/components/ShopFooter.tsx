@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import type { MouseEvent } from "react";
 import { currentYearInVietnam, formatDateOnly } from "@/lib/format";
 import { isSafeHref } from "@/features/content/safeHref";
+import { facebookHrefOf, facebookPlainTextOf } from "@/lib/facebook";
 import LogoSlot from "./LogoSlot";
 import Button from "./ui/Button";
 import Icon from "./ui/Icon";
@@ -44,6 +45,10 @@ export interface ShopFooterProps {
   hotline?: string;
   /** Link Zalo đầy đủ (https://zalo.me/…). Không có thì ẩn nút/dòng Zalo. */
   zaloUrl?: string;
+  /** Số Zalo để hiện chữ "Zalo: <số>" (FB-01 AC6). Không có thì hiện "Zalo" trơn. */
+  zaloNumber?: string;
+  /** Chuỗi Facebook thô từ site-info: link hợp lệ -> link; chữ khác -> chữ thường; rỗng -> ẩn (FB-01). */
+  facebook?: string | null;
   /** Nhóm "Chính sách": đúng danh sách của CMS (footer-links). */
   policyLinks: FooterLinkEntry[];
   /** Có link xác nhận thông báo website thì mới gắn biểu tượng; chưa có thì ẩn hẳn khối. */
@@ -177,7 +182,7 @@ export default function ShopFooter(props: ShopFooterProps) {
   const isDesktop = useIsDesktop();
   if (props.variant === "compact") return <CompactFooter {...props} />;
 
-  const { seller, hotline, zaloUrl, policyLinks, noticeUrl, noticeImage, currentPath, reserveBottomNav, logoSrc } = props;
+  const { seller, hotline, zaloUrl, zaloNumber, facebook, policyLinks, noticeUrl, noticeImage, currentPath, reserveBottomNav, logoSrc } = props;
   const year = currentYearInVietnam();
   // Link thông báo website chỉ nhận https và phải qua isSafeHref.
   const safeNoticeUrl = noticeUrl && /^https:\/\//i.test(noticeUrl.trim()) && isSafeHref(noticeUrl) ? noticeUrl.trim() : undefined;
@@ -186,6 +191,8 @@ export default function ShopFooter(props: ShopFooterProps) {
   const licenseText = licenseLine(seller);
   const address = seller.address?.trim();
   const email = seller.email?.trim();
+  const facebookHref = facebookHrefOf(facebook);
+  const facebookText = facebookPlainTextOf(facebook);
 
   const buy: FooterLinkEntry[] = [
     { label: "Hàng đang có", href: CATALOG_HREF },
@@ -215,12 +222,22 @@ export default function ShopFooter(props: ShopFooterProps) {
               ) : null}
               {zaloUrl ? (
                 <Button href={zaloUrl} variant="on-brand-outline" shape="pill" external>
-                  Nhắn Zalo
+                  Nhắn Zalo{zaloNumber ? ` ${zaloNumber}` : ""}
                 </Button>
               ) : null}
             </div>
           ) : null}
-          {/* Máy tính: danh sách Hotline · Zalo · Email. */}
+          {/* Điện thoại: dòng Facebook (danh sách bên dưới chỉ hiện ở máy tính). */}
+          {facebookHref ? (
+            <p className={s.facebookMobile}>
+              <TextLink href={facebookHref} variant="on-brand" external rel="noopener noreferrer">
+                Facebook
+              </TextLink>
+            </p>
+          ) : facebookText ? (
+            <p className={s.facebookMobile}>Facebook: {facebookText}</p>
+          ) : null}
+          {/* Máy tính: danh sách Hotline · Zalo · Facebook · Email. */}
           <ul className={s.contactList}>
             {hotline ? (
               <li>
@@ -231,10 +248,19 @@ export default function ShopFooter(props: ShopFooterProps) {
             ) : null}
             {zaloUrl ? (
               <li>
-                <TextLink href={zaloUrl} variant="on-brand" external>
-                  Zalo
+                <TextLink href={zaloUrl} variant="on-brand" external rel="noopener noreferrer">
+                  {zaloNumber ? `Zalo: ${zaloNumber}` : "Zalo"}
                 </TextLink>
               </li>
+            ) : null}
+            {facebookHref ? (
+              <li>
+                <TextLink href={facebookHref} variant="on-brand" external rel="noopener noreferrer">
+                  Facebook
+                </TextLink>
+              </li>
+            ) : facebookText ? (
+              <li>Facebook: {facebookText}</li>
             ) : null}
             {email ? (
               <li>

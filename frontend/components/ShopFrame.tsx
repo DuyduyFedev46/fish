@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { getCatalog } from "@/lib/api";
-import { pickHotline, zaloUrlOf } from "@/lib/phone";
+import { pickHotline, zaloNumberOf, zaloUrlOf } from "@/lib/phone";
 import { getFooterLinks, getSiteInfo } from "@/features/site/api";
 import type { FooterLinkItem, SiteInfoResponse } from "@/features/site/types";
 import { fallbackStripText, stripTextOf } from "@/features/home/homeBlocks";
@@ -112,6 +112,7 @@ export default function ShopFrame({
   // Ưu tiên số của người bán, rồi mới tới số trong cấu hình xác nhận đơn (02b §6.5).
   const hotline = pickHotline(seller?.phone, info?.confirmation_policy?.hotline);
   const zaloUrl = zaloUrlOf(seller?.zalo);
+  const zaloNumber = zaloNumberOf(seller?.zalo);
 
   const introText =
     bannerStrip === undefined ? "" : bannerStrip === null ? fallbackStripText(info?.policies?.min_qty_kg) : bannerStrip;
@@ -175,6 +176,8 @@ export default function ShopFrame({
         }}
         hotline={hotline}
         zaloUrl={zaloUrl}
+        zaloNumber={zaloNumber}
+        facebook={seller?.facebook}
         policyLinks={policyLinks}
         noticeUrl={seller?.website_notice_url?.trim() || undefined}
         noticeImage={seller?.website_notice_image?.trim() || undefined}

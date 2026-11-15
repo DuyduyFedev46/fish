@@ -49,7 +49,7 @@ export default function TextLink({
     );
   }
   return (
-    <a href={href} {...common} {...(external ? { target: "_blank", rel: "noopener" } : {})}>
+    <a href={href} {...common} {...(external ? { target: "_blank", rel: rest.rel ?? "noopener" } : {})}>
       {content}
     </a>
   );
