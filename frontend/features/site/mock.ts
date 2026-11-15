@@ -10,6 +10,7 @@ export const MOCK_SELLER_INFO: SiteInfoResponse = {
     phone: "0900000000",
     email: "lienhe@example.com",
     zalo: "0900000000",
+    facebook: "https://www.facebook.com/example.shop",
     working_hours: "7:00 – 20:00, thứ Hai đến Chủ nhật",
     registration_issued_by: "Sở Thử Nghiệm",
     registration_issued_on: "2026-01-01",

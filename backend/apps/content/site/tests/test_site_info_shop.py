@@ -13,6 +13,7 @@ from apps.content.body.scan import get_phone_allowlist
 
 NEW_SELLER_KEYS = {
     "zalo",
+    "facebook",
     "working_hours",
     "registration_issued_by",
     "registration_issued_on",
@@ -30,6 +31,7 @@ OLD_SELLER_VALUES = dict(
 )
 EMPTY_NEW_VALUES = dict(
     SELLER_ZALO="",
+    SELLER_FACEBOOK="",
     SELLER_WORKING_HOURS="",
     SELLER_REG_ISSUED_BY="",
     SELLER_REG_ISSUED_ON="",
@@ -159,3 +161,33 @@ class PhoneAllowlistTests(TestCase):
     def test_shop_5_01_ac5_placeholder_hotline_is_ignored(self):
         """Hotline giữ chỗ (chưa phải số) không thêm gì; danh sách cấu hình vẫn giữ."""
         self.assertEqual(get_phone_allowlist(), {"0900000004"})
+
+
+class SiteInfoFacebookTests(TestCase):
+    """FB-01 AC1: seller.facebook lấy từ SELLER_FACEBOOK, chuỗi thô (FE tự lọc link hợp lệ)."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.url = reverse("public-site-info")
+
+    def get(self):
+        resp = self.client.get(self.url)
+        self.assertEqual(resp.status_code, 200)
+        return resp.json()
+
+    @override_settings(**OLD_SELLER_VALUES, SELLER_FACEBOOK="  https://facebook.com/vua-gia  ")
+    def test_fb01_ac1_value_is_returned_stripped(self):
+        data = self.get()
+        self.assertEqual(data["seller"]["facebook"], "https://facebook.com/vua-gia")
+        self.assertTrue(data["seller_complete"])
+
+    @override_settings(**OLD_SELLER_VALUES, SELLER_FACEBOOK="[Link fanpage Facebook]")
+    def test_fb01_ac1_placeholder_text_kept_raw(self):
+        self.assertEqual(self.get()["seller"]["facebook"], "[Link fanpage Facebook]")
+
+    def test_fb01_ac1_empty_or_blank_is_null(self):
+        for raw in ("", "   "):
+            with self.subTest(raw=raw), override_settings(**OLD_SELLER_VALUES, SELLER_FACEBOOK=raw):
+                data = self.get()
+                self.assertIsNone(data["seller"]["facebook"])
+                self.assertTrue(data["seller_complete"])

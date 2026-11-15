@@ -29,3 +29,16 @@ export function zaloUrlOf(raw?: string | null): string | undefined {
   const digits = v.replace(/\D/g, "");
   return digits ? `https://zalo.me/${digits}` : undefined;
 }
+
+/** Số Zalo để hiện chữ ("Zalo: 0373850884"): nhận số thường hoặc link `https://zalo.me/<số>`; không rút được số thì undefined. */
+export function zaloNumberOf(raw?: string | null): string | undefined {
+  const v = raw?.trim();
+  if (!v) return undefined;
+  const fromLink = /^https:\/\/(?:www\.)?zalo\.me\/(\d{6,15})\/?$/i.exec(v);
+  if (fromLink) return fromLink[1];
+  if (/^\+?[\d ]+$/.test(v)) {
+    const digits = v.replace(/\D/g, "");
+    if (digits.length >= 8 && digits.length <= 15) return v;
+  }
+  return undefined;
+}

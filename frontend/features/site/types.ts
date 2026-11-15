@@ -9,6 +9,8 @@ export interface SellerInfo {
   // 02b §3.6 (BR-ND-18): khoá mới, BE trả thật ở lô 5. Tuỳ chọn để FE lô 1 đọc được cả backend cũ;
   // vắng hoặc `null` = chưa cấu hình -> ẩn phần tương ứng (khối biểu tượng thông báo ẩn hẳn khi chưa có link, 05-phap-ly §4).
   zalo?: string | null;
+  // FB-01: chuỗi thô (link facebook.com/fb.me hoặc chữ giữ chỗ); FE tự phân loại bằng lib/facebook.ts.
+  facebook?: string | null;
   working_hours?: string | null;
   registration_issued_by?: string | null;
   registration_issued_on?: string | null;

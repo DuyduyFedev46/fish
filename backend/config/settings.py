@@ -375,6 +375,7 @@ SHOP_RETURN_REPORT_HOURS = os.getenv("SHOP_RETURN_REPORT_HOURS", "")  # rỗng -
 VOUCHER_MAX_PERCENT = Decimal(os.getenv("VOUCHER_MAX_PERCENT", "50"))
 # Thông tin người bán hiển thị ở site-info (BR-ND-18) — mkt-brand đọc ở lô 5.
 SELLER_ZALO = os.getenv("SELLER_ZALO", "")
+SELLER_FACEBOOK = os.getenv("SELLER_FACEBOOK", "")  # FB-01: link hoặc chữ giữ chỗ, FE tự lọc
 SELLER_WORKING_HOURS = os.getenv("SELLER_WORKING_HOURS", "")
 SELLER_REG_ISSUED_BY = os.getenv("SELLER_REG_ISSUED_BY", "")
 SELLER_REG_ISSUED_ON = os.getenv("SELLER_REG_ISSUED_ON", "")
