@@ -98,6 +98,8 @@ export type OrderLineData = {
   unit: SaleUnit;
   qty: string;
   amount: Money;
+  /** Đơn giá bán niêm yết (TD-05). Tuỳ chọn vì máy chủ cũ chưa trả. */
+  rate?: Money;
 };
 
 export type CreateOrderResponse = {
