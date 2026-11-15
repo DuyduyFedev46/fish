@@ -5,12 +5,11 @@ do `exception_handler` dựng từ `BusinessError.extra`.
 Bất biến: payload KHÔNG chứa số kg tồn, số kg thiếu, mã lô, ngày, tên/SĐT/địa chỉ khách
 (BR-BH-24, bất biến 1 và 9). `lines` chỉ có mã hàng và mức ("out" | "short").
 """
-from decimal import Decimal
 
 from django.conf import settings
 
 from apps.common.exceptions import BusinessError
-from apps.sales.utils import money_str
+from apps.sales.utils import kg_vn_str, money_str
 
 INVALID_QTY = "INVALID_QTY"
 OUT_OF_STOCK = "OUT_OF_STOCK"
@@ -19,11 +18,6 @@ VOUCHER_INVALID = "VOUCHER_INVALID"
 
 LEVEL_OUT = "out"      # hết hàng, hoặc món không còn bán
 LEVEL_SHORT = "short"  # còn hàng nhưng không đủ số khách đặt
-
-
-def _vn_kg(value):
-    """Decimal('0.5') -> '0,5'; Decimal('1.0') -> '1' (số kiểu Việt Nam)."""
-    return format(Decimal(str(value)).normalize(), "f").replace(".", ",")
 
 
 class ShopValidationError(BusinessError):
@@ -45,8 +39,8 @@ class InvalidQtyError(ShopValidationError):
 
     def __init__(self, lines):
         # FISH-66 S1: câu dựng từ tham số (không viết cứng số). Không đưa mã BR vào câu của khách.
-        min_text = _vn_kg(settings.SHOP_MIN_QTY_KG)
-        step_text = _vn_kg(settings.SHOP_QTY_STEP_KG)
+        min_text = kg_vn_str(settings.SHOP_MIN_QTY_KG)
+        step_text = kg_vn_str(settings.SHOP_QTY_STEP_KG)
         detail = f"Món theo kg đặt từ {min_text} kg, mỗi lần thêm {step_text} kg. Combo đặt số nguyên từ 1."
         super().__init__(detail, extra={"lines": list(lines)})
 
