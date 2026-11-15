@@ -449,6 +449,11 @@ def recompute_landed_cost(*, batch, actor=None):
     purchase_total = batch.purchase_rate * batch.qty_received
     new_cost = (purchase_total + alloc_total) / batch.qty_received
     old_cost = batch.landed_unit_cost
+    # Tràn cột (N3): Postgres tự ném DataError, SQLite (Django 5.2) im lặng lưu số quá lớn → kiểm tường minh
+    # để cả hai cho cùng kết quả; người gọi (costs.services) đổi InvalidOperation thành 400.
+    field = batch._meta.get_field("landed_unit_cost")
+    if abs(new_cost) >= Decimal(10) ** (field.max_digits - field.decimal_places):
+        raise InvalidOperation("landed_unit_cost vượt giới hạn cột")
     if new_cost != old_cost:
         batch.landed_unit_cost = new_cost
         batch.save(update_fields=["landed_unit_cost"])

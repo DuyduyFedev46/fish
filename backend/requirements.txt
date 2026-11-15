@@ -1,24 +1,25 @@
 # Cảng cá Lộc — Django core (Level 4)
-# Phiên bản ghim theo quyết định stack: Django 100% lõi, PostgreSQL.
-Django>=5.0,<5.2
-djangorestframework>=3.15
-psycopg[binary]>=3.1
-python-dotenv>=1.0
-dj-database-url>=2.1
-celery>=5.3
-redis>=5.0
+# Phiên bản ghim chính xác (==), chỉ chọn bản đã phát hành >= 2 tuần; nâng bản = chạy lại pip-audit.
+# Django 5.2 LTS (5.1 hết hỗ trợ). Rà soát bảo mật 15/11.
+Django==5.2.18
+djangorestframework==3.18.3
+psycopg[binary]==3.3.6
+python-dotenv==1.2.4
+dj-database-url==3.1.2
+celery==5.6.3
+redis==8.1.0
 # Production serving (Cloud Run)
-gunicorn>=22.0
-whitenoise>=6.6
-django-cors-headers>=4.4
+gunicorn==26.2.0
+whitenoise==6.12.0
+django-cors-headers==4.9.0
 # Ảnh mặt hàng (doc/features/2026-09-26-anh-mat-hang, A1/A2): kiểm nội dung thật, gỡ
 # EXIF, xuất WebP. Pillow bắt buộc ở mọi môi trường (kể cả ITEM_IMAGE_STORAGE=local).
-Pillow>=10.4,<11
+Pillow==13.0.0
 # Chỉ thật sự cần khi ITEM_IMAGE_STORAGE=gcs (staging/production) — import trong hàm
 # (apps/catalog/images/storage.py) nên dev/test không bắt buộc cài để chạy `manage.py test`.
-google-cloud-storage>=2.18,<3
+google-cloud-storage==2.19.0
 # S01 (AI Native ERP): validate args theo input_schema của command registry (02b mục 4.4).
-jsonschema>=4.20
+jsonschema==4.26.0
 # FISH-66 S3–S6 (doc/features/2026-11-14-hang-ban-excel-dong-lanh/02b §6): đọc/ghi .xlsx danh sách mặt hàng.
 openpyxl==3.1.5
 # openpyxl tự dùng defusedxml khi có: chặn XML bomb / entity ngoài trong file người dùng tải lên.
