@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
+import { orderLimitMessage } from "../orderLimitError";
 import { ApiError, USE_MOCK, checkVoucher, createOrder, getCatalog, startCheckoutSession } from "@/lib/api";
 import { formatPriceVnd } from "@/lib/format";
 import { parseQtyRule, qtyToApiString, formatQty } from "@/lib/quantity";
@@ -360,6 +361,11 @@ function CheckoutForm() {
         setSummaryToken((n) => n + 1);
         return;
       }
+    }
+    const limitMessage = orderLimitMessage(code, err.data?.detail ?? err.message);
+    if (limitMessage) {
+      setBanner(limitMessage);
+      return;
     }
     if (code === "INVALID_QTY") {
       setBanner("Số lượng trong giỏ chưa đúng mức bán. Quay lại giỏ hàng để chỉnh rồi đặt lại.");
