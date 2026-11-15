@@ -449,3 +449,6 @@ Kiểm trên Shop staging (Playwright 360 + 1280): 9 ảnh từ bucket tải đ�
   - `ra-dong-ca-dung-cach.jpg` (`364.5 KB`): khoanh cá thu và phi lê cá hồi trong hộp thuỷ tinh đậy nắp kín đặt ở kệ kính ngăn mát tủ lạnh.
 - Đã kiểm tra mắt thường cả 5 ảnh: kiểu ảnh chụp DSLR thực tế, ánh sáng tự nhiên, đúng loài, chủ thể nằm giữa khung, không chữ/logo/watermark, không mặt người hay tay biến dạng.
 - Đã ghi đầy đủ bảng slug, prompt AI, kích thước, dung lượng và ngày tạo vào `doc/features/2026-11-11-shop-ui-gemini/anh-goc-bep/nguon-anh.md`. Không gọi API và không tải lên staging (đội Claude sẽ tải và gắn ảnh bìa theo phiếu).
+
+### GUI-15 — đội Claude lắp ảnh bìa lên staging (15/11)
+5 bài Góc bếp trên staging có bản ghi ảnh bìa cũ nhưng file không có trong bucket (link 404). Điều phối viên tải 5 ảnh AI qua `upload_content_image`, đặt làm ảnh bìa (`save_draft` với `cover_image`) rồi đăng lại từng bài (chữ giữ nguyên), người thao tác `demo_chu`, DB `cangca_staging`, bucket staging. Kiểm Playwright 360 + 1280: `/blog/` 5 ảnh, trang chủ 4 ảnh Góc bếp đều tải được, không cuộn ngang, 0 lỗi console.
