@@ -24,8 +24,6 @@ Luật (chi tiết ở `AGENTS.md` mục "Làm chung Claude và Gemini"):
 
 | Việc | Hồ sơ | Ai | Nhánh | Phạm vi file | Trạng thái | Ghi chú |
 |---|---|---|---|---|---|---|
-| Trả nợ kỹ thuật TD-01..10 | `doc/features/2026-11-15-tra-no-ky-thuat/` | claude | `td/be`, `td/fe-shop`, `td/fe-tiptap`, `td/e2e`, `td/spec` | `backend/apps/{catalog/item_files,sales,content}`, `frontend/{features,lib,components,e2e/run_shop_e2e.py}`, `erp-console/` (Tiptap, nhập Excel), `doc/business-process-spec.md` | Đang làm | Duy giao 15/11 |
-| Dùng chung workspace Claude và Gemini | — | claude | `ai/workspace-chung` | `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.claude/`, `.agents/`, `.gemini/`, `scripts/sync_ai_workspace.py`, `.github/workflows/` | Đang làm | Duy giao 15/11 |
 | An toàn khi AI làm nhầm (sao lưu DB, chặn lệnh nguy hiểm, bảo vệ nhánh) | — | — | — | hạ tầng GCP, `.claude/settings.json`, `.agents/hooks.json` | Chờ làm | Chờ Duy đồng ý bước 1 (15/11) |
 | Google Maps ở trang đặt hàng | — | — | — | — | Tạm dừng | Chờ Duy cấp key |
 
@@ -35,3 +33,5 @@ Luật (chi tiết ở `AGENTS.md` mục "Làm chung Claude và Gemini"):
 |---|---|---|---|
 | Shop UI GUI-01..15 | gemini + claude | xem `doc/features/2026-11-11-shop-ui-gemini/02c-giao-viec.md` | 11–15/11 |
 | FISH-66 bán 0,5 kg, nhập/xuất Excel · FISH-67 nhãn giao · FB-01 · NX-01 Next 15 | claude | `4ec6b2f` | 15/11 |
+| Trả nợ kỹ thuật TD-01..10 (staging api:v29) | claude | `e27788a` | 15/11 |
+| Dùng chung workspace Claude và Gemini | claude | `a46c1b2` | 15/11 |
