@@ -70,3 +70,11 @@ def fold_text(value):
 def vnd_display(amount):
     """Tiền hiển thị trong câu chữ: 540000 → "540.000 ₫" (một kiểu duy nhất, SR-25; xem `apps.common.formatting`)."""
     return format_vnd(amount)
+
+
+def kg_vn_str(qty):
+    """TD-03: số kg để HIỂN THỊ cho người đọc, kiểu Việt Nam: 0.5 -> "0,5", 1.0 -> "1", 12.25 -> "12,25".
+
+    Chỉ dùng cho câu chữ (thông báo lỗi, nội dung CMS). Giá trị máy đọc (JSON) vẫn dùng dấu chấm: `kg_str`, `money_str`.
+    """
+    return format(Decimal(str(qty)).normalize(), "f").replace(".", ",")

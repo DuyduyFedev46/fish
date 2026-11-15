@@ -190,9 +190,9 @@ class CheckSafetyTests(CheckBase):
         self.assertEqual(codes, [200, 200, 200, 429])
 
     def test_default_rate_is_20_per_minute(self):
-        from config import settings as config_settings
+        from apps.common.tests.throttle_defaults import default_throttle_rates
 
-        self.assertEqual(config_settings._DEFAULT_THROTTLE_RATES["shop_voucher_check"], "20/min")
+        self.assertEqual(default_throttle_rates()["shop_voucher_check"], "20/min")
 
     def test_s3b_03_ac8_no_other_codes_orders_cost_or_stock_numbers(self):
         make_voucher(code="KHAC9999", name="Mã bí mật khác")

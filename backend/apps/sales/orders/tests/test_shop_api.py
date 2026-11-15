@@ -134,7 +134,8 @@ class ShopOrderAPITests(TestCase):
         data = resp.json()
 
         forbidden_keys = {
-            "purchase_rate", "landed_unit_cost", "unit_cost", "rate", "batch",
+            # TD-05: `rate` trong `lines` là đơn giá BÁN niêm yết (SalesOrderLine.rate) nên được phép; mọi khoá giá vốn khác vẫn cấm.
+            "purchase_rate", "landed_unit_cost", "unit_cost", "batch",
             "batch_id", "cost", "profit", "phone", "customer_phone",
             "delivery_address", "address",
         }

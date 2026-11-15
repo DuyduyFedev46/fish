@@ -282,9 +282,9 @@ class PublicContentApiTests(TestCase):
                 )
 
     def test_qa_l12_default_rate_is_600_per_minute(self):
-        from config import settings as config_settings
+        from apps.common.tests.throttle_defaults import default_throttle_rates
 
-        self.assertEqual(config_settings._DEFAULT_THROTTLE_RATES["public_content"], "600/min")
+        self.assertEqual(default_throttle_rates()["public_content"], "600/min")
 
     def test_public_content_throttle(self):
         """Kiểm tra giới hạn tần suất PublicContentThrottle với scope public_content."""

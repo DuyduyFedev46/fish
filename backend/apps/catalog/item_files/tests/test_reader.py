@@ -200,6 +200,24 @@ class ReaderScanCeilingTests(ItemFilesBase):
         self.assertEqual(body["reason"], "too_many_rows")
         self.assertLess(elapsed, 3.0)  # trước khi sửa: hơn 10 giây
 
+    def test_td02_unknown_header_far_right_is_reported(self):
+        """TD-02 (02b §13.3 L6): cột lạ ở cột AD (xa hơn 25 cột) vẫn bị báo unknown_columns."""
+        sample_row = ["CA01", "Cá thu", "Cá", "Mặt hàng thường", "Kg", "Có", 365, "Có", "Có", "", "", "", "", "", None, None, None]
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Hàng bán"
+        ws.append(list(HEADERS_FULL))
+        ws.append(sample_row)
+        ws["AD1"] = "Gia moi"
+        buf = io.BytesIO()
+        wb.save(buf)
+        resp = self.post_preview(self.owner, SimpleUploadedFile("xa.xlsx", buf.getvalue()))
+        self.assertEqual(resp.status_code, 400, resp.content)
+        body = resp.json()
+        self.assertEqual(body["code"], "IMPORT_INVALID_FILE")
+        self.assertEqual(body["reason"], "unknown_columns")
+        self.assertIn("Gia moi", body["columns"])
+
     def test_s5_ac9_iter_rows_is_limited_to_template_column_count(self):
         """M1: truyền max_col cho iter_rows, cột rác xa bên phải không bị quét."""
         from apps.catalog.item_files import reader
@@ -214,5 +232,7 @@ class ReaderScanCeilingTests(ItemFilesBase):
         content = _workbook_bytes(HEADERS_FULL, [["CA01", "Cá thu", "Cá", "Mặt hàng thường", "Kg", "Có", 365, "Có", "Có", "", "", "", "", "", None, None, None]])
         with mock.patch.object(openpyxl.worksheet._read_only.ReadOnlyWorksheet, "iter_rows", spy):
             reader.read_import_workbook(SimpleUploadedFile("a.xlsx", content))
-        self.assertEqual(len(calls), 2)
-        self.assertTrue(all(isinstance(c, int) and c >= 1 for c in calls), calls)
+        # TD-02: dòng tiêu đề đọc riêng không giới hạn cột (max_col=None), các dòng dữ liệu vẫn có max_col.
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(calls.count(None), 1)
+        self.assertTrue(all(isinstance(c, int) and c >= 1 for c in calls if c is not None), calls)
