@@ -388,3 +388,50 @@ PASS  design_screens: 91 đạt, 0 lỗi, 4 bỏ qua
 ### Ghi chú môi trường e2e
 - Các ca e2e mới nằm trong `shop_full_flow.py` (runner `run_shop_e2e.py` không nằm trong danh sách file được sửa nên không thêm suite mới).
 - Runner đôi khi chập chờn (`ERR_CONNECTION_RESET`/hết giờ chờ) vì server tĩnh bind `127.0.0.1` còn trình duyệt gọi `localhost`; chạy lại thì qua. Worktree cần symlink `backend/.venv` và `npm ci` ở `erp-console/` (không commit).
+
+
+---
+
+## GUI-14 — Ảnh minh hoạ thật cho 6 món và banner, lắp lên staging
+
+### Phần (a): Tạo ảnh bằng AI & kiểm tra giải phẫu / kỹ thuật
+- Đã tạo mới toàn bộ 6 ảnh món hải sản (`1200 × 1200 px`, tỉ lệ vuông 1:1, JPEG 329–389 KB) và 2 ảnh banner ngang (`2150 × 1200 px`, tỉ lệ 16:9, JPEG 646–833 KB) trong `doc/features/2026-11-11-shop-ui-gemini/anh-san-pham/`:
+  - `BACH-TUOC.jpg`: Bạch tuộc nguyên con trên đá bào, khay inox, xúc tu tự nhiên.
+  - `CA-HOI-NU.jpg`: Cá hồi Na Uy cắt khoanh dày trên đá bào, vân mỡ trắng rõ.
+  - `CA-THU.jpg`: Cá thu Việt Nam (*Scomberomorus commerson* — cá thu ảo/cá thu phấn) nguyên con thân dài có vệt sọc dọc mờ kèm 1 khoanh cắt ngang trên đá bào (không phải cá saba).
+  - `GHE-XANH.jpg`: Ghẹ xanh (*Portunus pelagicus*) mai xanh đốm trắng, gai nhọn hai bên mai, 2 càng xanh thon dài + 3 đôi chân bò + 1 đôi chân bơi mái chèo (không phải cua biển).
+  - `MUC-ONG.jpg`: 2 con mực ống tươi (*Loligo chinensis*) thân ống thuôn dài, da trắng ánh hồng chấm sắc tố tự nhiên, vây đuôi hình thoi trên khay đá bào.
+  - `TOM-SU-1.jpg`: 5 con tôm sú loại 1 (*Penaeus monodon*) vỏ xanh đen bóng, sọc đen – vàng cam xen kẽ rõ nét trên đá bào (không phải tôm thẻ).
+  - `banner/banner-hai-san-da-lanh.jpg` & `banner/banner-cang-ca-binh-minh.jpg`: ảnh ngang quầy hải sản tươi trên đá bào và cảng cá bình minh ven biển Việt Nam (không địa danh cụ thể, không chữ/logo/mặt người).
+- Đã cập nhật đầy đủ bảng mã món, prompt AI, kích thước, dung lượng và ngày tạo (`2026-11-15`) trong `doc/features/2026-11-11-shop-ui-gemini/anh-san-pham/nguon-anh.md`.
+
+### Phần (b): Script `upload_staging.py` & kết quả chạy `--dry-run`
+- Đã viết `doc/features/2026-11-11-shop-ui-gemini/anh-san-pham/upload_staging.py`:
+  - Chỉ gọi staging (`https://cangca-api-staging-675411800433.asia-southeast1.run.app`), đọc `CAVE_STAGING_USER` và `CAVE_STAGING_PASSWORD` từ biến môi trường, không bao giờ in/log/ghi mật khẩu hay token.
+  - Hỗ trợ `--dry-run` và chế độ tải thật (`POST /api/auth/token/` → `GET /api/catalog/items/` → bỏ qua món đã có ảnh, chỉ `POST /api/catalog/items/{id}/image/` với `is_illustration=true` cho món chưa có ảnh).
+- Kết quả chạy `python3 doc/features/2026-11-11-shop-ui-gemini/anh-san-pham/upload_staging.py --dry-run`:
+
+| Mã món | ID | Tên món | Trạng thái | URL ảnh (`thumb` / `card` / `detail`) |
+|---|---|---|---|---|
+| `BACH-TUOC` | `?` | Bạch tuộc | **bỏ qua vì đã có ảnh** | `thumb`: https://storage.googleapis.com/cangca-item-images-keolai-staging/items/12/img_d48a64c1/thumb.webp<br>`card`: https://storage.googleapis.com/cangca-item-images-keolai-staging/items/12/img_d48a64c1/card.webp<br>`detail`: https://storage.googleapis.com/cangca-item-images-keolai-staging/items/12/img_d48a64c1/detail.webp |
+| `CA-HOI-NU` | `?` | Cá hồi Na Uy | **sẽ tải lên (dry-run)** (`CA-HOI-NU.jpg`, `is_illustration=true`) | *(chưa gọi POST)* |
+| `CA-THU` | `?` | Cá thu | **sẽ tải lên (dry-run)** (`CA-THU.jpg`, `is_illustration=true`) | *(chưa gọi POST)* |
+| `GHE-XANH` | `?` | Ghẹ xanh | **sẽ tải lên (dry-run)** (`GHE-XANH.jpg`, `is_illustration=true`) | *(chưa gọi POST)* |
+| `MUC-ONG` | `?` | Mực ống | **sẽ tải lên (dry-run)** (`MUC-ONG.jpg`, `is_illustration=true`) | *(chưa gọi POST)* |
+| `TOM-SU-1` | `?` | Tôm sú loại 1 | **sẽ tải lên (dry-run)** (`TOM-SU-1.jpg`, `is_illustration=true`) | *(chưa gọi POST)* |
+
+- **Banner `home-banner`**:
+  - Trạng thái: **bỏ qua (cần đổi nội dung bài CMS)**
+  - Lý do: Bài `home-banner` trên staging hiện chỉ có các block `heading` và `paragraph`, chưa có block `image` trong `body.blocks`. Gọi `POST /api/content/entries/<pk>/images/` chỉ tạo bản ghi `ContentImage` rời, không tự gắn ảnh vào slide nếu không sửa và đăng lại `body.blocks` của bài CMS (phiếu việc cấm sửa/đăng lại bài CMS).
+- **Điểm dừng chờ PO Duy**: Môi trường hiện chưa có biến `CAVE_STAGING_USER` và `CAVE_STAGING_PASSWORD` (`bool(os.getenv("CAVE_STAGING_USER")) == False`). Theo đúng phiếu việc `02c-giao-viec.md` (*"Thiếu biến thì làm xong (a), dừng và báo Duy"*), tạm dừng ở đây để chờ anh Duy cấp biến môi trường rồi chạy tải thật và chụp ảnh nghiệm thu Playwright trên Shop staging.
+
+### Phần (b) đội Claude làm tiếp (15/11)
+Duy không đặt biến tài khoản, giao đội Claude làm phần Gemini không làm được. Điều phối viên chạy hàm `upload_item_image` và `upload_content_image` của backend (bản `main` = api:v27) trên DB `cangca_staging`, ghi bucket `cangca-item-images-keolai-staging` bằng quyền gcloud. Người thao tác ghi nhận là tài khoản thử `demo_chu`, có AuditLog. Không đụng production.
+
+| Mã món | Kết quả |
+|---|---|
+| `CA-HOI-NU`, `CA-THU`, `GHE-XANH`, `MUC-ONG`, `TOM-SU-1` | đã tải, `is_illustration=true` |
+| `BACH-TUOC` | **thay** ảnh thử cũ (hình hoạt hình có chữ, không phải hải sản) bằng ảnh AI, `is_illustration=true` |
+| Banner `home-banner` | tải `banner-hai-san-da-lanh.jpg` vào bài, chèn khối ảnh ngay sau tiêu đề slide 1, lưu nháp rồi đăng lại (chữ bài giữ nguyên). Bài chỉ có 1 slide nên `banner-cang-ca-binh-minh.jpg` để dành |
+
+Kiểm trên Shop staging (Playwright 360 + 1280): 9 ảnh từ bucket tải được, banner hiện ảnh 1600 px, 6 nhãn "Ảnh minh hoạ", không cuộn ngang, 0 lỗi console. Ảnh gốc `*.jpg` bị `.gitignore` chặn nên chỉ nằm ở máy Duy; khi lên production cần chạy lại với bucket production sau khi Duy duyệt.
