@@ -61,6 +61,7 @@ def site_info() -> dict[str, Any]:
     # BR-ND-18 (sửa 10/10): trống -> null, Shop ẩn khối tương ứng. Link/ảnh thông báo website để trống tới khi có S-14.
     seller.update({
         "zalo": _clean_str(getattr(settings, "SELLER_ZALO", "")),
+        "facebook": _clean_str(getattr(settings, "SELLER_FACEBOOK", "")),
         "working_hours": _clean_str(getattr(settings, "SELLER_WORKING_HOURS", "")),
         "registration_issued_by": _clean_str(getattr(settings, "SELLER_REG_ISSUED_BY", "")),
         "registration_issued_on": _clean_str(getattr(settings, "SELLER_REG_ISSUED_ON", "")),

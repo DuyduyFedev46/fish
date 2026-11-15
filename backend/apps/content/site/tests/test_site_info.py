@@ -122,6 +122,7 @@ class SiteInfoApiTests(TestCase):
             "email",
             # SHOP-5-01 (BR-ND-18 sửa 10/10)
             "zalo",
+            "facebook",  # FB-01
             "working_hours",
             "registration_issued_by",
             "registration_issued_on",
