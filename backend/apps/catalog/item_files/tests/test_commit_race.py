@@ -106,8 +106,7 @@ class CommitConcurrentPgTests(PostgresRaceFixtureMixin, TransactionTestCase):
         with connection.cursor() as cur:
             while time.monotonic() < deadline:
                 cur.execute(
-                    "SELECT count(*) FROM pg_stat_activity "
-                    "WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()"
+                    "SELECT count(*) FROM pg_locks WHERE NOT granted"
                 )
                 if cur.fetchone()[0] >= 1:
                     return True
@@ -134,6 +133,8 @@ class CommitConcurrentPgTests(PostgresRaceFixtureMixin, TransactionTestCase):
                 return ("ok", None)
             except ConflictError as exc:
                 return ("conflict", exc.code)
+            except Exception as exc:  # noqa: BLE001 - để thông báo lỗi nêu rõ nguyên nhân thay vì chỉ "không chờ khoá"
+                return ("error", repr(exc))
             finally:
                 connections.close_all()
 
@@ -141,7 +142,11 @@ class CommitConcurrentPgTests(PostgresRaceFixtureMixin, TransactionTestCase):
             with transaction.atomic():
                 PriceList.objects.select_for_update().filter(is_default=True).order_by("pk").first()
                 future = pool.submit(_second_commit)
-                self.assertTrue(self._wait_until_a_session_waits_for_lock(), "Luồng phụ không chờ khoá")
+                waiting = self._wait_until_a_session_waits_for_lock()
+                self.assertTrue(
+                    waiting,
+                    f"Luồng phụ không chờ khoá; done={future.done()} result={future.result() if future.done() else None}",
+                )
                 with self.assertRaises(FutureTimeoutError):
                     future.result(timeout=0.5)  # luồng phụ chưa xong khi luồng chính còn giữ khoá
                 self.assertFalse(future.done())
