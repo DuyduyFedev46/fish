@@ -82,3 +82,8 @@ PASS  formats_timezones: 73 đạt, 0 lỗi, 0 bỏ qua       (exit=1)
 - Playwright tự dựng (`scratchpad/qa/td05_06.py`, `td06b.py`, `td08.py`, dùng lại hàm dựng môi trường của runner): 48 + 6 + 24 ca đều PASS, 0 FAIL.
 - `vitest features/catalog/itemFiles.test.ts features/content/editor` → `4 passed, 55 passed`; `check_naming.py` → OK.
 - `gh run view 43697514793` → SQLite `OK (skipped=19)`, Postgres `Ran 4071 tests ... OK`.
+
+## Sửa B1 và kiểm lại (điều phối, 15/11)
+- B1: `frontend/e2e/shop_general_rules.py` thêm `ALLOWED_COST_PATHS = {"/lines/rate"}`; `rate` ở mọi chỗ khác vẫn bị coi là rò giá nhập.
+- Chạy lại `run_shop_e2e.py --skip-build --suite general_rules --suite full_flow`: `general_rules: 168 đạt, 0 lỗi, 1 bỏ qua`, `full_flow: 135 đạt, 0 lỗi`, exit 0.
+- Các suite khác và tiêu chí TD-01..10 đã đạt ở lần 1, B1 chỉ sửa kịch bản kiểm. **Kết luận sau sửa: APPROVED.**
