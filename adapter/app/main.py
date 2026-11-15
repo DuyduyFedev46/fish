@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import os
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
@@ -46,10 +47,16 @@ logger = logging.getLogger("adapter")
 # vào body. Ghi rõ trong 03-dev-notes.md để đối chiếu với agent làm P3.
 DJANGO_IPN_ENDPOINT_PATH = "/api/internal/payments/sepay-ipn/"
 
+# B10 (rà soát bảo mật 15/11): /docs, /redoc, /openapi.json chỉ bật khi ADAPTER_DOCS_ENABLED=1 (dev).
+_DOCS_ENABLED = os.getenv("ADAPTER_DOCS_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
+
 app = FastAPI(
     title="Cảng Cá Lộc - Adapter",
     description="Lớp adapter mỏng nhận webhook SePay, forward vào Django nội bộ.",
     version="1.0.0",
+    docs_url="/docs" if _DOCS_ENABLED else None,
+    redoc_url="/redoc" if _DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if _DOCS_ENABLED else None,
 )
 
 

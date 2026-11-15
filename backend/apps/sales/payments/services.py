@@ -147,6 +147,7 @@ def confirm_payment(*, order, bank_txn_id, amount, received_at, source="WEBHOOK"
     payment, _created = _record_payment(
         order=order, bank_txn_id=bank_txn_id, amount=amount, received_at=received_at,
         source=source, raw_payload=raw_payload, actor=actor, invoice_code=invoice_code,
+        audit_action="confirm_payment_ipn",  # L-1 / bất biến 5: Hệ thống ghi tiền (changes không chứa raw_payload)
     )
     return payment
 

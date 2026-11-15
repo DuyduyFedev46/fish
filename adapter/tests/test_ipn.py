@@ -357,3 +357,33 @@ def test_ipn_notification_type_la_khong_bi_treo_tra_200_khong_goi_django(client,
 
     assert resp.status_code == 200
     assert not route.called
+
+
+# --- B10 (rà soát bảo mật 15/11): tài liệu API tự sinh chỉ bật ở môi trường dev ---
+def _docs_probe(env_value):
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    env = {k: v for k, v in os.environ.items() if k != "ADAPTER_DOCS_ENABLED"}
+    env.update({"DJANGO_INTERNAL_URL": "http://x", "INTERNAL_SERVICE_TOKEN": "t", "SEPAY_SECRET_KEY": "s"})
+    if env_value is not None:
+        env["ADAPTER_DOCS_ENABLED"] = env_value
+    code = (
+        "from fastapi.testclient import TestClient\n"
+        "from app.main import app\n"
+        "c = TestClient(app)\n"
+        "print([c.get(p).status_code for p in ('/docs', '/redoc', '/openapi.json', '/healthz')])\n"
+    )
+    out = subprocess.run([sys.executable, "-c", code], cwd=Path(__file__).resolve().parents[1],
+                         env=env, capture_output=True, text=True, timeout=60)
+    return out.stdout.strip() + out.stderr
+
+
+def test_docs_disabled_by_default():
+    assert _docs_probe(None).splitlines()[-1] == "[404, 404, 404, 200]"
+
+
+def test_docs_enabled_in_dev():
+    assert _docs_probe("1").splitlines()[-1] == "[200, 200, 200, 200]"

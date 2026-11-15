@@ -9,8 +9,10 @@ Xử lý tệp ảnh mặt hàng (BR-DM-10, Q5-Q10).
 - Cắt vuông 1:1 giữa (Q6), xuất 3 cỡ WebP, KHÔNG phóng to ảnh nhỏ hơn cỡ đích.
 """
 import io
+import warnings
 from dataclasses import dataclass
 
+from django.conf import settings
 from PIL import Image, ImageOps
 
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
@@ -33,11 +35,30 @@ class ProcessedImage:
     source_side: int  # cạnh ảnh vuông sau khi cắt, dùng để tính cảnh báo LOW_RESOLUTION
 
 
+# B7/L-5 (rà soát bảo mật 15/11): ảnh nén nhỏ nhưng nhiều điểm ảnh làm tràn RAM khi giải mã.
+# Đọc kích thước từ header và chặn TRƯỚC khi giải mã; trần cấu hình `ITEM_IMAGE_MAX_PIXELS` (mặc định 30 triệu).
+TOO_LARGE_MESSAGE = "Ảnh có kích thước quá lớn (tối đa {limit:,} điểm ảnh, khoảng 5500 × 5500). Hãy thu nhỏ ảnh rồi tải lại."
+
+
+def _too_large(limit: int) -> InvalidImageError:
+    return InvalidImageError(TOO_LARGE_MESSAGE.format(limit=limit).replace(",", "."))
+
+
 def _open_verified(raw: bytes) -> Image.Image:
+    limit = int(settings.ITEM_IMAGE_MAX_PIXELS)
     try:
-        probe = Image.open(io.BytesIO(raw))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", Image.DecompressionBombWarning)  # đã có trần riêng ngay dưới
+            probe = Image.open(io.BytesIO(raw))
+        width, height = probe.size  # chỉ đọc header
+        if width * height > limit:
+            raise _too_large(limit)
         probe.verify()
         fmt = (probe.format or "").upper()
+    except InvalidImageError:
+        raise
+    except Image.DecompressionBombError as exc:
+        raise _too_large(limit) from exc
     except Exception as exc:  # UnidentifiedImageError, OSError, SyntaxError...
         raise InvalidImageError(
             "Tệp không phải ảnh hợp lệ hoặc đã hỏng."

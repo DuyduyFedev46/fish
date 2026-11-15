@@ -9,14 +9,14 @@ from django.contrib.auth import logout as django_logout
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import update_last_login
 from rest_framework import status
-from rest_framework.authtoken.models import Token
+from rest_framework.exceptions import ValidationError
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.exceptions import BusinessError
-from apps.common.throttling import LoginIpThrottle, LoginUserThrottle
+from apps.common.throttling import ChangePasswordThrottle, LoginIpThrottle, LoginUserThrottle
 
 from . import services
 
@@ -32,10 +32,15 @@ class LoginTokenView(ObtainAuthToken):
     throttle_classes = [LoginIpThrottle, LoginUserThrottle]
 
     def post(self, request, *args, **kwargs):
+        data = request.data if hasattr(request.data, "get") else {}
+        # B4: username/password phải là chuỗi; kiểu khác -> 400 (không để DRF ép kiểu hay nổ 500).
+        for field in ("username", "password"):
+            if not isinstance(data.get(field), str):
+                raise ValidationError({field: ["Phải là chuỗi ký tự."]})
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
-        token, _ = Token.objects.get_or_create(user=user)
+        token = services.issue_token(user=user)  # M-3: đăng nhập lại cấp token mới, thu token cũ
         update_last_login(None, user)
         return Response({"token": token.key})
 
@@ -73,6 +78,7 @@ class ChangePasswordView(APIView):
     """Tự đổi mật khẩu của chính mình. Chỉ nhận `old_password`, `new_password` (BR-PQ-17)."""
 
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ChangePasswordThrottle]  # B8
     allow_must_change_password = True  # BR-PQ-19: miễn chặn
     allow_without_group = True  # D-3: miễn cổng không nhóm
 

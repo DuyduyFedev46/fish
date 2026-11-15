@@ -8,7 +8,9 @@ cùng hàm với danh bạ khách mới (hai API trả cùng một tập khách)
 - NV kho không có `sales.view_customer` (data migration accounts/0012) nên bị 403 (cổng Tầng 1 đứng trước).
   Ngoài phạm vi → 404 (không lộ bản ghi có tồn tại).
 """
-from rest_framework import viewsets
+from django.db.models import ProtectedError
+from rest_framework import status, viewsets
+from rest_framework.response import Response
 
 from apps.common.api import BusinessModelPermissions, NoStoreMixin
 from apps.sales.models import Customer
@@ -29,3 +31,14 @@ class CustomerViewSet(NoStoreMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         return scope_customers_for(self.request.user, super().get_queryset())
+
+    def destroy(self, request, *args, **kwargs):
+        """B9 / BR-PQ-10: khách đã có chứng từ (đơn, phiếu giao…) không xoá được -> 409 tiếng Việt, không 500."""
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"detail": "Khách này đã có đơn hàng hoặc chứng từ nên không xoá được (BR-PQ-10).",
+                 "code": "BR-PQ-10"},
+                status=status.HTTP_409_CONFLICT,
+            )

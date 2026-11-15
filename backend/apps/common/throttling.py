@@ -8,7 +8,10 @@ Nguyên tắc:
 - Shop lookup order dùng mã đơn viết hoa để chặn dò mã từ nhiều IP khác nhau.
 """
 import hashlib
+from functools import wraps
+
 from django.conf import settings
+from django.http import HttpResponse
 from rest_framework.throttling import SimpleRateThrottle
 
 
@@ -95,19 +98,58 @@ class LoginIpThrottle(SettingsRateThrottle):
     scope = "login_ip"
 
 
+def _login_username(request) -> str:
+    """Username đã chuẩn hoá từ DRF Request (`.data`) hoặc Django HttpRequest (`.POST`, form Admin).
+    Không phải chuỗi (số, object, list, null) -> "" (B4): view trả 400, throttle không được nổ."""
+    try:
+        data = request.data if hasattr(request, "data") else request.POST
+    except Exception:  # ParseError: để view báo lỗi
+        return ""
+    raw = data.get("username") if hasattr(data, "get") else None
+    return raw.strip().lower() if isinstance(raw, str) else ""
+
+
 class LoginUserThrottle(SettingsRateThrottle):
+    """B6/L-3: giới hạn theo CẶP (username, IP). Người ngoài gõ sai từ IP khác không khoá được người thật;
+    chống dò từ nhiều IP đã có `LoginIpThrottle` (theo IP)."""
+
     scope = "login_user"
 
     def get_cache_key(self, request, view):
-        try:
-            data = request.data if hasattr(request, "data") and hasattr(request.data, "get") else {}
-        except Exception:
-            data = {}
-        username = (data.get("username") or "").strip().lower()
+        username = _login_username(request)
         if not username:
             return None
-        ident = hashlib.sha256(username.encode("utf-8")).hexdigest()
+        ident = hashlib.sha256(f"{username}|{self.get_ident(request)}".encode("utf-8")).hexdigest()
         return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
+class ChangePasswordThrottle(SettingsRateThrottle):
+    """B8: chặn dò `old_password` ở đổi mật khẩu, đếm theo người dùng đang đăng nhập."""
+
+    scope = "change_password"
+
+    def get_cache_key(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": str(request.user.pk)}
+
+
+def throttle_admin_login(login_view):
+    """H-1: bọc view đăng nhập Django Admin bằng cùng hai throttle với `/api/auth/token/`.
+    Chỉ đếm POST (lần gõ mật khẩu); vượt mức -> 429, kể cả khi mật khẩu đúng."""
+
+    @wraps(login_view)
+    def wrapper(request, *args, **kwargs):
+        if request.method == "POST":
+            for throttle_class in (LoginIpThrottle, LoginUserThrottle):
+                if not throttle_class().allow_request(request, None):
+                    return HttpResponse(
+                        "Thử đăng nhập quá nhiều lần. Vui lòng đợi rồi thử lại.",
+                        status=429, content_type="text/plain; charset=utf-8",
+                    )
+        return login_view(request, *args, **kwargs)
+
+    return wrapper
 
 
 class CustomerSearchThrottle(SettingsRateThrottle):

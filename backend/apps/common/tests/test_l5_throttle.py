@@ -116,17 +116,18 @@ class ThrottleL5Tests(TestCase):
 
     @override_settings(CAVEVE_THROTTLE_RATES={"login_user": "2/hour"})
     def test_s03_ac2_login_user_throttle(self):
+        """B6 (15/11): khoá theo cặp (username, IP) — cùng IP bị chặn, IP khác không bị liên luỵ."""
         User.objects.create_user("targeted_user", password="password123")
         url = "/api/auth/token/"
         payload = {"username": "targeted_user", "password": "wrong"}
 
-        # 2 request từ 2 IP khác nhau
         self.client.post(url, payload, format="json", REMOTE_ADDR="172.16.0.1")
-        self.client.post(url, payload, format="json", REMOTE_ADDR="172.16.0.2")
+        self.client.post(url, payload, format="json", REMOTE_ADDR="172.16.0.1")
 
-        # Request thứ 3 từ IP thứ 3 nhắm vào cùng user bị throttle
-        resp3 = self.client.post(url, payload, format="json", REMOTE_ADDR="172.16.0.3")
+        resp3 = self.client.post(url, payload, format="json", REMOTE_ADDR="172.16.0.1")
         self.assertEqual(resp3.status_code, 429)
+        resp_other_ip = self.client.post(url, payload, format="json", REMOTE_ADDR="172.16.0.3")
+        self.assertEqual(resp_other_ip.status_code, 400)
 
     @override_settings(CAVEVE_THROTTLE_RATES={
         "shop_lookup_ip": None,

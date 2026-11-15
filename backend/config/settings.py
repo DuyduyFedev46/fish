@@ -160,6 +160,8 @@ ITEM_IMAGE_PUBLIC_BASE_URL = os.getenv("ITEM_IMAGE_PUBLIC_BASE_URL", "").strip()
     else "http://localhost:8000/media/item-images"
 )
 ITEM_IMAGE_MAX_BYTES = int(os.getenv("ITEM_IMAGE_MAX_BYTES", str(10 * 1024 * 1024)))
+# B7: trần số điểm ảnh của file tải lên (chặn ảnh "bom giải nén"), kiểm từ header trước khi giải mã.
+ITEM_IMAGE_MAX_PIXELS = int(os.getenv("ITEM_IMAGE_MAX_PIXELS", "30000000"))
 ITEM_IMAGE_MIN_SIDE_WARN = int(os.getenv("ITEM_IMAGE_MIN_SIDE_WARN", "600"))
 # 3 cỡ WebP xuất ra (Q7): thu nhỏ / lưới / chi tiết. Không phóng to ảnh gốc nhỏ hơn cỡ này.
 ITEM_IMAGE_SIZES = {
@@ -184,13 +186,47 @@ CSRF_TRUSTED_ORIGINS = [
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+# L-2 (rà soát bảo mật 15/11): production chuyển HTTPS + HSTS. Bỏ qua khi DEBUG hoặc `manage.py test`.
+# Cloud Run gắn X-Forwarded-Proto nên SECURE_PROXY_SSL_HEADER ở trên giữ chuyển hướng không lặp.
+# Không includeSubDomains vì domain run.app không phải của mình.
+_HTTPS_ENFORCED = not DEBUG and not TESTING
+SECURE_SSL_REDIRECT = _HTTPS_ENFORCED and _bool("SECURE_SSL_REDIRECT", "1")
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000")) if _HTTPS_ENFORCED else 0
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+
+# H-1 (rà soát bảo mật 15/11): form /api-auth/, SessionAuthentication và Browsable API chỉ cho dev.
+# ERP gọi API bằng header Token, nên production chỉ cần TokenAuthentication + JSON.
+_DEV_API_FEATURES = DEBUG or TESTING
+# Django Admin dùng cho vận hành (doc/ops/moi-truong.md) nên mặc định BẬT, có throttle đăng nhập
+# (config/urls.py). Đặt DJANGO_ADMIN_ENABLED=0 để tắt hẳn khi không ai dùng.
+ADMIN_ENABLED = _bool("DJANGO_ADMIN_ENABLED", "1")
+# M-3/B12: token ERP hết hạn sau N giờ kể từ lúc cấp; đăng nhập lại cấp token mới.
+AUTH_TOKEN_TTL_HOURS = int(os.getenv("AUTH_TOKEN_TTL_HOURS", "12"))
+
+# M-1/B5: throttle phải đếm chung giữa worker gunicorn và các instance Cloud Run -> cache trong Postgres
+# (DatabaseCache). Bảng `django_cache` do migration `accounts 0019` tạo, job migrate tự chạy.
+# MAX_ENTRIES lớn để không bị dọn bớt khoá đếm. Test dùng bộ nhớ cục bộ cho nhanh.
+if TESTING:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+            "LOCATION": "django_cache",
+            "OPTIONS": {"MAX_ENTRIES": 100000, "CULL_FREQUENCY": 10},
+        }
+    }
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        # Token cho dashboard SPA (cross-origin), Session cho browsable API/Admin.
-        # Bản bọc của DRF: thêm chặn BR-PQ-19 (phải đổi mật khẩu trước) — S48.
+        # Token cho dashboard SPA (cross-origin); Session chỉ khi dev/test (browsable API).
+        # Bản bọc của DRF: thêm chặn BR-PQ-19 (phải đổi mật khẩu trước) — S48; token có hạn (M-3).
         "apps.accounts.auth.authentication.TokenAuthentication",
-        "apps.accounts.auth.authentication.SessionAuthentication",
+        *(["apps.accounts.auth.authentication.SessionAuthentication"] if _DEV_API_FEATURES else []),
+    ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        *(["rest_framework.renderers.BrowsableAPIRenderer"] if _DEV_API_FEATURES else []),
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -217,7 +253,10 @@ _DEFAULT_THROTTLE_RATES = {
     "shop_lookup_token": _rate("THROTTLE_SHOP_LOOKUP_TOKEN", "60/min"),
     "shop_voucher_check": _rate("THROTTLE_SHOP_VOUCHER_CHECK", "20/min"),
     "login_ip": _rate("THROTTLE_LOGIN_IP", "10/min"),
-    "login_user": _rate("THROTTLE_LOGIN_USER", "30/hour"),
+    # B6/L-3: khoá theo cặp (username, IP) nên người ngoài không khoá được Chủ từ IP khác.
+    "login_user": _rate("THROTTLE_LOGIN_USER", "10/hour"),
+    # B8: dò old_password khi đổi mật khẩu, đếm theo người dùng.
+    "change_password": _rate("THROTTLE_CHANGE_PASSWORD", "10/hour"),
     "customer_search": _rate("THROTTLE_CUSTOMER_SEARCH", "30/min"),
     "public_content": _rate("THROTTLE_PUBLIC_CONTENT", "600/min"),
 }

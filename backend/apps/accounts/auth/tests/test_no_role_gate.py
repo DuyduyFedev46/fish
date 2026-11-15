@@ -101,9 +101,10 @@ class NoRoleGateTests(TestCase):
         # đổi mật khẩu: qua được cổng (sai mật khẩu cũ là 400, không phải 403)
         resp = self.client_no_role.post(CHANGE, {"old_password": "sai", "new_password": "Moi-mat-khau-2026"}, format="json")
         self.assertNotEqual(resp.status_code, 403)
+        self.assertEqual(self.client_no_role.post(LOGOUT).status_code, 204)
+        # M-3 (15/11): đăng nhập cấp token mới và thu token cũ, nên thử đăng nhập SAU khi đăng xuất.
         login = APIClient().post(LOGIN, {"username": "no_role_fake", "password": "x"}, format="json")
         self.assertEqual(login.status_code, 200)
-        self.assertEqual(self.client_no_role.post(LOGOUT).status_code, 204)
 
     def test_exempt_paths_are_not_gated(self):
         for path, view_cls in iter_routes():
