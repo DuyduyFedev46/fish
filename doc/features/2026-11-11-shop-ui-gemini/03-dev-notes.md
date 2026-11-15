@@ -435,3 +435,17 @@ Duy không đặt biến tài khoản, giao đội Claude làm phần Gemini kh�
 | Banner `home-banner` | tải `banner-hai-san-da-lanh.jpg` vào bài, chèn khối ảnh ngay sau tiêu đề slide 1, lưu nháp rồi đăng lại (chữ bài giữ nguyên). Bài chỉ có 1 slide nên `banner-cang-ca-binh-minh.jpg` để dành |
 
 Kiểm trên Shop staging (Playwright 360 + 1280): 9 ảnh từ bucket tải được, banner hiện ảnh 1600 px, 6 nhãn "Ảnh minh hoạ", không cuộn ngang, 0 lỗi console. Ảnh gốc `*.jpg` bị `.gitignore` chặn nên chỉ nằm ở máy Duy; khi lên production cần chạy lại với bucket production sau khi Duy duyệt.
+
+
+---
+
+## GUI-15 — Ảnh bìa AI cho 5 bài Góc bếp
+
+- Đã tạo 5 ảnh bìa ngang tỉ lệ **16:9** (`1920 × 1080 px`, đạt chuẩn ≥ `1600 × 900 px`, JPEG 364–503 KB) trong `doc/features/2026-11-11-shop-ui-gemini/anh-goc-bep/`:
+  - `ca-thu-chien-sa-ot.jpg` (`502.9 KB`): khoanh cá thu (*Scomberomorus commerson*) chiên vàng giòn phủ sả ớt phi thơm, dọn kèm chén nước mắm ớt, cơm trắng và rau sống trên bàn gỗ.
+  - `ca-thu-hap-gung-hanh.jpg` (`425.6 KB`): khoanh cá thu hấp trên đĩa sứ bầu dục, phủ gừng sợi vàng, hành lá và ớt đỏ.
+  - `muc-ong-hap-chien-hay-xao.jpg` (`425.2 KB`): 3 đĩa sứ nhỏ đặt cạnh nhau trên bàn gỗ (mực ống hấp gừng hành, mực ống chiên giòn vàng, mực ống xào hành cần).
+  - `ra-dong-tom.jpg` (`402.9 KB`): tôm sú sống (*Penaeus monodon*) trong túi zip trong suốt không nhãn hiệu, ngâm rã đông trong tô thuỷ tinh nước lạnh trên bàn bếp.
+  - `ra-dong-ca-dung-cach.jpg` (`364.5 KB`): khoanh cá thu và phi lê cá hồi trong hộp thuỷ tinh đậy nắp kín đặt ở kệ kính ngăn mát tủ lạnh.
+- Đã kiểm tra mắt thường cả 5 ảnh: kiểu ảnh chụp DSLR thực tế, ánh sáng tự nhiên, đúng loài, chủ thể nằm giữa khung, không chữ/logo/watermark, không mặt người hay tay biến dạng.
+- Đã ghi đầy đủ bảng slug, prompt AI, kích thước, dung lượng và ngày tạo vào `doc/features/2026-11-11-shop-ui-gemini/anh-goc-bep/nguon-anh.md`. Không gọi API và không tải lên staging (đội Claude sẽ tải và gắn ảnh bìa theo phiếu).
