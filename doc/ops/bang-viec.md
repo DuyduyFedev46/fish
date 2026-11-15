@@ -24,8 +24,8 @@ Luật (chi tiết ở `AGENTS.md` mục "Làm chung Claude và Gemini"):
 
 | Việc | Hồ sơ | Ai | Nhánh | Phạm vi file | Trạng thái | Ghi chú |
 |---|---|---|---|---|---|---|
-| Rà soát bảo mật toàn diện, chống tấn công | `doc/features/2026-11-15-ra-soat-bao-mat/` | claude | `claude/ra-soat-bao-mat` | chỉ doc báo cáo + test bảo mật mới; sửa lỗi tách việc sau | Đang làm | Duy giao 15/11 |
-| An toàn khi AI làm nhầm (sao lưu DB, chặn lệnh nguy hiểm, bảo vệ nhánh) | — | — | — | hạ tầng GCP, `.claude/settings.json`, `.agents/hooks.json` | Chờ làm | Chờ Duy đồng ý bước 1 (15/11) |
+| Rà soát bảo mật toàn diện, chống tấn công | `doc/features/2026-11-15-ra-soat-bao-mat/` | claude | `sec/tong` | backend, adapter, firebase*.json, e2e | Xong `93b24ad` (staging api:v30) | Production chờ Duy duyệt; checklist ở nhật ký `moi-truong.md` 15/11 |
+| An toàn khi AI làm nhầm (sao lưu DB, chặn lệnh nguy hiểm, bảo vệ nhánh) | — | claude | `sec/ai-guard` | hạ tầng GCP, `.claude/settings.json`, `.agents/hooks.json` | Xong `93b24ad` | Sao lưu đêm 02:00 (giữ 30 ngày, đã khoá), `main` cấm force-push, hook `scripts/ai_guard.py` cho Claude + Antigravity |
 | Google Maps ở trang đặt hàng | — | — | — | — | Tạm dừng | Chờ Duy cấp key |
 
 ## Đã xong
