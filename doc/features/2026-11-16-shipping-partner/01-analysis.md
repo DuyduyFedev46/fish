@@ -25,6 +25,8 @@ flowchart TD
 > Nguồn: sheet FIX WEB dòng 10 (Lộc, mức "Lưu Lại (<2 tháng)", ngày 16/11/2026).
 > Phụ thuộc: sheet dòng 9, hồ sơ `doc/features/2026-11-16-structured-address/` (đang phân tích song song).
 
+> **TẠM DỪNG (Duy 16/11/2026):** "Còn vụ phí ship và nhà vận chuyển tính sau, cái này chưa có đối tác nên chưa làm được đâu." Chỉ làm tiếp khi Lộc có đối tác (tài khoản doanh nghiệp + khoá thử).
+
 ## 1. Yêu cầu gốc
 
 > "Tiến hành tìm cách liên kết với đơn vị giao hàng ahamove, giao hàng tiết kiệm để test tiếp quá trình in tem đến giao hàng thành công"

@@ -25,6 +25,8 @@ flowchart TD
 > Trạng thái: **NHÁP — CHỜ DUYỆT**. Viết trước khi Duy trả lời Q-1..Q-4, giả định theo phương án BA khuyên (mục 0).
 > Duy duyệt `01-analysis.md` và mục 0 xong thì PO sửa lại story bị ảnh hưởng rồi mới chuyển "CHỜ DUYỆT".
 
+> **TẠM DỪNG (Duy 16/11/2026):** "Còn vụ phí ship và nhà vận chuyển tính sau, cái này chưa có đối tác nên chưa làm được đâu." Chỉ làm tiếp khi Lộc có đối tác (tài khoản doanh nghiệp + khoá thử).
+
 ## 0. Giả định đang dùng (chờ Duy chốt)
 
 | Câu | Giả định trong bản nháp | Nếu Duy chọn khác thì story nào đổi |
