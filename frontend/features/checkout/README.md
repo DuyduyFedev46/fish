@@ -24,6 +24,7 @@ flowchart TD
 - `components/OrderScreen.tsx` — `/shop/orders/?code=&result=`: tra cứu (F1/F2) và mọi màn đơn. Chọn màn bằng `orderState.ts`.
   Màn con: `PaymentView` (D1, D2, nền D4), `PendingView` (D3), `ExpiredView` (D4 trang), `OrderView` (E1–E5), `LookupForm`.
 - `orderState.ts` — `screenFor(order, result, clock)`: trạng thái máy chủ + `result` URL → màn; đồng hồ giữ hàng; dòng thời gian.
+- `components/AddressField.tsx`, `AdministrativeUnitPicker.tsx` — địa chỉ có cấu trúc (STA-02): kiểu mới/cũ, tỉnh → [huyện] → xã chọn từ `GET /api/shop/administrative-units/`, ô tìm không dấu, gửi `delivery_address_parts`.
 - `formRules.ts`, `reorder.ts` — luật form, dựng lại giỏ ("Đặt lại", "Mua lại"). Thuần TypeScript, có test.
 - `requestId.ts` — `client_request_id` (sessionStorage, kèm vân tay giỏ) để không tạo đơn trùng.
 - `lookupToken.ts` — mã tra đơn trong sessionStorage (`cangcaloc_order_tokens_v1`), không bao giờ trên URL.

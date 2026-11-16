@@ -5,3 +5,5 @@ khoá field/actor (`DocumentViewSet`, BR-PQ-14/16), `require_perm`, đổi `Busi
 `admin.py`: `LockedFieldsAdminMixin` (S9) — field trạng thái/tồn/giá vốn/người phụ trách chỉ đọc trong Django Admin với người không phải superuser; superuser sửa được nhưng ghi AuditLog `admin_edit`.
 `exceptions.py`: `BusinessError` (thông điệp tiếng Việt + mã BR). `audit.py`: `record_audit`. `actors.py`: `actor=None` = Hệ thống.
 `tests/`: test xuyên app của lô L2 (S3 khoá field, S4 người tạo, S5 phạm vi delivery_staff) + S9 khoá field Admin + `fixtures.py` dựng dữ liệu test.
+`administrative_units/` (STA-01/02): danh mục tỉnh/huyện/xã đọc từ JSON tĩnh (`catalog.py`), kiểm và ghép địa chỉ giao
+(`addresses.py`), API công khai `GET /api/shop/administrative-units/` (`shop_api.py`). Xem README trong thư mục đó.

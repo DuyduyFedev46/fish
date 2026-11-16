@@ -73,11 +73,32 @@ export type CreateOrderItemInput = {
   qty: string;
 };
 
+/** Kiểu địa chỉ (STA-02): mới = tỉnh → phường/xã; cũ = tỉnh → quận/huyện → phường/xã. */
+export type AddressScheme = "current" | "legacy";
+export type AdministrativeLevel = "province" | "district" | "ward";
+export type AdministrativeUnit = { code: string; name: string };
+export type AdministrativeUnitList = {
+  scheme: AddressScheme;
+  level: AdministrativeLevel;
+  parent_code: string | null;
+  items: AdministrativeUnit[];
+};
+/** Địa chỉ giao có cấu trúc gửi lúc đặt đơn (02b §2.2). `district_code` null khi `scheme = "current"`. */
+export type DeliveryAddressParts = {
+  scheme: AddressScheme;
+  province_code: string;
+  district_code: string | null;
+  ward_code: string;
+  street: string;
+};
+
 export type CreateOrderPayload = {
   /** UUID sinh một lần khi mở form, giữ qua các lần "Thử lại" để không tạo đơn trùng (BR-BH-27). */
   client_request_id: string;
   customer: { name: string; phone: string };
-  delivery_address: string;
+  /** Chỉ còn cho tương thích Shop bản cũ; Shop mới gửi `delivery_address_parts` (STA-02). */
+  delivery_address?: string;
+  delivery_address_parts?: DeliveryAddressParts;
   items: CreateOrderItemInput[];
   privacy_consent?: { accepted: boolean; policy_version_id: number };
   /** Lô 3b. */

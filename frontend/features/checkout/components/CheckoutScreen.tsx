@@ -38,7 +38,21 @@ import { saveLookupToken } from "../lookupToken";
 import { goToMockGateway, redirectToGateway } from "../gateway";
 import { orderUrl } from "../afterCreate";
 import { shouldOpenFallbackDirectly } from "../googleMaps";
-import { errorSummary, MESSAGES, normalizeVnPhone, validateForm, type FormErrors, type FormField } from "../formRules";
+import {
+  INITIAL_SELECTION,
+  STREET_MAX,
+  errorSummary,
+  mapServerFields,
+  normalizeVnPhone,
+  selectDistrict,
+  selectProvince,
+  selectScheme,
+  selectWard,
+  validateForm,
+  type AddressSelection,
+  type FormErrors,
+  type FormField,
+} from "../formRules";
 import AddressField from "./AddressField";
 import AddressMapPicker from "./AddressMapPicker";
 import PaymentChoice from "./PaymentChoice";
@@ -97,7 +111,9 @@ function CheckoutForm() {
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  // Địa chỉ có cấu trúc (STA-02): chỉ trong state, không storage/URL/console.
+  const [selection, setSelection] = useState<AddressSelection>(INITIAL_SELECTION);
+  const [street, setStreet] = useState("");
   const [consent, setConsent] = useState(false); // KHÔNG tick sẵn (BR-BH-17)
   const [errors, setErrors] = useState<FormErrors>({});
   const [summaryToken, setSummaryToken] = useState(0);
@@ -210,15 +226,35 @@ function CheckoutForm() {
 
   /** Kiểm một ô khi rời ô (blur). Không báo lỗi khi khách đang gõ lần đầu. */
   function checkOnBlur(field: FormField) {
-    const all = validateForm({ name, phone, address, consent }, false);
+    const all = validateForm({ name, phone, ...selection, street, consent }, false);
     setFieldError(field, all[field]);
   }
 
   /** Ô đang có lỗi: sửa đúng thì lỗi tắt ngay khi gõ. */
-  function recheck(field: FormField, next: { name: string; phone: string; address: string }) {
+  function recheck(field: FormField, next: { name: string; phone: string; street: string; selection: AddressSelection }) {
     if (!errors[field]) return;
-    const all = validateForm({ ...next, consent }, false);
+    const all = validateForm({ name: next.name, phone: next.phone, street: next.street, ...next.selection, consent }, false);
     setFieldError(field, all[field]);
+  }
+
+  /** Đổi một cấp địa chỉ: xoá cấp con (formRules), lỗi của ô nào đã hết thì tắt, ô con bị xoá không báo lỗi sớm. */
+  function changeSelection(next: AddressSelection) {
+    const prev = selection;
+    setSelection(next);
+    setErrors((cur) => {
+      const all = validateForm({ name, phone, ...next, street, consent }, false);
+      const out = { ...cur };
+      const codes = [
+        ["province", "provinceCode"],
+        ["district", "districtCode"],
+        ["ward", "wardCode"],
+      ] as const;
+      for (const [field, key] of codes) {
+        const justCleared = !!prev[key] && !next[key];
+        if (out[field] && (!all[field] || justCleared)) delete out[field];
+      }
+      return out;
+    });
   }
 
   /**
@@ -235,7 +271,13 @@ function CheckoutForm() {
       const payload: CreateOrderPayload = {
         client_request_id: opts?.withoutVoucher ? renewRequestId(fingerprint) : getRequestId(fingerprint),
         customer: { name: name.trim(), phone: normalizeVnPhone(phone) },
-        delivery_address: address.trim(),
+        delivery_address_parts: {
+          scheme: selection.scheme,
+          province_code: selection.provinceCode,
+          district_code: selection.scheme === "legacy" ? selection.districtCode : null,
+          ward_code: selection.wardCode,
+          street: street.split(/\s+/).filter(Boolean).join(" "),
+        },
         items,
       };
       if (consentRequired && policy) {
@@ -278,7 +320,7 @@ function CheckoutForm() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cart, name, phone, address, consent, consentRequired, policy, router, voucher.code, voucher.quote]
+    [cart, name, phone, selection, street, consent, consentRequired, policy, router, voucher.code, voucher.quote]
   );
 
   function handleSendError(err: unknown, lines: typeof cart.lines) {
@@ -349,12 +391,7 @@ function CheckoutForm() {
       return;
     }
     if (code === "VALIDATION" && err.data?.fields && typeof err.data.fields === "object") {
-      const f = err.data.fields as Record<string, string>;
-      const next: FormErrors = {};
-      if (f.name) next.name = MESSAGES.name;
-      if (f.phone) next.phone = MESSAGES.phone;
-      if (f.delivery_address) next.address = MESSAGES.address;
-      if (f.consent) next.consent = MESSAGES.consent;
+      const next: FormErrors = mapServerFields(err.data.fields as Record<string, string>);
       if (Object.keys(next).length > 0) {
         setErrors(next);
         setSummaryShown(true);
@@ -377,7 +414,7 @@ function CheckoutForm() {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submittingRef.current || consentRequired === null) return;
-    const found = validateForm({ name, phone, address, consent }, consentRequired && !!policy);
+    const found = validateForm({ name, phone, ...selection, street, consent }, consentRequired && !!policy);
     setErrors(found);
     if (Object.keys(found).length > 0) {
       setSummaryShown(true);
@@ -401,9 +438,9 @@ function CheckoutForm() {
   }
 
   function onMapConfirm(addr: string) {
-    setAddress(addr);
+    setStreet(addr.slice(0, STREET_MAX)); // bản đồ chỉ điền ô số nhà; khách vẫn chọn các cấp bằng danh mục
     setFilledFromMap(true);
-    setFieldError("address", undefined);
+    setFieldError("street", undefined);
     setMapOpen(false);
     // Hộp thoại trả tiêu điểm về nút Bản đồ khi đóng xong; ta vào ô địa chỉ sau đó (con trỏ cuối chuỗi).
     window.setTimeout(focusAddressEnd, 320);
@@ -512,7 +549,7 @@ function CheckoutForm() {
                   value={name}
                   onChange={(v) => {
                     setName(v);
-                    recheck("name", { name: v, phone, address });
+                    recheck("name", { name: v, phone, street, selection });
                   }}
                   onBlur={() => checkOnBlur("name")}
                   required
@@ -530,7 +567,7 @@ function CheckoutForm() {
                   value={phone}
                   onChange={(v) => {
                     setPhone(v);
-                    recheck("phone", { name, phone: v, address });
+                    recheck("phone", { name, phone: v, street, selection });
                   }}
                   onBlur={() => checkOnBlur("phone")}
                   required
@@ -543,14 +580,19 @@ function CheckoutForm() {
 
               <section className={s.section}>
                 <AddressField
-                  value={address}
-                  onChange={(v) => {
-                    setAddress(v);
+                  selection={selection}
+                  onScheme={(v) => changeSelection(selectScheme(selection, v))}
+                  onProvince={(v) => changeSelection(selectProvince(selection, v))}
+                  onDistrict={(v) => changeSelection(selectDistrict(selection, v))}
+                  onWard={(v) => changeSelection(selectWard(selection, v))}
+                  street={street}
+                  onStreet={(v) => {
+                    setStreet(v);
                     setFilledFromMap(false);
-                    recheck("address", { name, phone, address: v });
+                    recheck("street", { name, phone, street: v, selection });
                   }}
-                  onBlur={() => checkOnBlur("address")}
-                  error={errors.address}
+                  onStreetBlur={() => checkOnBlur("street")}
+                  errors={errors}
                   filledFromMap={filledFromMap}
                   readOnly={submitting}
                   onOpenMap={openMap}

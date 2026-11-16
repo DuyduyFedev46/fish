@@ -20,6 +20,7 @@ const load = async (file) =>
     ).toString("base64")}`
   );
 const rules = await load("features/checkout/formRules.ts");
+const text = await load("lib/text.ts");
 const reorder = await load("features/checkout/reorder.ts");
 
 let n = 0;
@@ -136,22 +137,50 @@ eq("chuẩn hoá +84", rules.normalizeVnPhone("+84 900 000 001"), "0900000001");
 eq("tên rỗng", rules.validName("   "), false);
 eq("tên ok", rules.validName(" Nguyễn Văn A "), true);
 eq("tên quá dài", rules.validName("a".repeat(101)), false);
-eq("địa chỉ rỗng", rules.validAddress(" "), false);
-eq("địa chỉ quá dài", rules.validAddress("a".repeat(501)), false);
+eq("số nhà rỗng", rules.validStreet(" \n "), false);
+eq("số nhà gộp khoảng trắng", rules.validStreet("12 Đường Giả"), true);
+eq("số nhà đúng 200", rules.validStreet("a".repeat(200)), true);
+eq("số nhà 201", rules.validStreet("a".repeat(201)), false);
+const base = { name: "A", phone: "0900000001", scheme: "current", provinceCode: "68", districtCode: "", wardCode: "22945", street: "1 Đường Thử", consent: true };
+eq("form kiểu mới đủ: không lỗi", rules.validateForm(base, true), {});
+eq("kiểu mới: không cần huyện", rules.validateForm({ ...base, districtCode: "" }, true).district, undefined);
+eq("kiểu cũ: bắt huyện", rules.validateForm({ ...base, scheme: "legacy" }, true).district, "Chọn quận/huyện");
+eq("kiểu cũ đủ: không lỗi", rules.validateForm({ ...base, scheme: "legacy", provinceCode: "60", districtCode: "593", wardCode: "22915" }, true), {});
 eq(
-  "form trống: 4 lỗi đúng thứ tự",
-  rules.errorSummary(rules.validateForm({ name: "", phone: "", address: "", consent: false }, true)).map((e) => e.fieldId),
-  ["f-name", "f-phone", "f-addr", "f-consent"]
+  "form trống: lỗi đúng thứ tự ô (kiểu mới)",
+  rules.errorSummary(rules.validateForm({ name: "", phone: "", scheme: "current", provinceCode: "", districtCode: "", wardCode: "", street: "", consent: false }, true)).map((e) => e.fieldId),
+  ["f-name", "f-phone", "f-addr-province", "f-addr-ward", "f-addr", "f-consent"]
 );
 eq(
-  "form chưa tick đồng ý",
-  rules.validateForm({ name: "A", phone: "0900000001", address: "1 Đường Thử", consent: false }, true),
-  { consent: "Đánh dấu đồng ý ở trên để đặt hàng." }
+  "form trống: lỗi đúng thứ tự ô (kiểu cũ có huyện)",
+  rules.errorSummary(rules.validateForm({ name: "", phone: "", scheme: "legacy", provinceCode: "", districtCode: "", wardCode: "", street: "", consent: false }, true)).map((e) => e.fieldId),
+  ["f-name", "f-phone", "f-addr-province", "f-addr-district", "f-addr-ward", "f-addr", "f-consent"]
 );
+eq("form chưa tick đồng ý", rules.validateForm({ ...base, consent: false }, true), { consent: "Đánh dấu đồng ý ở trên để đặt hàng." });
+eq("form không bắt đồng ý", rules.validateForm({ ...base, consent: false }, false), {});
+
+// chọn địa chỉ: đổi cấp cha xoá cấp con, số nhà giữ (số nhà không nằm trong selection)
+const full = { scheme: "legacy", provinceCode: "60", districtCode: "593", wardCode: "22915" };
+eq("đổi kiểu xoá tỉnh, huyện, xã", rules.selectScheme(full, "current"), { scheme: "current", provinceCode: "", districtCode: "", wardCode: "" });
+eq("chọn lại cùng kiểu: giữ nguyên", rules.selectScheme(full, "legacy"), full);
+eq("đổi tỉnh xoá huyện, xã", rules.selectProvince(full, "79"), { scheme: "legacy", provinceCode: "79", districtCode: "", wardCode: "" });
+eq("chọn lại cùng tỉnh: giữ nguyên", rules.selectProvince(full, "60"), full);
+eq("đổi huyện xoá xã", rules.selectDistrict(full, "594"), { scheme: "legacy", provinceCode: "60", districtCode: "594", wardCode: "" });
+eq("chọn xã", rules.selectWard({ ...full, wardCode: "" }, "22918").wardCode, "22918");
+
+// lọc không dấu
+const wards = [{ name: "Phường Mũi Né" }, { name: "Phường Phan Thiết" }, { name: "Xã Hàm Thuận" }, { name: "Phường Đa Kao" }];
+const names = (q) => rules.filterUnits(wards, q, text.foldVietnamese).map((u) => u.name);
+eq("lọc không dấu: mui ne", names("mui ne"), ["Phường Mũi Né"]);
+eq("lọc có dấu, hoa thường", names("PHAN thiết"), ["Phường Phan Thiết"]);
+eq("lọc đ/d", names("da kao"), ["Phường Đa Kao"]);
+eq("lọc theo tiền tố 'phuong'", names("phuong").length, 3);
+eq("lọc rỗng: đủ danh sách", names("  ").length, 4);
+eq("lọc không khớp", names("zzz"), []);
 eq(
-  "form không bắt đồng ý",
-  rules.validateForm({ name: "A", phone: "0900000001", address: "1 Đường Thử", consent: false }, false),
-  {}
+  "lỗi máy chủ → ô",
+  rules.mapServerFields({ scheme: "x", ward_code: "x", street: "x", name: "x" }),
+  { name: "Chọn họ tên người nhận".replace("Chọn", "Nhập"), province: "Chọn tỉnh/thành phố", ward: "Chọn phường/xã", street: "Nhập số nhà, tên đường (tối đa 200 ký tự)" }
 );
 
 // mua lại

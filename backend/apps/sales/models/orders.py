@@ -25,7 +25,20 @@ class SalesOrder(models.Model):
     status = models.CharField(
         "Trạng thái", max_length=16, choices=Status.choices, default=Status.BOOKED
     )
-    delivery_address = models.TextField("Địa chỉ giao")  # bắt buộc (BR-BH-09)
+    delivery_address = models.TextField("Địa chỉ giao")  # bắt buộc (BR-BH-09); dòng đầy đủ, máy chủ ghép khi có phần tách
+    # STA-02 (BR-BH-29/34/35): địa chỉ có cấu trúc. address_scheme="" = địa chỉ tự do (đơn cũ, Shop bản cũ, sửa chữ ở CS-12).
+    # Chỉ máy chủ ghi (editable=False) để không lệch dòng đầy đủ. street_address là dữ liệu cá nhân (bất biến 9).
+    ADDRESS_SCHEME_CHOICES = [
+        ("current", "Địa chỉ mới (từ 01/07/2025)"),
+        ("legacy", "Địa chỉ cũ (trước 01/07/2025)"),
+    ]
+    address_scheme = models.CharField(
+        "Kiểu địa chỉ", max_length=16, choices=ADDRESS_SCHEME_CHOICES, blank=True, default="", editable=False
+    )
+    province_code = models.CharField("Mã tỉnh/thành", max_length=8, blank=True, default="", editable=False)
+    district_code = models.CharField("Mã quận/huyện", max_length=8, blank=True, default="", editable=False)
+    ward_code = models.CharField("Mã phường/xã", max_length=8, blank=True, default="", editable=False)
+    street_address = models.CharField("Số nhà, tên đường", max_length=200, blank=True, default="", editable=False)
     phone = models.CharField("SĐT nhận hàng", max_length=20)
     total_amount = models.DecimalField(
         "Tổng tiền", max_digits=14, decimal_places=2, default=Decimal("0")

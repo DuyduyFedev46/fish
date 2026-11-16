@@ -45,7 +45,7 @@ def to_checkout(page):
 def fill(page, phone=FAKE_PHONE, consent=True):
     page.fill("#f-name", FAKE_NAME)
     page.fill("#f-phone", phone)
-    page.fill("#f-addr", FAKE_ADDRESS)
+    fill_address(page)
     if consent and page.locator("#f-consent").count():
         page.locator("#f-consent").check()
 

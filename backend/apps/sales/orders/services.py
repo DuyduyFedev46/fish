@@ -367,6 +367,7 @@ def create_order(
     voucher_code=None,
     client_ip_hash="",
     enforce_caps=False,
+    address_parts=None,
 ):
     """
     Tạo đơn ở trạng thái BOOKED — do Hệ thống tạo (BR-PQ-11). TẤT CẢ trong 1 transaction:
@@ -381,11 +382,16 @@ def create_order(
     `voucher_code` (SHOP-3b-04): tối đa một mã, không cộng dồn với PricingRule. Thứ tự khoá: đơn -> mã -> lô (02b §2.2).
     Mã không hợp lệ dưới khoá (kể cả hết lượt khi đua) -> rollback cả đơn, không giữ chỗ, không giữ lượt.
 
+    `address_parts` (STA-02, BR-BH-29/34): `StructuredAddress` đã kiểm; khi có thì `delivery_address` phải đúng
+    `address_parts.full_text` và 5 trường cấu trúc được ghi. Không có = địa chỉ tự do (BR-BH-35).
+
     `client_request_id` (BR-BH-27): ghi vào đơn; unique ở DB. Hai request cùng mã: request sau bị chặn ở unique index
     và nhận `IntegrityError` — `place_order` bắt NGOÀI `atomic` này và trả đơn đã có.
     """
     if not delivery_address:
         raise BusinessError("Địa chỉ giao bắt buộc (BR-BH-09).")
+    if address_parts is not None and delivery_address != address_parts.full_text:
+        raise BusinessError("Địa chỉ giao không khớp phần tách (BR-BH-29).")
     if not lines:
         raise BusinessError("Đơn hàng phải có ít nhất một dòng.")
 
@@ -429,6 +435,11 @@ def create_order(
             customer=customer,
             status=SalesOrder.Status.BOOKED,
             delivery_address=delivery_address,
+            address_scheme=address_parts.scheme if address_parts else "",
+            province_code=address_parts.province_code if address_parts else "",
+            district_code=address_parts.district_code if address_parts else "",
+            ward_code=address_parts.ward_code if address_parts else "",
+            street_address=address_parts.street if address_parts else "",
             phone=phone or customer_phone,
             total_amount=ZERO,
             booked_expires_at=now
@@ -740,6 +751,14 @@ def update_delivery_address(order: SalesOrder, address: str) -> None:
     if len(clean_address) > 500:
         raise BusinessError("Địa chỉ giao hàng không được vượt quá 500 ký tự.", code="INVALID_INPUT")
 
+    # STA-02: sửa chữ thì phần tách không còn khớp -> xoá trắng, đơn thành địa chỉ tự do (đến STA-04).
     order.delivery_address = clean_address
-    order.save(update_fields=["delivery_address"])
+    order.address_scheme = ""
+    order.province_code = ""
+    order.district_code = ""
+    order.ward_code = ""
+    order.street_address = ""
+    order.save(update_fields=[
+        "delivery_address", "address_scheme", "province_code", "district_code", "ward_code", "street_address",
+    ])
 

@@ -16,8 +16,22 @@ flowchart TD
   N{"Duy duyệt đổi quyết định một ô địa chỉ?"} -- "duyệt" --> A
 ```
 
-> BA · 2026-11-16 · Trạng thái: **CHỜ DUYỆT**
+> BA · 2026-11-16 · Trạng thái: **ĐÃ DUYỆT lát 1** (16/11, xem mục "Duy trả lời")
 > Nguồn: sheet FIX WEB dòng 9 (Lộc, mức Trung bình, dưới 1 tuần, ngày 16/11/2026).
+
+## Duy trả lời (16/11/2026, trong phiên điều phối)
+
+Nguyên văn: "cho chọn trước sáp nhập và sau sáp nhập, master data đủ tỉnh thành, huyện, xã → sau đó lên dropdown này trước".
+"Còn vụ phí ship và nhà vận chuyển tính sau, cái này chưa có đối tác nên chưa làm được đâu."
+
+| Câu | Chốt |
+|---|---|
+| Q-1 | **Duyệt** đổi "một ô" thành địa chỉ có cấu trúc (tỉnh, [huyện], phường/xã từ danh sách, số nhà gõ tay). Giữ các vế khác của BR-BH-29: không toạ độ, không nút vị trí hiện tại. |
+| Q-3 | **Không khoá tỉnh.** Khách chọn **kiểu địa chỉ**: *Địa chỉ mới (sau sắp xếp 01/07/2025)* gồm Tỉnh/thành → Phường/xã; hoặc *Địa chỉ cũ (trước sắp xếp)* gồm Tỉnh/thành → Quận/huyện → Phường/xã. Danh mục **đủ cả nước** cho cả hai kiểu. |
+| Q-2, Q-4 | **Chưa chốt, để sau.** Lát này chỉ làm dropdown; chưa chặn ngoài vùng giao (giữ như hiện nay: nhân viên gọi xác nhận lo). |
+| Thứ tự | Làm **dropdown trước**: STA-01 (danh mục) + STA-02 (Shop chọn và lưu). STA-03 (chặn ngoài vùng), STA-04 (ERP sửa theo danh mục), STA-06 để lát sau. STA-05 phần "ERP và tem hiện đủ địa chỉ" tự có vì máy chủ ghép chuỗi `delivery_address`. |
+
+Trạng thái lát 1: **ĐÃ DUYỆT** (16/11/2026).
 
 ## 1. Yêu cầu gốc
 

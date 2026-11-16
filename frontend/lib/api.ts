@@ -4,6 +4,9 @@
 
 import {
   ApiError,
+  type AddressScheme,
+  type AdministrativeLevel,
+  type AdministrativeUnitList,
   type CatalogItemDetail,
   type CatalogResponse,
   type CreateOrderPayload,
@@ -92,6 +95,35 @@ export function getCatalog(options?: { fresh?: boolean }): Promise<CatalogRespon
   catalogCache = { at: now, promise };
   promise.catch(() => {
     if (catalogCache && catalogCache.promise === promise) catalogCache = null;
+  });
+  return promise;
+}
+
+const unitCache = new Map<string, Promise<AdministrativeUnitList>>();
+
+/**
+ * Danh mục địa giới hành chính (02b §2.1). Cache trong bộ nhớ theo khoá truy vấn (chỉ dữ liệu công cộng, không có dữ liệu
+ * khách); lỗi thì bỏ mục cache để "Thử lại" gọi lại.
+ */
+export function getAdministrativeUnits(
+  scheme: AddressScheme,
+  level: AdministrativeLevel,
+  parent?: string
+): Promise<AdministrativeUnitList> {
+  const key = `${scheme}|${level}|${parent ?? ""}`;
+  const hit = unitCache.get(key);
+  if (hit) return hit;
+  const promise: Promise<AdministrativeUnitList> =
+    process.env.NEXT_PUBLIC_USE_MOCK === "1"
+      ? import("./mock").then((m) => m.mockGetAdministrativeUnits(scheme, level, parent))
+      : (() => {
+          const q = new URLSearchParams({ scheme, level });
+          if (parent && level !== "province") q.set("parent", parent);
+          return apiFetch<AdministrativeUnitList>(`/api/shop/administrative-units/?${q.toString()}`);
+        })();
+  unitCache.set(key, promise);
+  promise.catch(() => {
+    if (unitCache.get(key) === promise) unitCache.delete(key);
   });
   return promise;
 }
