@@ -207,10 +207,36 @@ def add_to_cart(page, item_code, qty_clicks=0, unit="kg"):
     page.wait_for_timeout(500)
 
 
+def pick_unit(page, field_id, text):
+    """Mở ô chọn cấp địa chỉ (#f-addr-province|district|ward), gõ tìm không dấu rồi chọn mục có chữ `text`."""
+    page.click(f"#{field_id}")
+    box = page.locator("dialog[open] input[role=combobox]")
+    box.wait_for(state="visible")
+    # Gõ bản không dấu để kiểm luôn tìm không dấu (STA-02-AC2)
+    import unicodedata
+    plain = unicodedata.normalize("NFD", text.replace("đ", "d").replace("Đ", "D"))
+    box.fill("".join(c for c in plain if not unicodedata.combining(c)))
+    page.locator("dialog[open] [role=option]", has_text=text).first.click()
+    page.locator("dialog[open]").wait_for(state="detached", timeout=3000)
+
+
+def fill_address(page, street=FAKE_ADDRESS, scheme="current"):
+    """Điền địa chỉ có cấu trúc bằng dữ liệu công cộng thật của danh mục (Lâm Đồng / Bình Thuận), số nhà giả."""
+    if scheme == "legacy":
+        page.get_by_label("Địa chỉ cũ (trước sắp xếp)").check()
+        pick_unit(page, "f-addr-province", "Bình Thuận")
+        pick_unit(page, "f-addr-district", "Phan Thiết")
+        pick_unit(page, "f-addr-ward", "Hàm Tiến")
+    else:
+        pick_unit(page, "f-addr-province", "Lâm Đồng")
+        pick_unit(page, "f-addr-ward", "Phường Phan Thiết")
+    page.fill("#f-addr", street)
+
+
 def fill_checkout(page, name=FAKE_NAME, phone=FAKE_PHONE, address=FAKE_ADDRESS, consent=True):
     page.fill("#f-name", name)
     page.fill("#f-phone", phone)
-    page.fill("#f-addr", address)
+    fill_address(page, address)
     box = page.locator("#f-consent")
     if consent and box.count():
         box.check()
@@ -227,7 +253,9 @@ def create_order_api(items, *, name=FAKE_NAME, phone=FAKE_PHONE, address=FAKE_AD
     """POST /api/shop/orders/ như FE. items = [(item_code, "1.5"), ...]. Trả (status, body)."""
     import uuid
     payload = {"client_request_id": request_id or str(uuid.uuid4()), "customer": {"name": name, "phone": phone},
-               "delivery_address": address, "items": [{"item_code": c, "qty": q} for c, q in items]}
+               "delivery_address_parts": {"scheme": "current", "province_code": "68", "district_code": None,
+                                                 "ward_code": "22945", "street": address},
+               "items": [{"item_code": c, "qty": q} for c, q in items]}
     consent = privacy_consent()
     if consent:
         payload["privacy_consent"] = consent

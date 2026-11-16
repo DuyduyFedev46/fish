@@ -151,7 +151,7 @@ def journey(browser, width):
     before = order_count()
     page.fill("#f-name", FAKE_NAME)
     page.fill("#f-phone", "12345")
-    page.fill("#f-addr", FAKE_ADDRESS)
+    fill_address(page)
     page.locator("#f-consent").check()
     page.get_by_role("button", name="Đặt hàng").click()
     page.wait_for_timeout(500)
@@ -422,7 +422,7 @@ def error_branches(browser):
     page.wait_for_timeout(1200)
     page.get_by_role("button", name=re.compile("^Tiếp tục")).click()
     page.wait_for_url(re.compile(r"/shop/checkout/"))
-    page.fill("#f-name", FAKE_NAME); page.fill("#f-phone", "0900000012"); page.fill("#f-addr", FAKE_ADDRESS)
+    page.fill("#f-name", FAKE_NAME); page.fill("#f-phone", "0900000012"); fill_address(page)
     if page.locator("#f-consent").count():
         page.locator("#f-consent").check()
     page.get_by_role("button", name="Đặt hàng").click()

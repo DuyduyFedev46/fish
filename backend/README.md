@@ -59,7 +59,7 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 | `reports` | (phẳng) | P-10 | `reports/batch/{batch_id}/`, `reports/period/`, `dashboard/summary/` |
 | `accounts` | `auth/`, `staff/`, `capabilities/`, `audit/` | §1 Phân quyền | `auth/token/`, `auth/me/`, `auth/logout/`, `auth/change-password/`; `staff/` (+ `groups`, `deactivate`, `reactivate`, `reset-password`); `staff/groups/` + `staff/groups/{code}/` + `staff/groups/{code}/capabilities/` (ma trận phân quyền, chỉ Chủ ghi); `audit-logs/?actor=` |
 | `content` | `categories/`, `entries/`, `images/`, `body/`, `public/` | P-11 | `content/categories/`, `content/entries/`; công khai `public/content/` |
-| `common` | (phẳng) | dùng chung | — (phân quyền, ẩn giá vốn, `BusinessError`, AuditLog) |
+| `common` | (phẳng) + `administrative_units/` | dùng chung | — (phân quyền, ẩn giá vốn, `BusinessError`, AuditLog, danh mục địa giới hành chính) |
 
 ### File cấu hình — mỗi file làm gì
 

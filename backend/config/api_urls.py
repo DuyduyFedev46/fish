@@ -60,6 +60,7 @@ from apps.reports.dashboard_api import DashboardSummaryView
 from apps.sales.customers.api import CustomerViewSet
 from apps.sales.customers.directory_api import CustomerDirectoryViewSet
 from apps.sales.orders.api import SalesOrderViewSet
+from apps.common.administrative_units.shop_api import AdministrativeUnitListView
 from apps.sales.orders.shop_api import ShopOrderCreateView, ShopOrderLookupView
 from apps.sales.payments.api import PaymentTransactionViewSet, SalesInvoiceViewSet
 from apps.sales.payments.internal_api import SepayGatewayIpnInternalView, SepayWebhookInternalView
@@ -155,6 +156,7 @@ urlpatterns = [
     path("shop/catalog/", ShopCatalogView.as_view()),
     path("shop/catalog/<str:item_code>/", ShopItemDetailView.as_view()),
     path("shop/vouchers/check/", ShopVoucherCheckView.as_view()),
+    path("shop/administrative-units/", AdministrativeUnitListView.as_view()),
     path("shop/orders/", ShopOrderCreateView.as_view()),
     # Tra đơn bằng POST (SHOP-3-02): đặt TRƯỚC mọi route shop/orders/<mã>/…; GET 4 số cuối đã gỡ (không còn route).
     path("shop/orders/lookup/", ShopOrderLookupView.as_view()),

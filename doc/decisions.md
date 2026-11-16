@@ -289,3 +289,8 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 - Giỏ hàng Shop hiện một nhãn cố định: "Giao trong 2 giờ kể từ lúc đặt hàng nếu cách vựa dưới 15 km · Từ 15 km trở lên: trong 4 giờ".
 - Mốc tính là **lúc đặt hàng** (Duy chọn). Chưa đo khoảng cách theo địa chỉ khách: giỏ chưa có địa chỉ, Google Maps chưa bật. Khi bật Maps sẽ cân nhắc hiện đúng một mức ở trang đặt hàng.
 - Câu chữ và các con số để ở một hằng số trong code Shop để đổi một chỗ. Đây là lời hứa với khách: giờ làm việc, đơn đặt ban đêm và việc giao trễ là vận hành của Lộc. Làm ở phiếu Gemini GUI-13.
+
+## 2026-11-16 — Địa chỉ giao có cấu trúc và hãng giao (sheet FIX WEB dòng 9, 10) — [DUY CHỐT]
+- **Địa chỉ giao không còn là một ô** (Duy 16/11, thay vế "Địa chỉ giao là một ô" ở mục 10/10 tối). Khách chọn **kiểu địa chỉ**: *Địa chỉ mới (sau sắp xếp 01/07/2025)* gồm tỉnh/thành → phường/xã, hoặc *Địa chỉ cũ (trước sắp xếp)* gồm tỉnh/thành → quận/huyện → phường/xã; rồi gõ số nhà, tên đường. Danh mục **đủ cả nước** cho cả hai kiểu, lưu tĩnh trong hệ thống. Các vế khác giữ: không lưu toạ độ, Maps chỉ nạp khi bấm. Đơn cũ giữ nguyên chuỗi.
+- Làm **dropdown trước**; vùng giao (phường nào giao được) và chặn khách ngoài vùng chưa chốt, làm sau. Hồ sơ `doc/features/2026-11-16-structured-address/`.
+- **Hãng giao (Ahamove/GHTK) và phí ship tạm dừng** (Duy 16/11): chưa có đối tác. Hồ sơ phân tích ở `doc/features/2026-11-16-shipping-partner/`, làm tiếp khi Lộc có tài khoản doanh nghiệp và khoá thử.

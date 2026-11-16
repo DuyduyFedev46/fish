@@ -4,7 +4,12 @@
 
 import {
   ApiError,
+  type AddressScheme,
+  type AdministrativeLevel,
+  type AdministrativeUnit,
+  type AdministrativeUnitList,
   type BundleComponent,
+  type DeliveryAddressParts,
   type CatalogItem,
   type CatalogItemDetail,
   type CatalogResponse,
@@ -521,6 +526,97 @@ function delay<T>(value: T, ms = 250): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
 
+// ---- Danh mục địa giới hành chính (STA-01/02, 02b §2.1): mẫu nhỏ, khoá cha-con đúng contract ----
+const U = (code: string, name: string): AdministrativeUnit => ({ code, name });
+const MOCK_UNITS = {
+  current: {
+    province: [U("68", "Tỉnh Lâm Đồng"), U("79", "Thành phố Hồ Chí Minh")],
+    ward: {
+      "68": [U("22918", "Phường Mũi Né"), U("22945", "Phường Phan Thiết"), U("22950", "Xã Hàm Thuận")],
+      "79": [U("26734", "Phường Bến Nghé"), U("26737", "Phường Đa Kao")],
+    } as Record<string, AdministrativeUnit[]>,
+  },
+  legacy: {
+    province: [U("60", "Tỉnh Bình Thuận"), U("79", "Thành phố Hồ Chí Minh")],
+    district: {
+      "60": [U("593", "Thành phố Phan Thiết"), U("594", "Huyện Tuy Phong")],
+      "79": [U("760", "Quận 1")],
+    } as Record<string, AdministrativeUnit[]>,
+    ward: {
+      "593": [U("22915", "Phường Hàm Tiến"), U("22918", "Phường Mũi Né"), U("22921", "Phường Phú Thủy")],
+      "594": [U("22930", "Thị trấn Liên Hương")],
+      "760": [U("26734", "Phường Bến Nghé"), U("26737", "Phường Đa Kao")],
+    } as Record<string, AdministrativeUnit[]>,
+  },
+};
+
+function unitError(fields: Record<string, string>): ApiError {
+  return new ApiError("Tham số tra cứu địa giới hành chính chưa hợp lệ.", 400, "VALIDATION", {
+    code: "VALIDATION",
+    fields,
+  });
+}
+
+/** Tra danh mục mẫu; kiểm tham số như máy chủ (§2.1). */
+export async function mockGetAdministrativeUnits(
+  scheme: AddressScheme,
+  level: AdministrativeLevel,
+  parent?: string
+): Promise<AdministrativeUnitList> {
+  const data = MOCK_UNITS[scheme];
+  if (!data) throw unitError({ scheme: "Kiểu địa chỉ chưa hợp lệ." });
+  let items: AdministrativeUnit[];
+  if (level === "province") {
+    items = data.province;
+  } else if (level === "district") {
+    if (scheme === "current") throw unitError({ level: "Địa chỉ mới không có cấp quận/huyện." });
+    if (!parent) throw unitError({ parent: "Thiếu mã đơn vị cấp trên." });
+    const found = MOCK_UNITS.legacy.district[parent];
+    if (!found) throw unitError({ parent: "Không tìm thấy đơn vị cấp trên." });
+    items = found;
+  } else if (level === "ward") {
+    if (!parent) throw unitError({ parent: "Thiếu mã đơn vị cấp trên." });
+    const found = (data.ward as Record<string, AdministrativeUnit[]>)[parent];
+    if (!found) throw unitError({ parent: "Không tìm thấy đơn vị cấp trên." });
+    items = found;
+  } else {
+    throw unitError({ level: "Cấp đơn vị chưa hợp lệ." });
+  }
+  return delay({ scheme, level, parent_code: level === "province" ? null : (parent ?? null), items });
+}
+
+/** Kiểm `delivery_address_parts` như máy chủ (02b §2.2): trả lỗi theo khoá request, rỗng nếu hợp lệ. */
+function mockCheckAddressParts(raw: unknown): Record<string, string> {
+  const err: Record<string, string> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { delivery_address: "Chọn địa chỉ giao hàng." };
+  const p = raw as Partial<DeliveryAddressParts>;
+  const street = typeof p.street === "string" ? p.street.split(/\s+/).filter(Boolean).join(" ") : "";
+  if (!street || street.length > 200) err.street = "Nhập số nhà, tên đường (tối đa 200 ký tự).";
+  if (p.scheme !== "current" && p.scheme !== "legacy") return { ...err, scheme: "Chọn kiểu địa chỉ." };
+  const provinces = MOCK_UNITS[p.scheme].province;
+  if (typeof p.province_code !== "string" || !provinces.some((u) => u.code === p.province_code)) {
+    err.province_code = "Chọn tỉnh/thành phố.";
+    err.ward_code = "Chọn phường/xã.";
+    if (p.scheme === "legacy") err.district_code = "Chọn quận/huyện.";
+    return err;
+  }
+  let wardParent = p.province_code;
+  if (p.scheme === "legacy") {
+    const ok = typeof p.district_code === "string" && (MOCK_UNITS.legacy.district[p.province_code] ?? []).some((u) => u.code === p.district_code);
+    if (!ok) {
+      err.district_code = "Chọn quận/huyện.";
+      err.ward_code = "Chọn phường/xã.";
+      return err;
+    }
+    wardParent = p.district_code as string;
+  } else if (p.district_code) {
+    err.district_code = "Địa chỉ mới không có quận/huyện.";
+  }
+  const wards = (MOCK_UNITS[p.scheme].ward as Record<string, AdministrativeUnit[]>)[wardParent] ?? [];
+  if (typeof p.ward_code !== "string" || !wards.some((u) => u.code === p.ward_code)) err.ward_code = "Chọn phường/xã.";
+  return err;
+}
+
 export async function mockGetCatalog(): Promise<CatalogResponse> {
   // Thứ tự `items`: tên nhóm, rồi mã (contract 02b §3.1). `groups` chỉ gồm nhóm có món.
   const items = [...MOCK_CATALOG]
@@ -712,7 +808,9 @@ export async function mockCreateOrder(payload: CreateOrderPayload): Promise<Crea
   if (!UUID_RE.test(payload.client_request_id ?? "")) fields.client_request_id = "Mã yêu cầu không hợp lệ.";
   if (!name.trim() || name.length > 100) fields.name = "Nhập họ tên người nhận";
   if (!/^0\d{9}$/.test(phone)) fields.phone = "Số điện thoại cần 10 chữ số, bắt đầu bằng 0";
-  if (!payload.delivery_address?.trim() || payload.delivery_address.length > 500) {
+  if (payload.delivery_address_parts != null) {
+    Object.assign(fields, mockCheckAddressParts(payload.delivery_address_parts));
+  } else if (!payload.delivery_address?.trim() || payload.delivery_address.length > 500) {
     fields.delivery_address = "Nhập địa chỉ giao hàng hoặc chọn trên bản đồ";
   }
   if (!payload.items?.length) fields.items = "Giỏ hàng đang trống";
@@ -784,7 +882,7 @@ export async function mockCreateOrder(payload: CreateOrderPayload): Promise<Crea
   }
 
   // Giới hạn đơn (đợt bảo mật 15/11): SOLUONGLON mô phỏng dòng quá lớn, DONLON đơn quá lớn, NHIEUDON quá nhiều đơn đang mở.
-  const limitProbe = String(payload.delivery_address ?? "").toUpperCase();
+  const limitProbe = String(payload.delivery_address_parts?.street ?? payload.delivery_address ?? "").toUpperCase();
   const limits: Record<string, [string, string]> = {
     "[GIOI-HAN-DONG]": ["ORDER_LINE_TOO_LARGE", "Một món đặt quá nhiều so với mức đặt online. Bạn giảm số lượng hoặc gọi hotline để được hỗ trợ."],
     "[GIOI-HAN-DON]": ["ORDER_TOO_LARGE", "Đơn vượt giới hạn đặt online, vui lòng gọi hotline để được hỗ trợ."],

@@ -20,6 +20,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.common.administrative_units.addresses import parse_address_parts
 from apps.common.api import NoStoreMixin
 from apps.common.formatting import iso_utc
 from apps.common.pii import mask_phone, normalize_phone
@@ -121,8 +122,15 @@ def _parse_create_body(d: dict) -> dict:
     if not _PHONE_RE.fullmatch(phone):
         fields["phone"] = PHONE_RULE
 
+    # STA-02: có `delivery_address_parts` -> nhánh cấu trúc (máy chủ ghép dòng đầy đủ, bỏ chuỗi gửi kèm);
+    # không có -> nhánh chữ cũ (Shop bản cũ), đơn là địa chỉ tự do (BR-BH-35).
+    address_parts = None
     address = _text(d.get("delivery_address"))
-    if not address or len(address) > ADDRESS_MAX:
+    if d.get("delivery_address_parts") is not None:
+        address_parts, address_errors = parse_address_parts(d.get("delivery_address_parts"))
+        fields.update(address_errors)
+        address = address_parts.full_text if address_parts else ""
+    elif not address or len(address) > ADDRESS_MAX:
         fields["delivery_address"] = f"Nhập địa chỉ giao hàng (tối đa {ADDRESS_MAX} ký tự)."
 
     lines = parse_lines(d.get("items"), fields)
@@ -144,6 +152,7 @@ def _parse_create_body(d: dict) -> dict:
         "name": name,
         "phone": phone,
         "address": address,
+        "address_parts": address_parts,
         "lines": lines,
         "privacy_consent": consent_payload,
     }
@@ -163,6 +172,7 @@ class ShopOrderCreateView(NoStoreMixin, APIView):
             customer_phone=parsed["phone"],
             customer_name=parsed["name"],
             delivery_address=parsed["address"],
+            address_parts=parsed["address_parts"],
             phone=parsed["phone"],
             lines=parsed["lines"],
             privacy_consent=parsed["privacy_consent"],
@@ -171,6 +181,8 @@ class ShopOrderCreateView(NoStoreMixin, APIView):
             enforce_caps=True,  # BR-BH-31: chỉ đường Shop công khai
         )
         logger.info("shop order %s created=%s", order.code, created)
+        if created and parsed["address_parts"] is None:
+            logger.info("shop order %s address=free_text", order.code)
         body = shop_payload.create_payload(order, now=timezone.now())
         return Response(body, status=201 if created else 200)
 

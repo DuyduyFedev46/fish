@@ -91,6 +91,13 @@ SCRUB_PII_KEYS = frozenset({
     "customer_phone",
     "customer_name",
     "delivery_address",
+    "delivery_address_parts",  # STA-02: địa chỉ có cấu trúc
+    "address_scheme",
+    "province_code",
+    "district_code",
+    "ward_code",
+    "street",
+    "street_address",
     "shipping_address",
     "recipient_name",
     "receiver_name",

@@ -126,7 +126,7 @@ def open_order(page, key, query=""):
 def fill_form(page, phone=FAKE_PHONE):
     page.fill("#f-name", FAKE_NAME)
     page.fill("#f-phone", phone)
-    page.fill("#f-addr", FAKE_ADDRESS)
+    fill_address(page)
     if page.locator("#f-consent").count():
         page.locator("#f-consent").check()
 

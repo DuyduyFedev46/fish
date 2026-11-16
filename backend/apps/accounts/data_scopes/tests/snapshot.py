@@ -23,6 +23,7 @@ from rest_framework.test import APIClient
 PII_LEAVES = frozenset({
     "phone", "address", "delivery_address", "default_address",
     "customer_name", "customer_phone", "customer_address", "recipient_name", "recipient_phone",
+    "street_address", "street", "ward_code", "district_code", "province_code", "address_scheme", "delivery_address_parts",
 })
 CUSTOMER_ENDPOINT_LEAVES = frozenset({"name", "note"})
 # Nhánh của nhân viên (người giao, người gọi...): `phone` ở đây là của nhân viên, không phải của khách.
