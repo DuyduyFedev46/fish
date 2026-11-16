@@ -119,7 +119,7 @@ phối viên giao rõ), không deploy, không đụng DB thật.
 - **Không báo "xong" / "test xanh"** khi chưa chạy lệnh kiểm chứng trong lượt đó và dán kết quả.
 - **QA không chấm PASS bằng đọc code**: AC giao diện cần Playwright hoặc ảnh 360 + 1280; mỗi AC nghiệp vụ có ca ngoài đường thuận.
 - **Pháp lý, thủ tục, tài khoản kinh doanh là việc của Lộc**; IT (Duy + AI) chỉ soạn khung và nhắc.
-- Sheet feedback của Lộc: chỉ sửa giá trị, không phá format Duy đã làm; việc đã lên staging thì cột Tình Trạng ghi "Xong".
+- Sheet feedback của Lộc: chỉ sửa giá trị, không phá format Duy đã làm; cột Tình Trạng: "Đang làm" → "Ready UAT" (đã QA đạt, chờ Duy test và cho gộp/lên thật, Duy chốt 16/11) → "Xong"; "Tạm ngưng" khi dừng.
 
 ## Lệnh kiểm chứng
 
