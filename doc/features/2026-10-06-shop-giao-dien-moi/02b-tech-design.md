@@ -5,7 +5,8 @@ flowchart LR
     K(["Khách trên điện thoại / máy tính"]) --> S["Shop Cá Về (trang tĩnh)"]
     S -->|"xem hàng, giỏ, kiểm mã"| A["Máy chủ Cá Về"]
     S -->|"đặt hàng"| A
-    S -->|"bấm Bản đồ (tuỳ chọn)"| G["Google Maps"]
+    S -->|"bấm tìm địa chỉ (tuỳ chọn)"| A
+    A -->|"chữ khách gõ"| G["VietMap"]
     A -->|"giữ hàng 30 phút"| KHO[("Kho theo lô")]
     S -->|"bấm Thanh toán"| C["Cổng chuyển khoản QR"]
     C -->|"báo đã nhận tiền"| A
@@ -52,7 +53,7 @@ flowchart LR
 | T10 | Mã giảm giá: `Voucher` ở app `catalog`, `VoucherRedemption` ở app `sales` (1-1 với đơn); quyền `catalog.manage_voucher` chỉ cấp `owner`, việc "Quản lý mã giảm giá" uỷ được ở màn Phân quyền | §3.8, §3.9, §4 |
 | T11 | Lãi lỗ theo lô **không đổi công thức** ở đợt này (vẫn tính theo đơn giá gộp như PricingRule hiện nay); giảm của mã đi vào `SalesOrderLine.amount` → hoá đơn → lãi lỗ theo kỳ đúng. Lệch của báo cáo theo lô ghi đề xuất cho Duy (§8) | §5, §9 |
 | T12 | Giỏ có món hết: theo 02a §7.1 — nút chính **không tắt**; bấm khi còn món hết thì báo `role="alert"` "Bỏ món đã hết để đặt hàng." và dời tiêu điểm tới "Bỏ khỏi giỏ" của món hết đầu tiên; không có nút gỡ hàng loạt | §6.1 |
-| T13 | Google Maps: biến `NEXT_PUBLIC_GOOGLE_MAPS_KEY`; không có key thì nút "Bản đồ" vẫn hiện, bấm mở C5; tự nạp script bằng thẻ `<script>` khi bấm, không thêm thư viện | §1.9 |
+| T13 | **(Thay bằng §1.9b VietMap, 25/11)** Google Maps: biến `NEXT_PUBLIC_GOOGLE_MAPS_KEY`; không có key thì nút "Bản đồ" vẫn hiện, bấm mở C5; tự nạp script bằng thẻ `<script>` khi bấm, không thêm thư viện | §1.9 |
 | T14 | `/ui-preview/` dùng đuôi trang `page.preview.tsx` + `pageExtensions` theo cờ `NEXT_PUBLIC_UI_PREVIEW=1`; build thường **không có route** (404) | §1.8 |
 | T15 | Khung trang mỗi màn tự bọc bằng `ShopFrame` (header/footer/BottomNav theo props); `app/layout.tsx` chỉ có font + provider | §1.4 |
 | T16 | `config/settings.py`, `config/api_urls.py`, mọi migration `catalog`/`sales` thuộc **be-dev**; be-dev khai **toàn bộ** biến cấu hình của đợt ngay lô 1 (kể cả biến site-info mkt-brand dùng ở lô 5) | §2.3, §7.0 |
@@ -195,7 +196,9 @@ URL chỉ chứa `code`, `result`, `q`, `group`, `type`, `sort`, `slug`, `catego
 - Trang render `features/ui-preview/PreviewGallery.tsx` với `previewFixtures.ts` (dữ liệu giả). Có `<meta name="robots" content="noindex">`.
 - QA build riêng: `NEXT_PUBLIC_USE_MOCK=1 NEXT_PUBLIC_UI_PREVIEW=1 npm run build` (hoặc `npm run dev`) để kiểm G5. Bản kiểm chứng chính vẫn build **không** cờ.
 
-### 1.9 Google Maps (Techlead chốt)
+### 1.9 Google Maps (Techlead chốt) — **thay bằng §1.9b VietMap** (decisions 24/11, Google không nhận thanh toán ở VN)
+> Đoạn dưới giữ để đối chiếu; dev làm theo §1.9b.
+
 - Biến: **`NEXT_PUBLIC_GOOGLE_MAPS_KEY`** (một tên duy nhất). Truyền lúc build như `NEXT_PUBLIC_*` khác; không commit.
 - Nút "Bản đồ" **luôn hiện**. Bấm → mở `FullscreenSheet` (điện thoại) / Dialog (máy tính) ngay, dòng thông báo Google (BR-BH-29) hiện **trước** khi tải script.
 - **Thiếu key (Techlead chốt, 02a §9.1):** `const MAPS_KEY = (process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "").trim()` đọc **một chỗ** ở `googleMaps.ts`, export `hasMapsKey(): boolean`. Rỗng = thiếu key → bấm "Bản đồ" mở thẳng Dialog C5, không mở sheet, không tạo thẻ script, 0 request tới Google.
@@ -205,6 +208,302 @@ URL chỉ chứa `code`, `result`, `q`, `group`, `type`, `sort`, `slug`, `catego
 - Bên trong: `google.maps.importLibrary("maps"|"places"|"geocoding")`; ô tìm dùng `PlaceAutocompleteElement` (Places API mới, `includedRegionCodes: ["vn"]`); ghim kéo được, kéo xong `Geocoder` đảo ngược ra chuỗi địa chỉ.
   Xác nhận → ghi **chuỗi** vào ô địa chỉ (C1c), khách sửa tay được. Không lưu `lat`, `lng`, `place_id` ở đâu (state cục bộ của sheet, mất khi đóng). Không `navigator.geolocation` (S-07).
 - QA tối nay chỉ kiểm được nhánh không key (C5) + AC1, AC2, AC4, AC6. Nhánh có key là **điểm dừng** (Duy + techlead cấp key có giới hạn referrer).
+
+### 1.9b VietMap (Techlead chốt 25/11)
+
+```mermaid
+flowchart TD
+  K(["Khách ở bước đặt hàng"]) --> N{"Máy chủ Cá Về đã có key VietMap?"}
+  N -- "chưa" --> AN["Không hiện nút tìm địa chỉ, khách gõ tay"]
+  N -- "có" --> B["Khách bấm nút, hộp tìm mở, dòng báo bên thứ ba hiện trước"]
+  B --> G["Khách gõ ít nhất 2 chữ"]
+  G --> P["Máy chủ Cá Về hỏi VietMap, không lưu, không ghi log chữ gõ"]
+  P --> L["Danh sách gợi ý"]
+  L --> C["Khách chọn một dòng"]
+  C --> D["Máy chủ lấy chi tiết, bỏ toạ độ, so tên phường với danh mục Cá Về"]
+  D --> F["Điền ô số nhà, tên đường"]
+  F --> M{"Phường khớp đúng một dòng danh mục?"}
+  M -- "khớp" --> S["Hiện nút 'Dùng phường này', khách tự bấm"]
+  M -- "không khớp" --> T["Nhắc khách tự chọn phường trong danh sách"]
+  P -- "VietMap lỗi, hết lượt, quá chậm" --> E["Đóng hộp tìm, mở hộp báo C5, khách gõ tay"]
+  Q{"Duy chọn phương án?"}
+  Q -- "A: tìm qua máy chủ (khuyên)" --> P
+  Q -- "B: bản đồ ngay trên trình duyệt" --> BB["Nạp thư viện bản đồ VietMap, key nằm ở trình duyệt"]
+```
+
+> `techlead` · 2026-11-25 · Thay §1.9 (Google). Căn cứ: `doc/decisions.md` mục 2026-11-24 (VietMap, các vế giữ nguyên), hồ sơ
+> `doc/features/2026-11-16-structured-address/` (01 Q-5, 02b §5). Trạng thái: **chờ Duy chọn phương án ở 🔴 Q-VM-1**; mọi
+> điểm khác đã chốt. Đoạn nào ghi "chưa xác minh" là tài liệu VietMap không nêu, dev không được đoán.
+
+#### 1.9b.1 Tài liệu VietMap đã tra (ngày 25/11/2026)
+
+| Trang | URL | Ngày ghi trên trang |
+|---|---|---|
+| Autocomplete v4 | https://maps.vietmap.vn/docs/map-api/autocomplete-version/autocomplete-v4/ | 05/11/2026 |
+| Place v4 | https://maps.vietmap.vn/docs/map-api/place-v4/ | 05/11/2026 |
+| Reverse v4 | https://maps.vietmap.vn/docs/map-api/reverse-version/reverse-v4/ | 05/11/2026 |
+| Mã lỗi chung | https://maps.vietmap.vn/docs/map-api/errors/ | 05/11/2026 |
+| Quản lý API key | https://maps.vietmap.vn/docs/map-api/console/manage-api-key/ | 07/09/2026 |
+| Giới hạn tài khoản | https://maps.vietmap.vn/docs/map-api/console/usage-limitation/ | (không ghi) |
+| Request → transaction | https://maps.vietmap.vn/docs/map-api/console/request-to-transaction/ | (không ghi) |
+| Hướng dẫn cho AI: tìm kiếm | https://maps.vietmap.vn/docs/assets/agents/search-geocoding.txt | (không ghi) |
+| Hướng dẫn cho AI: hiển thị bản đồ | https://maps.vietmap.vn/docs/assets/agents/map-display.txt | (không ghi) |
+| VietMap GL JS | https://maps.vietmap.vn/docs/sdk-web-gl/overview/ | 19/10/2026 |
+| Gói GL JS trên CDN | https://unpkg.com/@vietmap/vietmap-gl-js@6.0.1/dist/?meta | bản 6.0.1 |
+
+**API tìm kiếm (tài liệu):**
+
+| API | Endpoint (GET) | Tham số | Trả về |
+|---|---|---|---|
+| Autocomplete v4 | `https://maps.vietmap.vn/api/autocomplete/v4` | `apikey` (bắt buộc) · `text` (bắt buộc, "ít nhất 2 ký tự") · `focus=lat,lng` (tuỳ chọn, chỉ để xếp hạng gần) · `display_type` (1 = địa chỉ mới 2 cấp, 2 = địa chỉ cũ 3 cấp, 3 = tự nhận, 5 = mới kèm `data_old`, 6 = cũ kèm `data_new`) · tuỳ chọn khác: `cityId`, `distId`, `wardId`, `circle_center`, `circle_radius`, `cats`, `layers`, `admin_new` | Mảng tối đa 10 mục: `ref_id`, `distance` (km), `address`, `name`, `display`, `boundaries[] {type 0 tỉnh/1 huyện/2 xã, id, name, prefix, full_name}`, `categories`, `entry_points`, `data_old`, `data_new`. **Không có toạ độ.** `ref_id` có tiền tố `auto:` hoặc `geocode:` |
+| Place v4 | `https://maps.vietmap.vn/api/place/v4` | `apikey`, `refid` (bắt buộc, truyền nguyên văn cả tiền tố) | Một object: `display`, `name`, `hs_num`, `street`, `address` (vd "197 Đường Trần Phú"), `city_id`, `city`, `district_id`, `district`, `ward_id`, `ward`, `lat`, `lng`. Kiểu mới: `district_id` luôn `0`, `district` rỗng |
+| Reverse v4 | `https://maps.vietmap.vn/api/reverse/v4` | `apikey`, `lat`, `lng`, `display_type` (1, 2, 4, 5, 6) | Mảng object như Autocomplete + `lat`, `lng` |
+| Search v4 | `https://maps.vietmap.vn/api/search/v4` | như Autocomplete | "cùng dạng Autocomplete" — **chưa xác minh** trên trang chính (chỉ thấy ở file hướng dẫn cho AI); không dùng |
+
+- **Mã lỗi** (trang Mã lỗi): `400` thiếu/sai tham số · `401` key thiếu/sai, thân rỗng · `423` hết hạn mức, API chưa bật cho key, hoặc
+  dùng key bản đồ (tilemap) gọi API tìm kiếm, thân chữ thường · `429` quá nhiều request trong thời gian ngắn (không nêu con số) · `500`.
+- **Đo thật 25/11** (key giả `x`): `autocomplete/v4`, `place/v4`, `reverse/v4`, ô bản đồ `.pbf` đều trả `401` và **không có**
+  `Access-Control-Allow-Origin`; preflight `OPTIONS` trả `204` với `Access-Control-Allow-Origin: *`. Nghĩa là gọi thẳng từ trình
+  duyệt thì lỗi key thành lỗi CORS (`fetch` ném `TypeError`), không đọc được mã 401. `style.json` trả 200 kể cả key giả.
+- **Hạn mức** (trang Giới hạn): tài khoản **Trial** (miễn phí) 500 request/ngày + 100–200 request/phút **mỗi API**, riêng
+  Autocomplete không giới hạn theo ngày; **Standard** trả tiền theo tổng hạn mức; **Enterprise** 200 request/phút. Mỗi request
+  Autocomplete, Place, Reverse = 1 transaction; 25 ô bản đồ = 1 transaction. **Giá tiền: chưa xác minh** (không có trên các trang đã đọc).
+- **Key** (trang Giới hạn + Quản lý key): mỗi tài khoản có hai key. Key `default` cho API tìm kiếm: *"Server-to-server calls from your
+  backend. Keep this key private … should never be shipped to a client"*. Key `public tile` chỉ để vẽ bản đồ ở trình duyệt, *"safe to
+  expose"*, gọi API tìm kiếm bằng key này trả `423`. Key giới hạn được theo **domain**, **IP**, bật/tắt từng API, hạn mức theo API,
+  theo key hoặc theo IP. File hướng dẫn cho AI viết: *"All API calls MUST be made from your backend server. NEVER expose your API key
+  in frontend"*.
+- **GL JS**: `https://unpkg.com/@vietmap/vietmap-gl-js@6.0.1/dist/vietmap-gl.js` (784 255 byte, ~207 KB gzip, SRI
+  `sha256-cJSmprzhDy9rx3B9DQPBvF/70rb+trH91kpwqFLKjVA=`) và `…/vietmap-gl.css` (65 057 byte, SRI
+  `sha256-HHyM+H9qM6VI/0cMaj8oeBsvymj4aRrdOaBSM2UBvyY=`). Có bản `vietmap-gl-csp.js` + `vietmap-gl-csp-worker.js`. Style
+  `https://maps.vietmap.vn/maps/styles/tm/style.json?apikey=…`; trong style đo được ô vector, sprite, font đều ở
+  `https://maps.vietmap.vn`. Thư viện dựng worker bằng `blob:` (thấy `createObjectURL` + `new Worker` trong bản build). Tài liệu
+  **không** có hướng dẫn CSP. Toạ độ GL là `[lng, lat]` (ví dụ ở trang overview ghi ngược, đừng chép).
+
+#### 1.9b.2 Chọn phương án
+
+Đầu ra mà Cá Về giữ lại chỉ là **chữ số nhà, tên đường** và **mã phường trong danh mục Cá Về** (không lưu toạ độ, decisions 24/11).
+Ghim trên bản đồ không cho shipper thêm gì ngoài chuỗi đó, vì toạ độ bị bỏ. Vì vậy chọn phương án nhẹ nhất là **chỉ tìm kiếm, không
+vẽ bản đồ**.
+
+| | **A. Tìm qua máy chủ Cá Về (khuyên)** | B. Bản đồ GL + tìm ngay trên trình duyệt (như thiết kế Google cũ) |
+|---|---|---|
+| Key | Key `default` ở Secret Manager, chỉ máy chủ đọc (khớp câu "lưu ở Secret Manager" của decisions 24/11) | Phải để **key `default`** trong bản build JS (trái hướng dẫn VietMap) + key `public tile` |
+| Tải thêm khi bấm | 0 byte thư viện; mỗi lần gõ 1 request JSON nhỏ tới API Cá Về | ~207 KB gzip JS + 65 KB CSS + ô bản đồ từ unpkg.com và maps.vietmap.vn |
+| Dữ liệu đi đâu | Trình duyệt → Cá Về → VietMap: chữ gõ + mã gợi ý. VietMap **không** thấy IP, trình duyệt của khách | Trình duyệt → VietMap: chữ gõ, vị trí ghim, IP, trình duyệt |
+| Toạ độ | Không bao giờ tới trình duyệt; máy chủ bỏ `lat`/`lng` của Place ngay khi nhận, không log | Ở state cục bộ của hộp thoại (như Google) |
+| Lỗi key / hết lượt | Máy chủ đọc được 401/423/429, trả một mã lỗi rõ | Trình duyệt chỉ thấy lỗi CORS, không biết lý do |
+| Lộ key, bị xài trộm hạn mức | Không | Có (giới hạn domain giảm rủi ro nhưng referrer giả được từ ngoài trình duyệt) |
+| Ghim kéo trên bản đồ | Không có | Có |
+| Ai làm | be-dev (một lô nhỏ) + fe-dev + mkt-brand | fe-dev + mkt-brand |
+
+Phương án A **không lật vế nào** của decisions 24/11: không toạ độ, không `lat`/`lng` từ trình duyệt lên máy chủ, không "Vị trí của
+tôi", nút ẩn khi chưa có key, dòng thông báo hiện trước request đầu tiên, không có script bản đồ nào để nạp. Nhưng A thêm một
+endpoint BE và để chữ gõ đi qua máy chủ Cá Về, nên cần Duy gật (🔴 Q-VM-1). Phần dưới thiết kế đủ cho A; B ghi gọn ở §1.9b.9.
+
+#### 1.9b.3 Contract API mới (phương án A, be-dev)
+
+Cả hai endpoint `AllowAny`, chỉ `POST` (GET/PATCH/DELETE → 405). Dùng **POST thân JSON**, không query string, để chữ khách gõ (thường
+là địa chỉ nhà) không rơi vào log request của Cloud Run. Throttle mới `shop_address_search` theo IP, biến
+`THROTTLE_SHOP_ADDRESS_SEARCH` mặc định `"60/min"` (cùng chỗ `_DEFAULT_THROTTLE_RATES`, `backend/config/settings.py:254`).
+
+**`POST /api/shop/address-search/`**
+```json
+// request
+{ "scheme": "current", "text": "12 tran hung dao" }
+// 200
+{ "results": [
+  { "ref": "auto:Xyz…", "title": "12 Trần Hưng Đạo", "subtitle": "Phường Phan Thiết, Tỉnh Lâm Đồng" }
+] }
+```
+- `scheme` ∈ `current|legacy` (như STA §2.2), sai → 400 `VALIDATION` `fields.scheme`. `text` sau khi gộp khoảng trắng dài 2–120 ký
+  tự, sai → 400 `fields.text`.
+- Máy chủ gọi Autocomplete v4 với `apikey`, `text`, `display_type=1` (current) hoặc `2` (legacy), `focus=10.9289,108.1021`
+  (hằng tâm Phan Thiết, cùng `START_CENTER` của FE hiện nay, **không** phải vị trí khách). Lấy tối đa 6 mục: `ref` = `ref_id`
+  nguyên văn, `title` = `name`, `subtitle` = `address`. Không trả `boundaries`, `distance`, `entry_points`, `data_*`.
+- Không có kết quả → `{"results": []}`.
+
+**`POST /api/shop/address-place/`**
+```json
+// request
+{ "scheme": "current", "ref": "auto:Xyz…" }
+// 200
+{ "street": "12 Đường Trần Hưng Đạo",
+  "display": "12 Đường Trần Hưng Đạo, Phường Phan Thiết, Tỉnh Lâm Đồng",
+  "suggestion": { "scheme": "current", "province_code": "68", "district_code": null, "ward_code": "22945",
+                  "ward_name": "Phường Phan Thiết" } }
+// không khớp danh mục
+{ "street": "…", "display": "…", "suggestion": null }
+```
+- `ref` phải khớp `^(auto|geocode):[A-Za-z0-9_\-+/=.:]{1,500}$`, sai → 400 `fields.ref`. Máy chủ gọi Place v4 với `apikey`,
+  `refid=ref`.
+- `street`: `address` của Place (vd "197 Đường Trần Phú"); rỗng thì ghép `hs_num` + `street`; vẫn rỗng thì `name`. Nếu `name`
+  khác rỗng và khác `address` (điểm như "Chợ Phan Thiết") thì `"{name}, {address}"`. Gộp khoảng trắng, cắt 200 (`STREET_MAX`).
+- **Toạ độ, `ward_id`, `city_id`, `ref` không có trong phản hồi.** Biến cục bộ bị bỏ, không log.
+- `suggestion` theo §1.9b.4.
+
+**Lỗi chung (cả hai):** VietMap trả 401/423/429/5xx, quá 4 giây, hoặc JSON hỏng → **503**
+`{"code": "ADDRESS_SEARCH_UNAVAILABLE", "detail": "Chưa tìm được địa chỉ lúc này. Bạn gõ địa chỉ trực tiếp nhé."}`.
+Máy chủ chưa có key → **503** cùng mã (không gọi VietMap). Throttle của Cá Về → 429 như các endpoint khác. Log chỉ ghi
+`logger.warning("vietmap upstream failed status=%s api=%s", status, "autocomplete"|"place")`, không ghi `text`, `ref`, URL hay key.
+
+**Cấu hình** (`backend/config/settings.py`, đọc env, có mặc định): `VIETMAP_API_KEY = os.environ.get("VIETMAP_API_KEY", "").strip()`
+(rỗng = tắt), `VIETMAP_TIMEOUT_SECONDS = 4`. `site-info` (`backend/apps/content/site/services.py:42` `site_info()`) thêm khoá
+`"address_search_enabled": bool(settings.VIETMAP_API_KEY)`.
+
+**Gọi VietMap:** thư viện chuẩn `urllib.request.urlopen(urllib.request.Request(url, headers={"Accept": "application/json"}),
+timeout=settings.VIETMAP_TIMEOUT_SECONDS)` + `urllib.parse.urlencode` (Python stdlib, backend chưa có thư viện HTTP nào trong
+`backend/requirements.txt`; **không thêm `requests`/`httpx`**). Host là hằng `https://maps.vietmap.vn`, đường dẫn là hằng, mọi
+giá trị khách gửi chỉ đi qua `urlencode` (chặn SSRF). Bắt `urllib.error.HTTPError` (đọc `.code`), `URLError`, `TimeoutError`,
+`ValueError` (JSON).
+
+**Module:** `backend/apps/common/address_search/` (`__init__.py`, `vietmap.py` gọi API, `matching.py` so danh mục, `shop_api.py`
+hai view, `tests/`). Route ở `backend/config/api_urls.py` cạnh `shop/administrative-units/` (dòng 159). Không model, **không migration**.
+
+#### 1.9b.4 Ghép với địa chỉ có cấu trúc
+
+- Kiểu địa chỉ lấy theo ô khách đang chọn lúc mở hộp tìm (`selection.scheme`); đổi kiểu thì kết quả cũ trong hộp bị xoá.
+  `current` → `display_type=1`; `legacy` → `display_type=2` (Place trả đủ ba cấp cho ref kiểu cũ, theo trang Place v4).
+- **So danh mục ở máy chủ** (`matching.py`), dùng `catalog.fold_text` (`backend/apps/common/administrative_units/catalog.py:27`):
+  so `fold_text` toàn tên, kể cả tiền tố (VietMap "Phường Phan Thiết" ↔ danh mục "Phường Phan Thiết"; "Thành Phố" ↔ "Thành phố"
+  qua chữ thường).
+  1. Tỉnh: `city` so với `catalog.provinces(scheme)`; không khớp đúng 1 → `suggestion: null`.
+  2. `legacy`: `district` so với `catalog.districts(scheme, province_code)`; không khớp đúng 1 → `null`.
+  3. Xã: `ward` so với `catalog.wards(scheme, cha)`; khớp **đúng 1** → trả `suggestion`; 0 hoặc ≥ 2 → `null`.
+  Không so bằng `ward_id` của VietMap: mã VietMap (vd `18700`) có phải mã GSO như danh mục Cá Về hay không là **chưa xác minh**.
+- **FE không tự đổi tỉnh/phường** (Q-5: khách vẫn chọn phường trong danh sách). Sau khi khách bấm "Dùng địa chỉ này":
+  - ô `f-addr` nhận `street` (thay chữ cũ, cắt 200), nền `--good-soft` (C1c) như hiện nay;
+  - có `suggestion` → Banner trong `AddressField`: "Đã điền số nhà từ VietMap. Phường gợi ý: **{ward_name}**." + nút
+    "Dùng phường này" (bấm → `selectProvince` → [`selectDistrict`] → `selectWard` của `formRules.ts`, đúng thứ tự xoá cấp con);
+    tỉnh/phường đang chọn trùng gợi ý thì chỉ hiện "Phường đã khớp.";
+  - `suggestion: null` → Banner: "Đã điền số nhà từ VietMap. Bạn chọn tỉnh và phường/xã ở trên nhé." (giống câu hiện nay).
+- Khách sửa tay ô số nhà → banner mất (như `filledFromMap` hiện nay, `AddressField.tsx:120`).
+- **Request tạo đơn không đổi:** vẫn `delivery_address_parts {scheme, province_code, district_code, ward_code, street}` theo STA
+  §2.2; **không** có `lat`, `lng`, `place_id`, `ref`, `refid`. Máy chủ tạo đơn kiểm mã như cũ, nên gợi ý sai cũng không lọt.
+
+#### 1.9b.5 Cờ bật nút (thay `NEXT_PUBLIC_GOOGLE_MAPS_KEY`)
+
+- Phương án A **không có key ở FE**. Bỏ `NEXT_PUBLIC_GOOGLE_MAPS_KEY` khỏi code và tài liệu. Nút bật theo
+  `site-info.address_search_enabled`, đọc **một chỗ**: `features/checkout/addressSearch.ts` export
+  `isAddressSearchEnabled(info: SiteInfoResponse | null): boolean` (`info?.address_search_enabled === true`). CheckoutScreen đã gọi
+  `getSiteInfo()` (`CheckoutScreen.tsx:155`), không thêm request.
+- `false`, thiếu khoá, hoặc site-info lỗi → **không render nút** (Q-5, decisions 24/11). Lợi: bật/tắt chỉ cần đặt hoặc xoá secret
+  ở backend, không build lại Shop; FE và BE không thể lệch nhau.
+- Hai lần lỗi `ADDRESS_SEARCH_UNAVAILABLE`/mạng trong phiên → lần bấm sau mở thẳng C5 (giữ luật `mapsGaveUp` của §1.9).
+- Nếu Duy chọn B: biến `NEXT_PUBLIC_VIETMAP_KEY` (key `default`) + `NEXT_PUBLIC_VIETMAP_TILE_KEY`, đọc một chỗ ở
+  `features/checkout/vietmap.ts`, `hasMapsKey()` = cả hai khác rỗng (§1.9b.9).
+
+#### 1.9b.6 CSP (`frontend/firebase.json`, `frontend/firebase.staging.json`, dòng 18)
+
+Phương án A: Shop chỉ gọi API Cá Về (đã có trong `connect-src`) → **không mở domain mới**. Bỏ đúng 4 chỗ Google Maps, giữ nguyên
+phần còn lại (kể cả `https://storage.googleapis.com` cho ảnh món, `worker-src 'self' blob:`):
+
+| Chỉ thị | Bỏ |
+|---|---|
+| `script-src` | `https://maps.googleapis.com` |
+| `img-src` | `https://maps.googleapis.com`, `https://maps.gstatic.com` |
+| `connect-src` | `https://maps.googleapis.com` |
+
+Phương án B thêm: `script-src https://unpkg.com` · `style-src https://unpkg.com` · `connect-src https://maps.vietmap.vn` ·
+`img-src https://maps.vietmap.vn` (sprite) · `worker-src blob:` (đã có). Thẻ `<script>`/`<link>` gắn `integrity` SRI ở §1.9b.1 +
+`crossorigin="anonymous"`.
+
+#### 1.9b.7 File cần sửa
+
+**be-dev (lô VM-BE):**
+- ✚ `backend/apps/common/address_search/{__init__,vietmap,matching,shop_api}.py`, `README.md`, `tests/test_address_search.py`
+- ↻ `backend/config/settings.py` (2 biến + throttle), `backend/config/api_urls.py` (2 route), `backend/apps/common/throttling.py`
+  (lớp `ShopAddressSearchThrottle`, scope `shop_address_search`), `backend/apps/content/site/services.py` + test site-info
+- ↻ `backend/apps/ai/policy/rules.py` `SCRUB_PII_KEYS` thêm `text` chỉ khi không vỡ test hiện có — nếu vỡ thì ghi dev notes, không ép
+- Test (mock `urllib.request.urlopen` bằng `unittest.mock.patch`, **không gọi VietMap thật**): 200 hai endpoint; phản hồi không có
+  khoá `lat|lng|ref_id|ward_id|city_id|boundaries` (đệ quy); khớp current `Phường Phan Thiết` → `22945`; legacy `60/593/22915`;
+  không khớp và khớp 2 dòng → `null`; upstream 401, 423, 429, 500, timeout, JSON hỏng → 503 đúng mã; chưa có key → 503 và
+  `urlopen` không được gọi; `text` 1 ký tự / 121 ký tự, `ref` lạ (`http://…`, có xuống dòng) → 400; GET → 405; `assertLogs` không có
+  chữ gõ giả ("12 Đường Giả"), không có key; tham số gửi đi đúng `display_type`, `focus` hằng.
+
+**fe-dev (lô VM-FE):**
+- ✖ `frontend/features/checkout/googleMaps.ts`, ✖ `googleMaps.d.ts`
+- ✚ `frontend/features/checkout/addressSearch.ts` (`isAddressSearchEnabled`, đếm lỗi `searchGaveUp`, `shouldOpenFallbackDirectly`)
+- ↻ đổi tên `components/AddressMapPicker.tsx` → `AddressSearchSheet.tsx` (+ `.module.css`): bỏ khung bản đồ, ghim, Geocoder; giữ
+  `FullscreenSheet`/Dialog, combobox ARIA, debounce 250 ms, tối thiểu 2 ký tự, Esc trả tiêu điểm (AC6). Dòng thông báo hiện ngay khi
+  mở, request đầu tiên chỉ đi khi khách gõ đủ 2 ký tự. `onConfirm(result: {street, suggestion})`. Không `navigator.geolocation`.
+- ↻ `components/CheckoutScreen.tsx` (import mới, `onMapConfirm` nhận object, truyền `addressSearchEnabled`), `components/AddressField.tsx`
+  (ẩn nút khi tắt; banner gợi ý phường + nút "Dùng phường này")
+- ↻ `lib/api.ts` (`searchAddress`, `getAddressPlace`), `lib/types.ts`, `lib/mock.ts` (mock: "12" → 2 kết quả, một ref khớp
+  `22945`, một ref `suggestion: null`; chữ `[VIETMAP-LOI]` → 503), `features/site/types.ts` (`address_search_enabled?: boolean`)
+- ↻ `frontend/firebase.json`, `frontend/firebase.staging.json` (§1.9b.6), `features/checkout/README.md`
+- ↻ e2e: `frontend/e2e/shop_design_screens.py` — C1b, C1c, DP3, C5 bỏ ghi chú `needs-maps-key`, dựng bằng `page.route` giả hai
+  endpoint Cá Về (`**/api/shop/address-search/`, `**/api/shop/address-place/`) và site-info có `address_search_enabled: true`;
+  đổi tên màn "Google Maps" → "VietMap". Thêm ca vào `frontend/e2e/shop_general_rules.py` (hoặc file e2e checkout fe-dev chọn, ghi
+  dev notes): cờ tắt → không có nút; log mạng cả phiên không có request tới `maps.vietmap.vn`, `unpkg.com`, `googleapis.com`.
+- **QA không cần key thật:** e2e chạy backend thật không có `VIETMAP_API_KEY` → site-info `false` (ca ẩn nút); ca có nút dùng
+  `page.route` giả site-info + hai endpoint (200, `results: []`, 503, 429). BE đã có test mock `urlopen`. Kiểm thật với VietMap chỉ ở
+  staging sau khi Duy đặt secret.
+
+**mkt-brand (lô VM-CMS):** chỉ `backend/apps/content/management/shop_content/pages.json`, trang `quyen-rieng-tu` mục 3: thay gạch đầu
+dòng Google Maps bằng VietMap theo câu legal-vn soát. Câu nháp (phương án A, legal-vn sửa chữ cuối):
+> **VietMap (Công ty Cổ phần Ứng dụng Bản đồ Việt, dịch vụ tìm địa chỉ):** chỉ khi bạn bấm nút tìm địa chỉ. Chữ bạn gõ được máy chủ
+> Cá Về chuyển tới VietMap để lấy gợi ý; Cá Về không lưu chữ đó và không gửi họ tên, số điện thoại. VietMap xử lý theo chính sách
+> riêng của VietMap. Bạn có thể không dùng và gõ địa chỉ trực tiếp.
+
+Tên pháp nhân VietMap và đường dẫn chính sách của VietMap: **chưa xác minh**, legal-vn tra. Dòng thông báo trong hộp tìm (thay câu
+§1.2b): "Gợi ý địa chỉ do VietMap cung cấp. Chữ bạn gõ sẽ được gửi tới VietMap qua máy chủ Cá Về. Không muốn dùng, bạn đóng lại
+và gõ địa chỉ trực tiếp." — legal-vn soát trước khi fe-dev chốt hằng `MAP_NOTICE_TEXT`.
+
+Thứ tự: VM-BE ∥ VM-FE (FE mock theo §1.9b.3) → VM-CMS (sau khi legal-vn chốt câu) → QA. Ba lô không trùng file.
+
+#### 1.9b.8 AC đề xuất cho SHOP-3-04 (điều phối chép vào 02-stories)
+
+Tên story: **SHOP-3-04 · Tìm địa chỉ bằng VietMap (C1b, C1c, C5) · Must · be-dev + fe-dev**.
+
+| Mã | Given | When | Then | BR |
+|---|---|---|---|---|
+| AC1 | Mở `/shop/checkout/`, ghi log mạng | Chưa bấm nút tìm địa chỉ | 0 request tới `/api/shop/address-*`, `maps.vietmap.vn`, `unpkg.com`, `maps.googleapis.com`, `maps.gstatic.com` | BR-BH-29 |
+| AC2 | Cờ bật, mạng chậm | Bấm nút | Hộp tìm mở; dòng thông báo VietMap (câu legal-vn chốt) hiện **trước** request tìm đầu tiên | BR-BH-29, §1.2b |
+| AC3 | Gõ "12 Tran", chọn gợi ý khớp danh mục, bấm "Dùng địa chỉ này" | — | Ô số nhà điền chuỗi (C1c, nền `--good-soft`), sửa tay được; banner có "Phường gợi ý: …" + nút "Dùng phường này"; tỉnh/phường **chưa đổi** tới khi khách bấm; request tạo đơn chỉ có `delivery_address_parts`, không có `lat`, `lng`, `place_id`, `ref`, `refid` | BR-BH-29, Q-5 |
+| AC3b (không khớp) | Gợi ý có phường không có trong danh mục Cá Về (API trả `suggestion: null`) | Bấm "Dùng địa chỉ này" | Ô số nhà được điền; banner "Bạn chọn tỉnh và phường/xã ở trên"; các ô tỉnh/phường giữ nguyên; không có nút "Dùng phường này" | Q-5 |
+| AC3c (Địa chỉ cũ) | Khách chọn kiểu "Địa chỉ cũ" | Tìm và chọn gợi ý | Request tìm gửi `scheme: "legacy"`; gợi ý khớp thì nút "Dùng phường này" điền đủ tỉnh → quận/huyện → phường/xã đúng thứ tự; đổi kiểu địa chỉ khi hộp đang mở xoá kết quả cũ | STA-02 |
+| AC4 | — | Tìm "Vị trí của tôi" / `navigator.geolocation` trong mã nguồn | 0 kết quả | S-07 |
+| AC5 (lỗi) | API tìm trả 503 (VietMap 401/423/429/hết giờ) hoặc mất mạng | Gõ để tìm | Hộp tìm đóng **trước**, Dialog C5 mở; nút đưa tiêu điểm về ô số nhà; form vẫn đặt được; lỗi lần hai trong phiên → lần bấm sau mở thẳng C5 | |
+| AC5b (quá nhanh) | API tìm trả 429 của Cá Về | Gõ tiếp | Dòng "Thao tác quá nhanh, thử lại sau vài giây" trong hộp tìm, hộp không đóng, không mở C5 | |
+| AC6 (G5) | Hộp tìm đang mở | Esc | Đóng, tiêu điểm về nút, chữ đã có trong ô giữ nguyên | |
+| AC7 (tắt) | Máy chủ chưa có key (`address_search_enabled` false) hoặc site-info lỗi | Mở bước đặt hàng | Không có nút tìm địa chỉ; form gõ tay đặt được | Q-5, decisions 24/11 |
+| AC8 (BE) | — | Gọi hai endpoint mới | Phản hồi không có toạ độ, `ref_id`, mã VietMap; log không có chữ gõ; GET → 405; chưa có key → 503 không gọi VietMap | bất biến 9 |
+
+#### 1.9b.9 Phương án B (chỉ khi Duy chọn)
+
+Giữ khung §1.9 cũ, thay Google bằng VietMap: bấm nút → chèn `<link>` CSS và một `<script>` `vietmap-gl.js` 6.0.1 từ unpkg (SRI ở
+§1.9b.1), timeout 10 giây, lỗi hai lần thì thôi (như §1.9). `new vietmapgl.Map({container, style: STYLE_URL(tile key), center:
+[108.1021, 10.9289]})`; ô tìm gọi thẳng Autocomplete/Place bằng `fetch` với key `default`; ghim kéo → Reverse v4. Lỗi key ở trình
+duyệt chỉ thấy là `TypeError` (thiếu CORS ở 401, đo 25/11) → coi như lỗi chung, mở C5. Khai kiểu tối thiểu ở
+`features/checkout/vietmap.d.ts` (không thêm `@vietmap/vietmap-gl-js` vào npm). Key `default` nằm trong bản build công khai → Duy
+phải đặt giới hạn domain `cangca-loc*.web.app` và hạn mức theo key ở console VietMap; vẫn trái khuyến cáo của VietMap.
+
+#### 1.9b.10 Rủi ro
+
+| Rủi ro | Cơ chế chặn | Test |
+|---|---|---|
+| Gửi PII cho VietMap ngoài ý khách | Chỉ gửi khi khách bấm và gõ; chỉ `text` + `ref`; không gửi tên, SĐT, mã đơn; `focus` là hằng, không phải vị trí khách | BE: assert tham số `urlopen`; e2e AC1 |
+| Chữ gõ (địa chỉ) rơi vào log Cá Về | POST thân JSON; view không log `request.data`; log lỗi chỉ có mã trạng thái | `assertLogs` (§1.9b.7) |
+| Toạ độ lọt ra trình duyệt hay DB | Serializer dict tường minh; không model | test khoá cấm đệ quy; AC3 |
+| Lộ key | Phương án A: key chỉ ở Secret Manager → env Cloud Run backend; không có trong bản build FE | QA `grep` bản build `out/` không có chuỗi key staging |
+| Xài trộm hạn mức qua endpoint Cá Về | Throttle 60/phút/IP; tối thiểu 2 ký tự; FE debounce 250 ms; ở console VietMap chỉ bật Autocomplete + Place cho key, đặt hạn mức theo API | test throttle (override settings) |
+| SSRF | Host, path là hằng; tham số qua `urlencode`; `ref` theo regex | test `ref` lạ → 400 |
+| Chi phí | Mỗi lần tìm ≈ 3–6 Autocomplete + 1 Place. Trial: Place 500/ngày, Autocomplete không giới hạn ngày, 100–200/phút mỗi API; vượt → 423 → C5, form gõ tay vẫn chạy. Giá Standard chưa xác minh | AC5 |
+| Gợi ý phường sai | Chỉ gợi ý khi khớp đúng 1 tên; khách tự bấm; máy chủ tạo đơn kiểm mã như cũ | test khớp 0/2 dòng; AC3b |
+| Pháp lý | Chính sách quyền riêng tư đổi Google → VietMap (VM-CMS); phiên bản chính sách mới bắt đồng ý lại (§1.2 của 05-phap-ly). Hồ sơ chuyển dữ liệu ra nước ngoài: VietMap là công ty Việt Nam, nơi đặt máy chủ **chưa xác minh** → legal-vn xem còn cần nêu không | legal-vn |
+
+#### 1.9b.11 Câu hỏi
+
+- 🔴 **Q-VM-1 (Duy):** chọn **A** (tìm qua máy chủ Cá Về, không vẽ bản đồ, key chỉ ở máy chủ, thêm một lô be-dev nhỏ) hay **B** (bản đồ
+  VietMap ngay trên trình duyệt có ghim kéo, key `default` nằm trong bản build công khai trái khuyến cáo VietMap)? Techlead khuyên
+  **A**. Chọn A thì chữ khách gõ đi qua máy chủ Cá Về (không lưu, không log) — cần Duy gật vì khác mô hình "trình duyệt gọi thẳng"
+  của 10/10.
+- 🟡 Nhãn nút: A không có bản đồ nên đề xuất đổi chữ "Bản đồ" thành **"Tìm địa chỉ"** (giữ icon `map-pin`, `aria-label` "Tìm địa chỉ
+  giao hàng"). Không chốt thì giữ "Bản đồ".
+- 🟡 legal-vn: câu thông báo trong hộp tìm, câu chính sách, tên pháp nhân VietMap, nơi đặt máy chủ VietMap.
+- Việc của Duy (không phải code): lấy key `default` ở console VietMap, chỉ bật Autocomplete + Place, đặt vào Secret Manager
+  (`VIETMAP_API_KEY` cho backend staging trước); điều phối thêm biến vào `doc/ops/moi-truong.md` khi deploy.
 
 ### 1.10 Ánh xạ 48 component → file → lô → người
 
@@ -681,6 +980,7 @@ Nguồn giảm của dòng **suy ra** (Techlead chốt, không thêm cột dòng
 | **Lộ tiến độ hoàn trên Shop** | `cancel_notice` không khoá `refund*`; FE không chữ "hoàn" | `test_shop_lookup.py::test_cancel_notice_has_no_refund_keys`, `::test_other_reason_note_not_leaked` (ghi chú "gọi 0900000001"), `::test_partial_refund_notice`, `::test_late_payment_notice` |
 | **Lọt mock vào bản build** | nạp động + `check-no-mock.mjs` | chạy mỗi lô |
 | **Gửi dữ liệu cho Google khi chưa bấm** | script nạp khi bấm | QA log mạng (3-04 AC1) |
+| **Gửi dữ liệu cho VietMap / rò chữ gõ, toạ độ, key (§1.9b)** | xem bảng §1.9b.10 | test BE §1.9b.7 + 3-04 AC1, AC3, AC8 mới |
 | **Font gọi Google lúc chạy** | `next/font` | QA log mạng (1-01 AC2) |
 
 Mỗi endpoint mới còn đủ bộ tối thiểu của skill: happy path, 403/401, lỗi nghiệp vụ 400, biên.
@@ -696,7 +996,7 @@ Mỗi endpoint mới còn đủ bộ tối thiểu của skill: happy path, 403/
 - Nhãn nút theo thiết kế ("Tiếp tục: nhập thông tin nhận hàng" / "Tiếp tục"); QA tìm theo vai trò nút chính, không theo chữ "Đặt hàng".
 - Giá đổi: giỏ giữ `price` lúc thêm, hiện giá cũ gạch + giá mới, tính bằng giá mới; khi bấm nút chính thành công thì ghi `price` mới vào giỏ. Tải giá lỗi (AC7) → banner "Chưa cập nhật được giá. Thử lại", vẫn cho đi tiếp (máy chủ kiểm lại).
 
-### 6.2 Google Maps — xem §1.9 (Techlead chốt). Không key → C5; form gõ tay vẫn đặt được.
+### 6.2 Bản đồ — **xem §1.9b VietMap** (thay §1.9 Google). Chưa có key → không hiện nút; lỗi → C5; form gõ tay vẫn đặt được.
 
 ### 6.3 Bảng trạng thái → màn (E6) — FE `features/checkout/orderState.ts::screenFor(state, result, now)`
 
