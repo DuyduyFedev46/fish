@@ -1,7 +1,0 @@
-# Sinh tự động bởi scripts/sync_ai_workspace.py từ .claude/commands/lam-tiep.md. Đừng sửa file này.
-description = "Làm tiếp việc dở theo bảng việc chung doc/ops/bang-viec.md (dùng chung cho Claude và Gemini)"
-
-prompt = """
-Đọc toàn bộ `.claude/commands/lam-tiep.md` rồi làm đúng theo đó, tuân thủ `AGENTS.md` và `GEMINI.md`.
-Lời Duy gõ kèm lệnh: {{args}}
-"""

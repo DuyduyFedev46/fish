@@ -104,10 +104,10 @@ Chỉ giữ những ràng buộc kỹ thuật sau (vì test tự động kiểm,
    `Shop UI: ẩn số gạch ở hộp mã hết hiệu lực khi chưa có giá máy chủ (GUI-02)`. Không commit `out/`, `.next/`, `node_modules/`, ảnh rác.
 7. **Đánh dấu:** đổi ☐ thành ☑ và ghi hash commit ở phiếu, commit kèm. Quay lại bước 2.
 
-## 4b. Chia việc cho subagent (Duy giao 14/11)
+## 4b. Chia việc cho worker Orca (Duy giao 14/11, đổi sang Orca 24/11)
 
-Bạn (điều phối viên) là **điều phối**: đọc phiếu, chia việc, làm git, tổng hợp báo cáo. Code, QA và tìm ảnh giao cho 3 subagent
-cùng tên ở cả Claude (`.claude/agents/`) và Gemini (`.agents/agents/`):
+Bạn (điều phối viên) là **điều phối**: đọc phiếu, chia việc, làm git, tổng hợp báo cáo. Code, QA và tìm ảnh giao cho 3 vai
+(`.claude/agents/`), chạy dưới dạng worker Orca `agy` `gemini-4-carbon-high` theo `doc/ops/orca-worker.md`:
 
 | Subagent | Làm gì | Được ghi vào |
 |---|---|---|
@@ -126,7 +126,7 @@ Cách chạy một vòng:
 6. ĐẠT → bạn chạy `python3 scripts/check_shop_ui_scope.py` (phải `OK`), commit theo mục 4 bước 6, đánh dấu ☑ ở phiếu (bước 7), rồi sang việc kế.
 7. Hết việc hoặc gặp điểm dừng → báo Duy theo mục 5.
 
-Subagent chạy ở chế độ tự động (không ai bấm duyệt từng lệnh). Vì vậy **chỉ bạn** được chạy lệnh git. Đọc lại báo cáo của subagent
+Worker chạy ở chế độ tự động (không ai bấm duyệt từng lệnh). Worker chỉ commit trên nhánh của mình; gộp, push là việc của bạn. Đọc lại báo cáo của worker
 trước khi commit: không tin "PASS" khi không có dòng tổng kết test thật hoặc ảnh chụp.
 
 ## 5. Khi dừng

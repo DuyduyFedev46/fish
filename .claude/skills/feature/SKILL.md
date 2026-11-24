@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → Review → QA → Deploy) bằng các subagent product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
+description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → Review → QA → Deploy) bằng worker Orca (agy gemini-4-carbon-high) theo vai product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
 argument-hint: "<yêu cầu bằng lời thường>"
 ---
 
@@ -22,7 +22,7 @@ flowchart TD
   UXTL --> DEV["BE và FE làm theo lô nhỏ"]
   AC --> DEV
   DEV --> KC["Điều phối tự chạy lại test, soát giao diện"]
-  KC --> TLR["Tech Lead review diff"]
+  KC --> TLR["Opus tự soát chỗ nhạy cảm"]
   TLR --> QA{"QA đạt?"}
   QA -- "chưa, tối đa 2 vòng" --> DEV
   QA -- "đạt" --> GIT["Commit theo pathspec trên nhánh lô, gộp main, push"]
@@ -64,13 +64,17 @@ Quy tắc khi phân vân:
 - Việc hạ tầng/vận hành không đổi code sản phẩm (xem log, đổi mật khẩu, seed dữ liệu) →
   làm trực tiếp, không qua agent.
 
-Bạn (luồng chính, Claude hoặc Gemini) là **điều phối viên**. Subagent không gọi được subagent khác, nên mọi
-lượt giao việc đều đi qua bạn. Bạn không tự viết code nghiệp vụ — bạn giao việc, kiểm
+Bạn (phiên chính, Claude Opus 5.5 trong Orca) là **điều phối viên duy nhất**. Mỗi chỗ dưới đây ghi "giao `<vai>`"
+nghĩa là tạo Task và chạy `orca orchestration worker-start --agent antigravity --model gemini-4-carbon-high` với spec theo
+mẫu `doc/ops/orca-worker.md` (dán Luật worker, trỏ tới `.claude/agents/<vai>.md`). Mỗi "ĐIỂM DỪNG" là một gate Orca
+(`gate-create`) chặn Task phía sau. Orca hỏng hoặc phiên chạy trên cloud: dùng công cụ Agent làm dự phòng. Worker không
+giao việc cho nhau, nên mọi lượt giao việc đều đi qua bạn. Bạn không tự viết code nghiệp vụ — bạn giao việc, kiểm
 kết quả, và giữ Duy trong vòng lặp. Ý tưởng lấy từ BMAD-METHOD (vai trò), GitHub Spec Kit
 (spec → plan → tasks) và superpowers (subagent-driven development, verify before done).
 
 ## 0. Khởi tạo
-- Nhận việc ở `doc/ops/bang-viec.md` (ai, nhánh, phạm vi file), commit bảng lên `main` trước khi code; làm trong worktree riêng (luật ở `AGENTS.md` mục Làm chung).
+- Nhận việc ở `doc/ops/bang-viec.md` (ai, nhánh, phạm vi file), commit bảng lên `main` trước khi code; làm trong worktree riêng (luật ở `AGENTS.md` mục Điều phối bằng Orca).
+- `orca status --json`, `orca skills get orchestration --full` (một lần mỗi phiên), rồi `run-create` cho tính năng.
 - Tạo slug ngắn không dấu từ yêu cầu; thư mục `doc/features/<YYYY-MM-DD>-<slug>/`.
 - Báo Duy 1 dòng: thư mục hồ sơ + các bước sắp chạy.
 
@@ -81,13 +85,13 @@ trước khi giao BA. Yêu cầu đã rõ thì bỏ bước này.
 
 ## 1. BA — phân tích
 Giao `ba-analyst`: yêu cầu nguyên văn + đường dẫn thư mục hồ sơ.
-➜ **ĐIỂM DỪNG 1**: đưa Duy tóm tắt + câu hỏi 🔴 (dùng AskUserQuestion nếu câu hỏi có
-phương án rõ). Ghi câu trả lời vào `01-analysis.md`, đổi trạng thái `ĐÃ DUYỆT`.
+➜ **ĐIỂM DỪNG 1**: gate Orca trên Task PO, câu hỏi gồm tóm tắt + câu hỏi 🔴 (phương án rõ thì đưa vào `--options`;
+Duy đang chat trực tiếp thì hỏi bằng AskUserQuestion cũng được). Ghi câu trả lời vào `01-analysis.md`, đổi trạng thái `ĐÃ DUYỆT`.
 Không có câu hỏi 🔴 và Duy đã nói "cứ làm" → đi tiếp, không cần dừng.
 
 ## 2. PO — story & AC
 Giao `po-owner` (chế độ viết story).
-➜ **ĐIỂM DỪNG 2**: đưa Duy bảng story (mã · tiêu đề · ưu tiên · BE/FE) + thứ tự làm. Duy
+➜ **ĐIỂM DỪNG 2**: gate Orca trên Task Tech Lead/UX, đưa Duy bảng story (mã · tiêu đề · ưu tiên · BE/FE) + thứ tự làm. Duy
 duyệt/cắt bớt → cập nhật `02-stories.md` thành `ĐÃ DUYỆT`.
 
 ## 2a. UX — luồng màn hình (khi có đổi giao diện; song song 2b)
@@ -102,8 +106,8 @@ chỉ dừng hỏi Duy khi techlead nêu câu hỏi kỹ thuật 🔴 cần quy�
 
 ## 3. BE ∥ FE — hiện thực
 - BE/FE làm theo `02b-tech-design.md` (contract API + thứ tự lô trong đó).
-- Story `BE` → `be-dev`; story `FE` → `fe-dev`; story `BE+FE` → cả hai, **chạy song song
-  trong cùng một lượt** (FE dùng mock theo contract trong story).
+- Story `BE` → `be-dev`; story `FE` → `fe-dev`; story `BE+FE` → cả hai, **khởi động song song
+  trong cùng một lệnh shell**, mỗi worker một worktree (FE dùng mock theo contract trong story).
 - Giao theo lô nhỏ (1–3 story/lượt) theo thứ tự PO đề xuất, không dồn cả backlog.
 - Sau mỗi lượt: **tự kiểm** (skill `tdd-workflow` — cổng kiểm chứng): chạy lại
   `manage.py test` / `npm run build`, xem diff. Không tin báo cáo suông.
@@ -122,14 +126,15 @@ Giao `fe-dev` một lượt **chỉ để soát và đánh bóng**:
 
 Theo "Cổng chất lượng UI" trong skill `caveve-ui`. Có ảnh trước và sau.
 
-## 3c. Tech Lead — review diff (trước QA, khớp `AGENTS.md`)
-Giao `techlead` review diff của lô: giá vốn, dữ liệu cá nhân, phân quyền, migration, lệch 02b
-(code review + security review khi đụng thanh toán, webhook). Lỗi xác thực được → giao lại
-`be-dev`/`fe-dev`, rồi điều phối tự chạy lại lệnh kiểm chứng.
+## 3c. Opus tự review diff (trước QA, khớp `AGENTS.md`)
+Bạn (Opus) **tự** review diff của lô, không giao worker: giá vốn, dữ liệu cá nhân, phân quyền, migration,
+lệch 02b, API worker dùng có thật không (đối chiếu "file:line" trong báo cáo); thêm security review khi đụng thanh toán,
+webhook. Lỗi xác thực được → `send` lại cho đúng worker `be-dev`/`fe-dev`, rồi tự chạy lại lệnh kiểm chứng.
 
 ## 4. QA — kiểm thử
 Giao `qa-tester` với danh sách story đã làm.
-- **REJECTED** → giao lỗi chặn về đúng `be-dev`/`fe-dev` → QA lại. Tối đa **2 vòng**; quá
+- QA chạy e2e trên cổng cố định: mỗi lúc chỉ một worker QA.
+- **REJECTED** → `send` lỗi chặn về đúng worker `be-dev`/`fe-dev` → QA lại. Tối đa **2 vòng**; quá
   2 vòng → dừng, báo Duy tình trạng + lỗi còn lại.
 - **APPROVED** → sang bước 5.
 
@@ -149,13 +154,13 @@ Trước khi push, kiểm `git status` không có `.env`, DB hay bí mật nào.
 ## 5. Review & nghiệm thu
 - Nếu lô đụng pháp lý (dữ liệu cá nhân, thanh toán, AI, hợp đồng, go-live) → giao `legal-vn`
   soát trước khi nghiệm thu, memo vào hồ sơ tính năng.
-- Review code của `techlead` đã chạy ở bước 3c (trước QA).
+- Review code đã do Opus làm ở bước 3c (trước QA).
 - Giao `po-owner` (chế độ nghiệm thu) đối chiếu `04-qa-report.md` với AC.
 - Rule nghiệp vụ mới/đổi → đề xuất cập nhật `doc/business-process-spec.md` (hỏi Duy trước
   khi sửa spec gốc).
 
 ## 6. Tổng kết & deploy
-➜ **ĐIỂM DỪNG 3**: báo Duy: story xong · test (số liệu thật) · QA · review · việc còn nợ.
+➜ **ĐIỂM DỪNG 3** (gate Orca): báo Duy: story xong · test (số liệu thật) · QA · review · việc còn nợ.
 **Chỉ deploy khi Duy nói rõ.** Có 2 môi trường (từ 27/09): **staging** (SePay sandbox, DB
 `cangca_staging`) và **production** (SePay live, DB `postgres`), cả hai trên Supabase
 (Cloud SQL đã xoá). Luôn lên **staging trước**, Duy duyệt rồi mới lên production. URL, lệnh
@@ -170,8 +175,8 @@ Cho bug nhỏ / chỉnh sửa rõ ràng, 1 story:
 3. `qa-tester` (chỉ AC + hồi quy app liên quan).
 4. Commit theo bước 4b, tổng kết như bước 6.
 
-Không cần `techlead` trừ khi sửa đụng kiến trúc/hợp đồng BE↔FE — lúc đó techlead viết
-`02b` ngắn trước khi dev.
+Không cần `techlead` trừ khi sửa đụng kiến trúc/hợp đồng BE↔FE — lúc đó worker techlead viết
+`02b` ngắn trước khi dev. Bước 3c (Opus tự soát) vẫn chạy khi đụng giá vốn, dữ liệu cá nhân, phân quyền, migration.
 
 ## Nguyên tắc điều phối
 - Mỗi lượt giao việc: nêu rõ đường dẫn hồ sơ, mã story, phạm vi file được sửa, đầu ra cần trả.

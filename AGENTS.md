@@ -1,4 +1,4 @@
-# Cá Về — luật chung cho mọi AI (Claude Code, Gemini CLI, Antigravity)
+# Cá Về — luật chung cho mọi AI (Claude Code điều phối, worker Gemini qua Orca)
 
 ```mermaid
 flowchart TD
@@ -27,31 +27,33 @@ Vựa cá B2C (mua lô tại cảng → bán online → quản lý kho/giá vố
 Việt; AI xưng "em", gọi Duy là "anh", báo cáo ngắn kiểu tổng quan. Nghiệp vụ và bất biến: skill `caveve-domain`
 (**đọc trước khi đụng code**).
 
-File này là **luật chung duy nhất**. Claude đọc qua `CLAUDE.md` (`@AGENTS.md`), Gemini/Antigravity đọc trực tiếp.
-`CLAUDE.md` và `GEMINI.md` chỉ ghi phần riêng của từng công cụ. Sửa luật chung thì sửa ở đây.
+File này là **luật chung duy nhất**. Claude đọc qua `CLAUDE.md` (`@AGENTS.md`), worker Antigravity đọc trực tiếp.
+`CLAUDE.md` ghi phần riêng của điều phối viên, `GEMINI.md` ghi phần riêng của worker Gemini. Sửa luật chung thì sửa ở đây.
 
-## Làm chung Claude và Gemini (Duy chốt 2026-11-15)
+## Điều phối bằng Orca (Duy chốt 2026-11-24, thay chế độ "ngang quyền" 15/11)
 
-Hai bên **ngang quyền**: cùng bộ agent, cùng skill, cùng workflow, cùng luật. Duy giao việc cho bên nào thì bên đó là
-**điều phối viên** (phiên chính) của việc đó.
+**Một bộ não:** Claude Code chạy `claude-opus-5-5` trong Orca là điều phối viên duy nhất. Mọi vai trong đội chạy dưới dạng
+**worker Orca** `antigravity` (`agy`), model `gemini-4-carbon-high`. Gemini không làm điều phối nữa. Lệnh Orca, luật worker
+và mẫu spec ở `doc/ops/orca-worker.md`.
 
-| Thứ | Nguồn duy nhất | Claude đọc ở | Gemini/Antigravity đọc ở |
-|---|---|---|---|
-| Luật chung | `AGENTS.md` | `CLAUDE.md` → `@AGENTS.md` | `AGENTS.md` (+ `GEMINI.md`) |
-| Agent (vai trong đội) | `.claude/agents/<tên>.md` | như nguồn | `.agents/agents/<tên>.md` (sinh tự động), `.gemini/agents` trỏ tới |
-| Skill | `.claude/skills/<tên>/` | như nguồn | `.agents/skills/<tên>` (liên kết), `.gemini/skills` trỏ tới |
-| Workflow đội | skill `feature` | skill `feature` | skill `feature`, lệnh `/feature` |
-| Lệnh | `.claude/commands/<tên>.md` | `/<tên>` | skill `/<tên>` trong `.agents/skills/`, `.gemini/commands/<tên>.toml` |
+| Thứ | Nguồn duy nhất | Worker Gemini đọc ở |
+|---|---|---|
+| Luật chung | `AGENTS.md` | `AGENTS.md` (Antigravity tự nạp) |
+| Vai trong đội | `.claude/agents/<vai>.md` | chính file đó, spec Task trỏ tới |
+| Skill | `.claude/skills/<tên>/` | `.agents/skills/<tên>` (liên kết, sinh bằng script) |
+| Workflow đội | skill `feature` | chỉ Opus chạy |
+| Luật worker + mẫu spec | `doc/ops/orca-worker.md` | dán vào đầu mọi spec |
 
-- **Sửa agent, skill hay lệnh: chỉ sửa trong `.claude/`**, rồi chạy `python3 scripts/sync_ai_workspace.py` và commit cả
-  bản sinh ra. CI chạy `--check`, lệch là đỏ. Không sửa tay file trong `.agents/agents/`, `.gemini/commands/`.
+- **Sửa vai, skill hay lệnh: chỉ sửa trong `.claude/`**. Thêm hay bớt skill thì chạy `python3 scripts/sync_ai_workspace.py`
+  để cập nhật liên kết `.agents/skills/`. CI chạy `--check`, lệch là đỏ.
 - **Nhận việc trước khi code** ở `doc/ops/bang-viec.md` (ai, nhánh, phạm vi file), commit bảng lên `main` rồi push.
   Hai việc đang làm không được trùng phạm vi file; trùng thì dừng, hỏi Duy.
-- **Mỗi việc một worktree riêng**, nhánh `<ai>/<slug>` (vd `claude/shop-facebook`, `gemini/shop-ui`) tách từ `main`.
-  **Không `git switch` ở checkout chính** (bên kia có thể đang làm ở đó). Gộp `main` và push cũng làm từ worktree.
+- **Mỗi việc một worktree riêng** tách từ `origin/main`: nhánh lô `claude/<slug>` của điều phối viên, worktree của worker
+  do `orca orchestration worker-start` tạo. **Không `git switch` ở checkout chính.** Gộp `main` và push làm từ worktree.
 - Trước khi gộp `main`: `git fetch` rồi gộp lên `origin/main` mới nhất. Không force-push, không viết lại lịch sử `main`.
-- e2e dùng cổng cố định 8000/3000/3100. Runner tự dừng nếu cổng bận; **không kill tiến trình của bên kia**, chờ hoặc hỏi Duy.
-- Tiến độ theo dõi ở hồ sơ `doc/features/`, bảng việc chung và sheet FIX WEB của Lộc. **Không dùng Jira nữa** (Duy 15/11).
+- e2e dùng cổng cố định 8000/3000/3100: mỗi lúc chỉ một worker chạy e2e. Runner tự dừng nếu cổng bận; **không kill tiến
+  trình người khác**, chờ hoặc hỏi Duy.
+- Tiến độ theo dõi ở hồ sơ `doc/features/`, bảng việc chung, Run trên Orca và sheet FIX WEB của Lộc. **Không dùng Jira**.
 
 ## Workflow đội — tự nhận diện, Duy không gõ lệnh
 
@@ -82,22 +84,22 @@ thích/tra cứu, hoặc việc vận hành không đổi code (xem log, seed d�
 | QA | `qa-tester` | e2e-playwright, tdd-workflow | `04-qa-report.md` |
 | Shop UI dev / QA / ảnh | `shop-ui-dev`, `shop-ui-qa`, `image-scout` | caveve-ui, nextjs-shop-patterns, e2e-playwright | việc GUI-xx theo lệnh `/lam-shop-ui` |
 
-**Model:** lập kế hoạch (điều phối, PM, BA, PO, UX, mkt-brand, techlead, legal-vn) dùng model mạnh nhất của công cụ; code
-và test (be-dev, fe-dev, qa-tester, shop-ui-*) dùng model nhanh. Claude ghi model ở frontmatter agent; Gemini dùng
-`model: inherit`.
+**Model:** điều phối và review chỗ nhạy cảm dùng `claude-opus-5-5`; mọi vai trong bảng trên là worker `agy`
+`gemini-4-carbon-high` (giao theo `doc/ops/orca-worker.md`). Dòng `model:` trong frontmatter vai chỉ dùng cho đường dự
+phòng (công cụ Agent của Claude khi Orca hỏng hoặc chạy trên cloud).
 
 **Quy trình một lô:**
 1. Điều phối viên nhận việc ở bảng việc chung, tạo worktree, đọc dòng lô trong `02c-giao-viec.md`, chạy lệnh kiểm chứng để ghi số gốc.
-2. Giao `be-dev` ∥ `fe-dev` (song song khi lô ghi BE ∥ FE), kèm mã story, danh sách file được sửa và không được đụng, contract 02b.
-3. Điều phối viên **tự chạy lại** lệnh kiểm chứng. Không tin báo cáo của subagent khi chưa chạy.
-4. `techlead` review diff (giá vốn, dữ liệu cá nhân, phân quyền, migration, lệch 02b).
+2. Giao worker `be-dev` ∥ `fe-dev` qua Orca (song song khi lô ghi BE ∥ FE, mỗi bên một worktree), spec theo mẫu `doc/ops/orca-worker.md`: mã story, file được sửa và không được đụng, contract 02b.
+3. Điều phối viên **tự chạy lại** lệnh kiểm chứng. Không tin báo cáo của worker khi chưa chạy.
+4. Opus **tự review diff** (giá vốn, dữ liệu cá nhân, phân quyền, migration, lệch 02b), không giao worker.
 5. `qa-tester` kiểm theo luật đã siết: không PASS bằng đọc code, có ca ngoài đường thuận, `npm ci` sạch.
 6. REJECTED → giao lại dev, quay về bước 3 (tối đa 2 vòng). APPROVED → commit tiếng Việt có mã lô/story **theo pathspec**
    (không `git add -A`), gộp `main`, chạy lại test tuần tự, `git push origin main`, đánh ☑ ở 02c và bảng việc.
 7. QA đạt + gộp main → tự deploy **staging** (UAT) cho Duy test. **Production chỉ khi Duy duyệt.**
 
-Subagent không gọi được subagent khác: mọi lượt giao việc đi qua điều phối viên. Subagent không làm git (trừ khi điều
-phối viên giao rõ), không deploy, không đụng DB thật.
+Worker không giao việc cho worker khác: mọi lượt giao việc đi qua điều phối viên. Worker chỉ commit trên nhánh worktree
+của mình theo pathspec; không push, không merge, không deploy, không đụng DB thật.
 
 ## Luật bắt buộc (vi phạm = dừng lại hỏi Duy)
 

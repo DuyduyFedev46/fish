@@ -1,7 +1,0 @@
-# Sinh tự động bởi scripts/sync_ai_workspace.py từ .claude/skills/feature/SKILL.md. Đừng sửa file này.
-description = "Chạy workflow đội dự án Cá Về cho một yêu cầu của Duy (chọn luồng, giao agent, kiểm chứng, QA)"
-
-prompt = """
-Đọc toàn bộ `.claude/skills/feature/SKILL.md` rồi làm đúng theo đó, tuân thủ `AGENTS.md` và `GEMINI.md`.
-Lời Duy gõ kèm lệnh: {{args}}
-"""
