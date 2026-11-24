@@ -125,6 +125,19 @@ production kiểm tra lại bằng `gcloud run services describe` trước khi l
 | `CONFIRMATION_NOTICE_ENABLED` | `CSKH_NOTICE_ENABLED` | 1 | Hiện thông báo quy trình gọi trên Shop |
 | `THROTTLE_CUSTOMER_SEARCH` | `THROTTLE_CSKH_SEARCH` | `30/min` | Giới hạn tốc độ tìm kiếm khách (route `confirmation/search/`; route `cskh/search/` đã gỡ) |
 
+### Biến môi trường tìm địa chỉ VietMap (SHOP-3-04, 25/11)
+- `VIETMAP_API_KEY` (backend, **secret**, rỗng = tắt): key `default` của tài khoản VietMap, chỉ bật Autocomplete + Place trong
+  console VietMap. Rỗng thì `site-info.address_search_enabled=false`, Shop ẩn nút "Tìm địa chỉ", hai endpoint trả 503.
+  Không có biến FE (key không bao giờ vào bản build Shop). Bật/tắt chỉ cần đặt hoặc gỡ secret, không build lại Shop.
+- `VIETMAP_TIMEOUT_SECONDS` (mặc định 4), `THROTTLE_SHOP_ADDRESS_SEARCH` (mặc định `60/min`, theo IP, chung hai endpoint).
+- Bật trên staging (sau khi Duy có key):
+  ```bash
+  read -s K && printf %s "$K" | gcloud secrets create cangca-staging-vietmap-key --project keolai-63ec1 --data-file=-
+  gcloud run services update cangca-api-staging --region asia-southeast1 --project keolai-63ec1 \
+    --update-secrets VIETMAP_API_KEY=cangca-staging-vietmap-key:latest
+  ```
+  Service account của `cangca-api-staging` cần quyền `secretAccessor` trên secret mới.
+
 ### Biến môi trường phạm vi dữ liệu khách (SR-PII-02)
 | Tên | Mặc định | Ý nghĩa |
 |---|---|---|
@@ -261,3 +274,13 @@ Duy chốt 11/10 (`doc/decisions.md`). Workflow `.github/workflows/backend-tests
 - **2026-11-15 — FISH-68 trả nợ kỹ thuật lên staging** (commit `e27788a`): image `api:v29`, revision `cangca-api-staging-00028-r65` (rollback `00027-8rd`/v28; không migration). Dòng đơn Shop có thêm `rate` (đơn giá bán niêm yết), nên **khi lên production phải deploy API trước Shop**. Test main tuần tự 4071 OK; CI Postgres xanh. Shop + ERP (Tiptap 3) build lại trỏ API staging, `check-no-mock` xanh; smoke trang chủ, giỏ, đăng nhập ERP 200.
 - **2026-11-15 — Sửa bảo mật đợt 1 lên staging** (commit `93b24ad`): image `api:v30`, revision `cangca-api-staging-00030-c5f` (rollback: `00029-whs`/v29; 2 migration chỉ thêm `accounts 0019_cache_table`, `sales 0023_salesorder_client_ip_hash` nên v29 vẫn chạy). Adapter `adapter:v5`, rollback `cangca-adapter-staging-00003-x5g`/v4. **Migrate chạy trước** (job `cangca-migrate-staging` v30), rồi mới chuyển traffic. Gồm: Django 5.2 LTS + DRF 3.18 + Pillow 13 + Starlette 1.x (pip-audit sạch); tắt `/api-auth/`, Browsable API, SessionAuthentication khi DEBUG=0; throttle đăng nhập theo cặp tài khoản + IP, đổi mật khẩu, Admin (đếm chung qua `DatabaseCache`); token 12 giờ (`AUTH_TOKEN_TTL_HOURS`); HSTS + chuyển HTTPS; trần đơn Shop BR-BH-31 (`SHOP_MAX_LINE_KG`=20, `SHOP_MAX_LINE_COMBO`=10, `SHOP_MAX_ORDER_VND`=10.000.000, đơn chưa trả tối đa 2/SĐT, 5/IP); header CSP/XFO/nosniff/Referrer/Permissions cho Shop + ERP; adapter tắt `/docs`. Test main tuần tự 4133 OK, adapter 70 passed, e2e 8 bộ xanh, CI Postgres xanh, QA kiểm lại APPROVED (`doc/features/2026-11-15-ra-soat-bao-mat/04-qa-kiem-lai.md`). Smoke staging: catalog 200, `/api-auth/` 404, http→https 302, HSTS + nosniff có, đăng nhập sai kiểu 400, adapter `/docs` 404, IPN không khoá 401; Shop/ERP 360 + 1280 dưới CSP thật: 0 lỗi CSP.
   > ⚠️ **Khi lên production:** (1) chạy job `cangca-migrate` image v30 **trước**; (2) deploy API rồi mới Shop; (3) `cangca-api` đang dùng SA mặc định: chuyển sang `cangca-runtime-prod@`, gắn secret `cangca-prod-django-secret-key` + `cangca-prod-internal-token` trong **một lệnh** `--update-secrets` (xoay `INTERNAL_SERVICE_TOKEN` ở API và adapter cùng lúc); (4) job `cangca-ttl`, `cangca-batch-status` còn image v25, đổi image + SA; (5) quyết `DJANGO_ADMIN_ENABLED` (B3) và chặn đường IPN nội bộ từ internet (B11). Chưa kiểm luồng thanh toán sandbox và Google Maps dưới CSP (Maps chờ key).
+- **2026-11-25 — SHOP-3-04 tìm địa chỉ VietMap (thay Google Maps) + địa chỉ có cấu trúc STA-01/02 lên staging** (commit `4222c5b`):
+  image `api:v31` (Cloud Build), revision `cangca-api-staging-00031-5mq` (rollback: chuyển traffic về `00030-c5f`/v30; migration
+  `sales.0024_salesorder_structured_address` chỉ thêm cột nên v30 vẫn chạy, nhưng Shop mới gửi `delivery_address_parts` → rollback API
+  thì build lại Shop bản trước). Job `cangca-migrate-staging` đổi sang v31, `Applying sales.0024… OK`. Shop staging build lại trỏ API
+  staging, `check-no-mock` xanh, CSP không còn domain Google Maps (còn `storage.googleapis.com`), header noindex. Smoke: site-info
+  `address_search_enabled=false` (chưa có key), `POST /api/shop/address-search/` → 503, GET → 405, danh mục hành chính 200.
+  Test lô tuần tự 4184 OK; QA lô (Sonnet) APPROVED `04-qa-report-vietmap.md`. **Chưa làm:** `load_shop_content --publish` bỏ qua
+  `quyen-rieng-tu` vì trang đã sửa tay trên staging (cùng 12 trang khác) → trang chính sách staging còn đoạn Google; khi bật key thì
+  sửa đoạn đó ở màn Nội dung ERP (câu ở `05-phap-ly.md` §1.2c-A) hoặc Duy cho chạy `--overwrite` (ghi đè cả 13 trang). Chưa đặt
+  `VIETMAP_API_KEY` (chờ Duy đăng ký). QA tổng (Opus) chạy sau khi có key.
