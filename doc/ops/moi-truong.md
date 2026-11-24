@@ -150,6 +150,7 @@ Các job đều idempotent (khoá dòng, chạy lại không làm hai lần). Lo
   NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app npm run build
   firebase deploy --only hosting --project keolai-63ec1
   ```
+- **Shop, Google Maps (SHOP-3-04, bật staging 24/11):** truyền thêm `NEXT_PUBLIC_GOOGLE_MAPS_KEY="$(gcloud secrets versions access latest --secret cangca-staging-google-maps-key --project keolai-63ec1)"` khi build staging. Key `cangca-maps-staging` chỉ chạy trên tên miền staging + `localhost:3000`, chỉ gọi Maps JavaScript, Places (mới), Geocoding. Production dùng key riêng (chưa tạo, chờ Duy duyệt). Thiếu biến thì nút "Bản đồ" mở hộp thoại gõ tay, không gọi Google. CSP trong `firebase*.json` mở `*.googleapis.com`, `*.gstatic.com`, `*.google.com` theo hướng dẫn CSP của Google Maps.
 - **ERP, cờ giao diện AI:** `NEXT_PUBLIC_AI_FEATURES` (đọc ở một chỗ, `erp-console/shared/lib/features.ts`). **Mặc định tắt**: vắng cờ hoặc giá trị khác "1" đều ẩn menu, trang `/ai/*`, khối Trợ lý AI và nút AI (SR-HIDE-AI-01). Build với `NEXT_PUBLIC_AI_FEATURES=1` để bật lại. Cờ chỉ ẩn giao diện, backend `AI_ENABLED` là việc riêng.
 - Sau khi build, grep thư mục `out/_next` để chắc bản build trỏ đúng URL. Thư mục `out/` đang chứa bản build nào thì deploy ra đúng bản đó.
 - Staging được gắn header `X-Robots-Tag: noindex, nofollow` qua `firebase.staging.json` để chặn máy tìm kiếm index; sau deploy kiểm bằng `curl -sI https://cangca-loc-staging.web.app/shop/ | grep -i x-robots-tag` và `https://cangca-erp-staging.web.app/`.
