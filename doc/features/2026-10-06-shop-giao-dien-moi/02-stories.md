@@ -435,20 +435,26 @@ Màn: `Checkout`, `DesktopCheckout`, `C2-Invalid`, `DesktopInvalid`, `X2-ShopPau
 | AC6 (C9) | API trả 409 `POLICY_CHANGED` | Bấm "Đặt hàng" | Dialog "Chính sách vừa cập nhật"; đóng thì ô đồng ý bỏ tick, 3 ô giữ nguyên chữ | BR-BH-17 |
 | AC7 (G2) | Đã nhập 3 ô | Tải lại trang, đọc `localStorage`/`sessionStorage`/URL | Không lưu tên, SĐT, địa chỉ ở đâu; URL không có query chứa chúng | Bất biến 9 |
 
-## SHOP-3-04 · Chọn địa chỉ bằng Google Maps (C1b, C1c, C5) · Must · fe-dev
-**Là** Khách, **tôi muốn** tìm hoặc ghim nhà trên bản đồ rồi tự điền địa chỉ, **để** shipper tìm đúng nhà.
-Bối cảnh: decisions 10/10; BR-BH-29; `05-phap-ly.md` §1.2b (dòng thông báo); S-07 (không nút "Vị trí của tôi"); L-10; COMPONENTS #8, #40. Biến `NEXT_PUBLIC_GOOGLE_MAPS_KEY` (tên chốt ở 02b). Không thêm thư viện loader nếu chưa hỏi.
-**Điểm dừng:** cần API key. Thiếu key thì làm và kiểm theo AC5 trước.
-Màn: `C1b-MapPicker`, `DesktopMapPicker`, `C1c-AddressFilled`, `C5-LocationDenied`.
+## SHOP-3-04 · Tìm địa chỉ bằng VietMap (C1b, C1c, C5) · Must · be-dev + fe-dev
+**Là** Khách, **tôi muốn** gõ vài chữ để tìm địa chỉ nhà rồi tự điền, **để** shipper tìm đúng nhà.
+Bối cảnh: decisions 24/11 (VietMap thay Google); 02b §1.9b (phương án A: tìm qua máy chủ Cá Về, không vẽ bản đồ, key chỉ ở máy
+chủ; **tạm theo A** chờ Duy xác nhận Q-VM-1 ở gate Orca trước khi lên thật); hồ sơ địa chỉ có cấu trúc Q-5; BR-BH-29;
+`05-phap-ly.md` §1.2c; S-07. Nhãn nút "Tìm địa chỉ" (🟡 techlead, mặc định). Bản Google cũ (10/10) bỏ.
+Màn: `C1b-MapPicker` (thành hộp tìm), `C1c-AddressFilled`, `C5-LocationDenied`.
 
 | Mã | Given | When | Then | BR |
 |---|---|---|---|---|
-| AC1 | Mở `/shop/checkout/`, ghi log mạng | Chưa bấm "Bản đồ" | **0** request tới `maps.googleapis.com`, `maps.gstatic.com` | BR-BH-29 |
-| AC2 | Mạng chậm | Bấm "Bản đồ" | Popup mở; dòng "Bản đồ do Google cung cấp. Chữ bạn gõ và vị trí bạn ghim sẽ được gửi tới Google. Không muốn dùng, bạn đóng lại và gõ địa chỉ trực tiếp." hiện **trước** khi script tải xong | BR-BH-29, §1.2b |
-| AC3 | Tìm "1 Đường Thử", chọn kết quả, bấm xác nhận | — | Ô địa chỉ điền chuỗi địa chỉ (C1c, nền `--good-soft`), khách sửa tay được; request tạo đơn **chỉ** có chuỗi `delivery_address`, không có `lat`, `lng`, `place_id` | BR-BH-29 |
-| AC4 | — | Tìm phần tử "Vị trí của tôi" / gọi `navigator.geolocation` trong mã nguồn | 0 kết quả | S-07 |
-| AC5 (lỗi) | Không có key / script lỗi / mạng chặn Google | Bấm "Bản đồ" | Dialog C5 báo không mở được bản đồ, nút đưa tiêu điểm về ô địa chỉ để gõ tay; form vẫn đặt được | |
-| AC6 (G5) | Popup bản đồ | Esc | Đóng, tiêu điểm về nút "Bản đồ", chữ đã có trong ô giữ nguyên | |
+| AC1 | Mở `/shop/checkout/`, ghi log mạng | Chưa bấm nút tìm địa chỉ | 0 request tới `/api/shop/address-*`, `maps.vietmap.vn`, `unpkg.com`, `maps.googleapis.com`, `maps.gstatic.com` | BR-BH-29 |
+| AC2 | Cờ bật, mạng chậm | Bấm nút | Hộp tìm mở; dòng thông báo VietMap (câu legal-vn chốt) hiện **trước** request tìm đầu tiên | BR-BH-29, §1.2b |
+| AC3 | Gõ "12 Tran", chọn gợi ý khớp danh mục, bấm "Dùng địa chỉ này" | — | Ô số nhà điền chuỗi (C1c, nền `--good-soft`), sửa tay được; banner có "Phường gợi ý: …" + nút "Dùng phường này"; tỉnh/phường **chưa đổi** tới khi khách bấm; request tạo đơn chỉ có `delivery_address_parts`, không có `lat`, `lng`, `place_id`, `ref`, `refid` | BR-BH-29, Q-5 |
+| AC3b (không khớp) | Gợi ý có phường không có trong danh mục Cá Về (API trả `suggestion: null`) | Bấm "Dùng địa chỉ này" | Ô số nhà được điền; banner "Bạn chọn tỉnh và phường/xã ở trên"; các ô tỉnh/phường giữ nguyên; không có nút "Dùng phường này" | Q-5 |
+| AC3c (Địa chỉ cũ) | Khách chọn kiểu "Địa chỉ cũ" | Tìm và chọn gợi ý | Request tìm gửi `scheme: "legacy"`; gợi ý khớp thì nút "Dùng phường này" điền đủ tỉnh → quận/huyện → phường/xã đúng thứ tự; đổi kiểu địa chỉ khi hộp đang mở xoá kết quả cũ | STA-02 |
+| AC4 | — | Tìm "Vị trí của tôi" / `navigator.geolocation` trong mã nguồn | 0 kết quả | S-07 |
+| AC5 (lỗi) | API tìm trả 503 (VietMap 401/423/429/hết giờ) hoặc mất mạng | Gõ để tìm | Hộp tìm đóng **trước**, Dialog C5 mở; nút đưa tiêu điểm về ô số nhà; form vẫn đặt được; lỗi lần hai trong phiên → lần bấm sau mở thẳng C5 | |
+| AC5b (quá nhanh) | API tìm trả 429 của Cá Về | Gõ tiếp | Dòng "Thao tác quá nhanh, thử lại sau vài giây" trong hộp tìm, hộp không đóng, không mở C5 | |
+| AC6 (G5) | Hộp tìm đang mở | Esc | Đóng, tiêu điểm về nút, chữ đã có trong ô giữ nguyên | |
+| AC7 (tắt) | Máy chủ chưa có key (`address_search_enabled` false) hoặc site-info lỗi | Mở bước đặt hàng | Không có nút tìm địa chỉ; form gõ tay đặt được | Q-5, decisions 24/11 |
+| AC8 (BE) | — | Gọi hai endpoint mới | Phản hồi không có toạ độ, `ref_id`, mã VietMap; log không có chữ gõ; GET → 405; chưa có key → 503 không gọi VietMap | bất biến 9 |
 
 ## SHOP-3-05 · Gửi đơn: hết hàng C3, lỗi mạng C4, quá nhanh C8, sang trang đơn · Must · fe-dev
 **Là** Khách, **tôi muốn** biết món nào vừa hết khi bấm đặt và thử lại an toàn khi mất mạng, **để** không mất đơn và không bị giữ hàng gấp đôi.
@@ -793,7 +799,7 @@ Bối cảnh: `HUONG-DAN-CODE.md` §6; luật QA đã siết (không PASS bằng
 | SHOP-3-01 | Tạo đơn trả dòng, mã tra đơn, chống trùng | Must | be-dev | 3+4 | 2-02 |
 | SHOP-3-02 | Tra đơn POST, gỡ 4 số cuối | Must | be-dev | 3+4 | 3-01 |
 | SHOP-3-03 | Form C1/C2, C7, C9 | Must | fe-dev | 3+4 | 2-06 · dòng khu vực **chặn bởi S-08** |
-| SHOP-3-04 | Google Maps C1b/C1c/C5 | Must | fe-dev | 3+4 | 3-03 · **điểm dừng API key** |
+| SHOP-3-04 | Tìm địa chỉ VietMap C1b/C1c/C5 | Must | be-dev + fe-dev | 3+4 | 3-03 · nút ẩn tới khi có key (Q-5) |
 | SHOP-3-05 | Gửi đơn C3/C4/C8, sang trang đơn | Must | fe-dev | 3+4 | 3-03; mock theo 3-01 |
 | SHOP-4-01 | Trang đơn = tra cứu F1/F2 | Must | fe-dev | 3+4 | mock theo 3-02 |
 | SHOP-4-02 | Thanh toán D1/D2/D6 | Must | fe-dev | 3+4 | 4-01 |
