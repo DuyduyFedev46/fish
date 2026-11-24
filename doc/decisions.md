@@ -294,3 +294,13 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 - **Địa chỉ giao không còn là một ô** (Duy 16/11, thay vế "Địa chỉ giao là một ô" ở mục 10/10 tối). Khách chọn **kiểu địa chỉ**: *Địa chỉ mới (sau sắp xếp 01/07/2025)* gồm tỉnh/thành → phường/xã, hoặc *Địa chỉ cũ (trước sắp xếp)* gồm tỉnh/thành → quận/huyện → phường/xã; rồi gõ số nhà, tên đường. Danh mục **đủ cả nước** cho cả hai kiểu, lưu tĩnh trong hệ thống. Các vế khác giữ: không lưu toạ độ, Maps chỉ nạp khi bấm. Đơn cũ giữ nguyên chuỗi.
 - Làm **dropdown trước**; vùng giao (phường nào giao được) và chặn khách ngoài vùng chưa chốt, làm sau. Hồ sơ `doc/features/2026-11-16-structured-address/`.
 - **Hãng giao (Ahamove/GHTK) và phí ship tạm dừng** (Duy 16/11): chưa có đối tác. Hồ sơ phân tích ở `doc/features/2026-11-16-shipping-partner/`, làm tiếp khi Lộc có tài khoản doanh nghiệp và khoá thử.
+
+## 2026-11-24 — Bản đồ ở bước đặt hàng đổi từ Google Maps sang VietMap — [DUY CHỐT]
+- **Nhà cung cấp bản đồ là VietMap** (Duy 24/11: "đăng ký vietmap rồi tiếp tục task"). Thay vế "nút mở Google Maps" ở mục 2026-10-10 (tối)
+  và chữ "Maps" ở mục 2026-11-16. Lý do: Google Maps Platform không nhận tài khoản thanh toán ở Việt Nam (thử ngày 24/11, lỗi
+  "Maps Platform unavailable in this region").
+- Các vế khác giữ nguyên: script bản đồ chỉ nạp khi khách bấm "Bản đồ"; không lưu toạ độ, không gửi `lat`/`lng` lên máy chủ;
+  không có nút "Vị trí của tôi"; nút "Bản đồ" ẩn tới khi có key (Q-5 của hồ sơ địa chỉ có cấu trúc); dòng thông báo bên thứ ba
+  hiện trước khi tải script; chính sách quyền riêng tư nêu VietMap thay Google.
+- Key VietMap do Duy đăng ký (tài khoản của Cá Về), lưu ở Secret Manager, không commit. Thiết kế chi tiết: phụ lục VietMap trong
+  `doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md` §1.9.
