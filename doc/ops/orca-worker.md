@@ -1,4 +1,4 @@
-# Điều phối bằng Orca: Opus 5.5 giao việc cho worker Gemini
+# Điều phối bằng Orca: Opus 5.5 giao việc cho worker Opus và Gemini
 
 ```mermaid
 flowchart TD
@@ -16,8 +16,11 @@ flowchart TD
 Duy chốt ngày 24/11/2026, làm giống dự án LiveTranscribe:
 
 - **Điều phối duy nhất** là Claude Code chạy model `claude-opus-5-5` trong Orca.
-- **Mọi vai** trong bảng ở `AGENTS.md` (PM, BA, PO, UX, Tech Lead viết thiết kế, Marketing, Pháp lý, BE, FE, QA, Shop UI,
-  image-scout) chạy dưới dạng **worker Orca**: agent `antigravity` (`agy`), model `gemini-4-carbon-high`.
+- **Mọi vai** trong bảng ở `AGENTS.md` chạy dưới dạng **worker Orca**, chia hai nhóm (Duy chốt 24/11):
+  - **Vai quan trọng → worker Claude Opus** (`--agent claude --model claude-opus-5-5`): `techlead`, `ba-analyst`, `po-owner`, `legal-vn`.
+    Sai ở đây là sai nghiệp vụ, giá vốn hoặc pháp lý, sửa về sau rất tốn.
+  - **Các vai còn lại → worker Gemini** (`--agent antigravity --model gemini-4-carbon-high`): `product-manager`,
+    `ux-designer`, `mkt-brand`, `be-dev`, `fe-dev`, `qa-tester`, `shop-ui-dev`, `shop-ui-qa`, `image-scout`.
 - Gemini **không làm điều phối** nữa. Bỏ `.agents/agents/`, `.gemini/commands/` và chế độ "ngang quyền".
 - Opus **tự review diff** ở các chỗ nhạy cảm: giá vốn, dữ liệu cá nhân, phân quyền, migration, thanh toán, webhook.
   Việc này không giao cho worker.
@@ -42,8 +45,10 @@ ORCA orchestration task-create --environment local --task-title "PO <slug>" --sp
 ORCA orchestration gate-create --task <task PO> --question "Duyệt phân tích BA <slug>? (tóm tắt + câu hỏi 🔴)" \
   --options '["duyet","sua-lai","dung"]'
 
-# giao cho worker Gemini; mỗi việc một worktree mới tách từ origin/main
-ORCA orchestration worker-start --environment local --task <task_id> --agent antigravity --model gemini-4-carbon-high \
+# giao worker; mỗi việc một worktree mới tách từ origin/main
+#   vai techlead, ba-analyst, po-owner, legal-vn: --agent claude --model claude-opus-5-5
+#   các vai còn lại:                             --agent antigravity --model gemini-4-carbon-high
+ORCA orchestration worker-start --environment local --task <task_id> --agent <agent> --model <model> \
   --worktree new-top-level --repo id:19653c71-270c-4299-8146-e6ff05e5e8c9 --base-branch origin/main --name claude-<slug>-<vai>
 ```
 
@@ -86,7 +91,8 @@ LUẬT WORKER CÁ VỀ (bắt buộc)
 6. Giá vốn và dữ liệu cá nhân khách (tên, SĐT, địa chỉ) không được lộ ra API công khai, log, prompt AI, test, tài liệu.
    Chỉ dùng dữ liệu giả.
 7. Git: chỉ commit trên nhánh của worktree mình, theo pathspec (`git add <file>`, `git commit -m "<mã story>: …" -- <file>`),
-   message tiếng Việt, dòng cuối `Co-Authored-By: Gemini 4 Carbon <noreply@google.com>`.
+   message tiếng Việt, dòng cuối `Co-Authored-By: Gemini 4 Carbon <noreply@google.com>` (worker Opus ghi
+   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
    Không push, không merge, không rebase, không `git add -A`. Không deploy, không gcloud, không đụng DB staging/production.
 8. Không kill tiến trình nào bạn không tự bật. Cổng 8000/3000/3100 bận thì báo, không tự giải phóng.
 9. Báo xong đúng một lần theo cách Orca ghi ở đầu prompt (worker_done), kèm danh sách file đã sửa. Body gồm:
@@ -134,7 +140,8 @@ Placement: this machine (local), the user named it.
 | Bước trong skill `feature` | Ai làm |
 |---|---|
 | Chọn luồng, nhận việc ở bảng việc, tạo Run/Task/gate | Opus |
-| PM, BA, PO (viết story và nghiệm thu), UX, Tech Lead viết 02b, Marketing, Pháp lý | worker Gemini theo vai |
+| BA, PO (viết story và nghiệm thu), Tech Lead viết 02b, Pháp lý | worker Claude Opus theo vai |
+| PM, UX, Marketing | worker Gemini theo vai |
 | BE, FE, UI review (đánh bóng), QA, Shop UI, image-scout | worker Gemini theo vai |
 | Tự chạy lại kiểm chứng, review diff chỗ nhạy cảm (bước 3c) | Opus |
 | Commit gộp, gộp `main`, push, deploy staging, cập nhật bảng việc và sheet | Opus |

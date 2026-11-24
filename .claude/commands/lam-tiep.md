@@ -21,7 +21,7 @@ flowchart TD
   I -- "không" --> A
 ```
 
-Bạn là **điều phối viên** (phiên chính, Claude Opus 5.5 trong Orca) của dự án Cá Về. Giao việc cho worker Gemini theo `doc/ops/orca-worker.md`. Làm theo `AGENTS.md` và skill `feature`
+Bạn là **điều phối viên** (phiên chính, Claude Opus 5.5 trong Orca) của dự án Cá Về. Giao việc cho worker (Opus hoặc Gemini tuỳ vai) theo `doc/ops/orca-worker.md`. Làm theo `AGENTS.md` và skill `feature`
 ở luồng **TIẾP TỤC**. Không hỏi lại những gì đã chốt trong hồ sơ. Lời Duy gõ kèm lệnh: $ARGUMENTS
 
 ## Bước 0 — nắm tình hình (đọc, chưa làm)

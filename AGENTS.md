@@ -1,4 +1,4 @@
-# Cá Về — luật chung cho mọi AI (Claude Code điều phối, worker Gemini qua Orca)
+# Cá Về — luật chung cho mọi AI (Claude Code điều phối, worker Opus và Gemini qua Orca)
 
 ```mermaid
 flowchart TD
@@ -28,12 +28,13 @@ Việt; AI xưng "em", gọi Duy là "anh", báo cáo ngắn kiểu tổng quan.
 (**đọc trước khi đụng code**).
 
 File này là **luật chung duy nhất**. Claude đọc qua `CLAUDE.md` (`@AGENTS.md`), worker Antigravity đọc trực tiếp.
-`CLAUDE.md` ghi phần riêng của điều phối viên, `GEMINI.md` ghi phần riêng của worker Gemini. Sửa luật chung thì sửa ở đây.
+`CLAUDE.md` ghi phần riêng của điều phối viên, `GEMINI.md` ghi phần riêng của worker Gemini (worker Claude theo mục worker trong `CLAUDE.md`). Sửa luật chung thì sửa ở đây.
 
 ## Điều phối bằng Orca (Duy chốt 2026-11-24, thay chế độ "ngang quyền" 15/11)
 
 **Một bộ não:** Claude Code chạy `claude-opus-5-5` trong Orca là điều phối viên duy nhất. Mọi vai trong đội chạy dưới dạng
-**worker Orca** `antigravity` (`agy`), model `gemini-4-carbon-high`. Gemini không làm điều phối nữa. Lệnh Orca, luật worker
+**worker Orca**: `techlead`, `ba-analyst`, `po-owner`, `legal-vn` là worker Claude `claude-opus-5-5`; các vai còn lại là worker `antigravity` (`agy`)
+`gemini-4-carbon-high`. Gemini không làm điều phối nữa. Lệnh Orca, luật worker
 và mẫu spec ở `doc/ops/orca-worker.md`.
 
 | Thứ | Nguồn duy nhất | Worker Gemini đọc ở |
@@ -84,8 +85,8 @@ thích/tra cứu, hoặc việc vận hành không đổi code (xem log, seed d�
 | QA | `qa-tester` | e2e-playwright, tdd-workflow | `04-qa-report.md` |
 | Shop UI dev / QA / ảnh | `shop-ui-dev`, `shop-ui-qa`, `image-scout` | caveve-ui, nextjs-shop-patterns, e2e-playwright | việc GUI-xx theo lệnh `/lam-shop-ui` |
 
-**Model:** điều phối và review chỗ nhạy cảm dùng `claude-opus-5-5`; mọi vai trong bảng trên là worker `agy`
-`gemini-4-carbon-high` (giao theo `doc/ops/orca-worker.md`). Dòng `model:` trong frontmatter vai chỉ dùng cho đường dự
+**Model:** điều phối, review chỗ nhạy cảm và 4 vai `techlead`, `ba-analyst`, `po-owner`, `legal-vn` dùng `claude-opus-5-5`; các vai còn lại là
+worker `agy` `gemini-4-carbon-high` (giao theo `doc/ops/orca-worker.md`). Dòng `model:` trong frontmatter vai chỉ dùng cho đường dự
 phòng (công cụ Agent của Claude khi Orca hỏng hoặc chạy trên cloud).
 
 **Quy trình một lô:**

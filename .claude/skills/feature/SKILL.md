@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → Review → QA → Deploy) bằng worker Orca (agy gemini-4-carbon-high) theo vai product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
+description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → Review → QA → Deploy) bằng worker Orca (Opus cho techlead/ba-analyst/po-owner/legal-vn, Gemini 4 Carbon cho các vai khác) theo vai product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
 argument-hint: "<yêu cầu bằng lời thường>"
 ---
 
@@ -65,7 +65,8 @@ Quy tắc khi phân vân:
   làm trực tiếp, không qua agent.
 
 Bạn (phiên chính, Claude Opus 5.5 trong Orca) là **điều phối viên duy nhất**. Mỗi chỗ dưới đây ghi "giao `<vai>`"
-nghĩa là tạo Task và chạy `orca orchestration worker-start --agent antigravity --model gemini-4-carbon-high` với spec theo
+nghĩa là tạo Task và chạy `orca orchestration worker-start` (vai `techlead`, `ba-analyst`, `po-owner`, `legal-vn`: `--agent claude --model claude-opus-5-5`;
+vai khác: `--agent antigravity --model gemini-4-carbon-high`) với spec theo
 mẫu `doc/ops/orca-worker.md` (dán Luật worker, trỏ tới `.claude/agents/<vai>.md`). Mỗi "ĐIỂM DỪNG" là một gate Orca
 (`gate-create`) chặn Task phía sau. Orca hỏng hoặc phiên chạy trên cloud: dùng công cụ Agent làm dự phòng. Worker không
 giao việc cho nhau, nên mọi lượt giao việc đều đi qua bạn. Bạn không tự viết code nghiệp vụ — bạn giao việc, kiểm
