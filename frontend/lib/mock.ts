@@ -4,7 +4,12 @@
 
 import {
   ApiError,
+  type AddressPlaceInput,
+  type AddressPlaceResponse,
   type AddressScheme,
+  type AddressSearchInput,
+  type AddressSearchItem,
+  type AddressSearchResponse,
   type AdministrativeLevel,
   type AdministrativeUnit,
   type AdministrativeUnitList,
@@ -583,6 +588,124 @@ export async function mockGetAdministrativeUnits(
     throw unitError({ level: "Cấp đơn vị chưa hợp lệ." });
   }
   return delay({ scheme, level, parent_code: level === "province" ? null : (parent ?? null), items });
+}
+
+// ---- Tìm địa chỉ giả lập (02b §1.9b.3, §1.9b.7): "12" → 2 kết quả (1 khớp 22945 ở current / 22915 ở legacy, 1 suggestion: null);
+// chữ `[VIETMAP-LOI]` → 503 ADDRESS_SEARCH_UNAVAILABLE; `[VIETMAP-NHANH]` → 429 throttled. Dữ liệu 100% giả.
+const ADDRESS_SEARCH_UNAVAILABLE_TEXT = "Chưa tìm được địa chỉ lúc này. Bạn gõ địa chỉ trực tiếp nhé.";
+
+function foldPlain(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+}
+
+export async function mockSearchAddress(input: AddressSearchInput): Promise<AddressSearchResponse> {
+  if (input.scheme !== "current" && input.scheme !== "legacy") {
+    throw unitError({ scheme: "Kiểu địa chỉ chưa hợp lệ." });
+  }
+  const text = (input.text ?? "").trim().replace(/\s+/g, " ");
+  if (text.length < 2 || text.length > 120) {
+    throw unitError({ text: "Từ khoá tìm địa chỉ cần từ 2 đến 120 ký tự." });
+  }
+  const upper = text.toUpperCase();
+  if (upper.includes("[VIETMAP-LOI]")) {
+    throw new ApiError(ADDRESS_SEARCH_UNAVAILABLE_TEXT, 503, "ADDRESS_SEARCH_UNAVAILABLE", {
+      code: "ADDRESS_SEARCH_UNAVAILABLE",
+      detail: ADDRESS_SEARCH_UNAVAILABLE_TEXT,
+    });
+  }
+  if (upper.includes("[VIETMAP-NHANH]")) {
+    throw new ApiError("Bạn thao tác quá nhanh. Vui lòng thử lại sau vài giây.", 429, "throttled");
+  }
+  const q = foldPlain(text);
+  const candidates: AddressSearchItem[] =
+    input.scheme === "legacy"
+      ? [
+          {
+            ref: "auto:mock-matched",
+            title: "12 Đường Trần Hưng Đạo",
+            subtitle: "Phường Hàm Tiến, Thành phố Phan Thiết, Tỉnh Bình Thuận",
+          },
+          {
+            ref: "auto:mock-unmatched",
+            title: "12 Đường Mẫu Khu Mới",
+            subtitle: "Phường Ngoài Danh Mục, Tỉnh Giả",
+          },
+        ]
+      : [
+          {
+            ref: "auto:mock-matched",
+            title: "12 Đường Trần Hưng Đạo",
+            subtitle: "Phường Phan Thiết, Tỉnh Lâm Đồng",
+          },
+          {
+            ref: "auto:mock-unmatched",
+            title: "12 Đường Mẫu Khu Mới",
+            subtitle: "Phường Ngoài Danh Mục, Tỉnh Giả",
+          },
+        ];
+  const results = candidates.filter((item) => foldPlain(`${item.title} ${item.subtitle}`).includes(q));
+  return delay({ results }, 120);
+}
+
+export async function mockGetAddressPlace(input: AddressPlaceInput): Promise<AddressPlaceResponse> {
+  if (input.scheme !== "current" && input.scheme !== "legacy") {
+    throw unitError({ scheme: "Kiểu địa chỉ chưa hợp lệ." });
+  }
+  if (!/^(auto|geocode):[A-Za-z0-9_\-+/=.:]{1,500}$/.test(input.ref ?? "")) {
+    throw unitError({ ref: "Mã địa điểm chưa hợp lệ." });
+  }
+  if (input.ref === "auto:mock-error") {
+    throw new ApiError(ADDRESS_SEARCH_UNAVAILABLE_TEXT, 503, "ADDRESS_SEARCH_UNAVAILABLE", {
+      code: "ADDRESS_SEARCH_UNAVAILABLE",
+      detail: ADDRESS_SEARCH_UNAVAILABLE_TEXT,
+    });
+  }
+  if (input.ref === "auto:mock-matched") {
+    if (input.scheme === "legacy") {
+      return delay(
+        {
+          street: "12 Đường Trần Hưng Đạo",
+          display: "12 Đường Trần Hưng Đạo, Phường Hàm Tiến, Thành phố Phan Thiết, Tỉnh Bình Thuận",
+          suggestion: {
+            scheme: "legacy",
+            province_code: "60",
+            district_code: "593",
+            ward_code: "22915",
+            ward_name: "Phường Hàm Tiến",
+          },
+        },
+        100
+      );
+    }
+    return delay(
+      {
+        street: "12 Đường Trần Hưng Đạo",
+        display: "12 Đường Trần Hưng Đạo, Phường Phan Thiết, Tỉnh Lâm Đồng",
+        suggestion: {
+          scheme: "current",
+          province_code: "68",
+          district_code: null,
+          ward_code: "22945",
+          ward_name: "Phường Phan Thiết",
+        },
+      },
+      100
+    );
+  }
+  return delay(
+    {
+      street: "12 Đường Mẫu Khu Mới",
+      display: "12 Đường Mẫu Khu Mới, Phường Ngoài Danh Mục, Tỉnh Giả",
+      suggestion: null,
+    },
+    100
+  );
 }
 
 /** Kiểm `delivery_address_parts` như máy chủ (02b §2.2): trả lỗi theo khoá request, rỗng nếu hợp lệ. */

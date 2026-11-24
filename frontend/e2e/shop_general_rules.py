@@ -765,6 +765,402 @@ with sync_playwright() as p:
             (banner_img_el.count(), page10_img.locator("h1").count()),
         )
         ctx10_img.close()
+
+        # --- SHOP-3-04 (02b §1.9b): Tìm địa chỉ VietMap qua máy chủ Cá Về (AC1–AC7)
+        cors_post = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Content-Type": "application/json; charset=utf-8",
+        }
+        forbidden_domains = ("maps.vietmap.vn", "unpkg.com", "googleapis.com", "maps.gstatic.com")
+        forbidden_order_keys = {"lat", "lng", "latitude", "longitude", "place_id", "ref", "refid", "ref_id"}
+        expected_notice = (
+            "Gợi ý địa chỉ do VietMap cung cấp. Chữ bạn gõ được máy chủ Cá Về chuyển tới VietMap để tìm địa chỉ, "
+            "không kèm họ tên hay số điện thoại. Không muốn dùng, bạn đóng lại và gõ địa chỉ trực tiếp."
+        )
+        cart_one = [{"item_code": "CA-THU", "name": "Cá thu", "unit": "kg", "price": "165000", "qty": 1}]
+
+        def fulfill_cors(route, status, payload):
+            if route.request.method == "OPTIONS":
+                route.fulfill(status=204, headers=cors_post, body="")
+                return
+            route.fulfill(status=status, headers=cors_post, body=json.dumps(payload, ensure_ascii=False))
+
+        # AC7a: mặc định máy chủ chưa có VIETMAP_API_KEY -> không hiện nút tìm địa chỉ
+        ctx_off = browser.new_context(viewport={"width": width, "height": 844 if width < 600 else 800})
+        page_off = ctx_off.new_page()
+        watch_off = PageWatch(page_off)
+        page_off.goto(SHOP + "/shop/orders/")
+        page_off.wait_for_load_state("networkidle")
+        page_off.evaluate(set_cart_js, cart_one)
+        goto(page_off, "/shop/checkout/", 800)
+        page_off.locator("#f-addr").wait_for(timeout=10000)
+        R.ok(
+            f"SHOP-3-04 AC7 [{width}] cờ tắt (máy chủ chưa có key) → ẩn nút 'Tìm địa chỉ'",
+            page_off.get_by_role("button", name="Tìm địa chỉ giao hàng").count() == 0
+            and page_off.get_by_role("button", name="Tìm địa chỉ").count() == 0,
+        )
+        ctx_off.close()
+
+        # AC7b: site-info lỗi (500) -> cũng ẩn nút tìm địa chỉ, form vẫn hiện
+        ctx_siter = browser.new_context(viewport={"width": width, "height": 844 if width < 600 else 800})
+        ctx_siter.route(
+            re.compile(r".*/api/public/site-info/?$"),
+            lambda route: fulfill_cors(route, 500, {"detail": "Server error"}),
+        )
+        page_siter = ctx_siter.new_page()
+        page_siter.goto(SHOP + "/shop/orders/")
+        page_siter.wait_for_load_state("networkidle")
+        page_siter.evaluate(set_cart_js, cart_one)
+        goto(page_siter, "/shop/checkout/", 800)
+        page_siter.locator("#f-addr").wait_for(timeout=10000)
+        R.ok(
+            f"SHOP-3-04 AC7 [{width}] site-info lỗi → ẩn nút 'Tìm địa chỉ', ô địa chỉ gõ tay vẫn dùng được",
+            page_siter.get_by_role("button", name="Tìm địa chỉ giao hàng").count() == 0
+            and page_siter.locator("#f-addr").is_visible(),
+        )
+        ctx_siter.close()
+
+        # AC1, AC2, AC3, AC3b, AC3c, AC6: cờ bật (page.route giả lập site-info + 2 endpoint Cá Về)
+        ctx_vm = browser.new_context(viewport={"width": width, "height": 844 if width < 600 else 800})
+        search_calls = []
+        place_calls = []
+        order_payloads = []
+        ctx_vm.route(
+            re.compile(r".*/api/public/site-info/?$"),
+            lambda route: fulfill_cors(route, 200, {**base_site_info, "address_search_enabled": True}),
+        )
+
+        def handle_address_search(route):
+            if route.request.method == "OPTIONS":
+                route.fulfill(status=204, headers=cors_post, body="")
+                return
+            data = json.loads(route.request.post_data or "{}")
+            search_calls.append((route.request.method, route.request.url, data))
+            scheme_req = data.get("scheme", "current")
+            sub = (
+                "Phường Mũi Né, Thành phố Phan Thiết, Tỉnh Bình Thuận"
+                if scheme_req == "legacy"
+                else "Phường Phan Thiết, Tỉnh Lâm Đồng"
+            )
+            fulfill_cors(
+                route,
+                200,
+                {
+                    "results": [
+                        {"ref": "auto:mock-matched", "title": "12 Đường Trần Hưng Đạo", "subtitle": sub},
+                        {"ref": "auto:mock-unmatched", "title": "12 Đường Mẫu Khu Mới", "subtitle": "Phường Ngoài Danh Mục, Tỉnh Giả"},
+                    ]
+                },
+            )
+
+        def handle_address_place(route):
+            if route.request.method == "OPTIONS":
+                route.fulfill(status=204, headers=cors_post, body="")
+                return
+            data = json.loads(route.request.post_data or "{}")
+            place_calls.append((route.request.method, route.request.url, data))
+            ref_val = data.get("ref")
+            scheme_req = data.get("scheme", "current")
+            if ref_val == "auto:mock-matched":
+                suggestion = (
+                    {
+                        "scheme": "legacy",
+                        "province_code": "60",
+                        "district_code": "593",
+                        "ward_code": "22915",
+                        "ward_name": "Phường Mũi Né",
+                    }
+                    if scheme_req == "legacy"
+                    else {
+                        "scheme": "current",
+                        "province_code": "68",
+                        "district_code": None,
+                        "ward_code": "22945",
+                        "ward_name": "Phường Phan Thiết",
+                    }
+                )
+                fulfill_cors(
+                    route,
+                    200,
+                    {
+                        "street": "12 Đường Trần Hưng Đạo",
+                        "display": f"12 Đường Trần Hưng Đạo, {suggestion['ward_name']}",
+                        "suggestion": suggestion,
+                    },
+                )
+                return
+            fulfill_cors(
+                route,
+                200,
+                {
+                    "street": "12 Đường Mẫu Khu Mới",
+                    "display": "12 Đường Mẫu Khu Mới, Phường Ngoài Danh Mục, Tỉnh Giả",
+                    "suggestion": None,
+                },
+            )
+
+        ctx_vm.route("**/api/shop/address-search/", handle_address_search)
+        ctx_vm.route("**/api/shop/address-place/", handle_address_place)
+        ctx_vm.route(
+            re.compile(r"https://(?!localhost).*sepay.*"),
+            lambda route: route.fulfill(status=200, content_type="text/html", body="<html><body>gateway stub</body></html>"),
+        )
+        page_vm = ctx_vm.new_page()
+        watch_vm = PageWatch(page_vm)
+        page_vm.on(
+            "request",
+            lambda r: order_payloads.append(json.loads(r.post_data or "{}"))
+            if r.url.rstrip("/").endswith("/api/shop/orders") and r.method == "POST"
+            else None,
+        )
+        page_vm.goto(SHOP + "/shop/orders/")
+        page_vm.wait_for_load_state("networkidle")
+        page_vm.evaluate(set_cart_js, cart_one)
+        goto(page_vm, "/shop/checkout/", 800)
+        find_btn = page_vm.get_by_role("button", name="Tìm địa chỉ giao hàng")
+        find_btn.wait_for(state="visible", timeout=10000)
+        btn_box = find_btn.bounding_box()
+        pre_click_bad = [
+            u for _, u, _ in watch_vm.requests
+            if "/api/shop/address-" in u or any(dom in u for dom in forbidden_domains)
+        ]
+        R.ok(
+            f"SHOP-3-04 AC1 [{width}] mở /shop/checkout/ chưa bấm nút: hiện nút 'Tìm địa chỉ' ≥44px và 0 request tới address-* hay domain bản đồ ngoài",
+            not pre_click_bad and btn_box is not None and btn_box["height"] >= 44 and "Tìm địa chỉ" in find_btn.inner_text(),
+            (pre_click_bad, btn_box),
+        )
+
+        # Điền chữ sẵn để kiểm Esc giữ nguyên (AC6)
+        page_vm.fill("#f-addr", "88 Đường Giữ Nguyên")
+        find_btn.click()
+        dlg_vm = page_vm.locator("dialog[open]")
+        dlg_vm.wait_for(state="visible", timeout=5000)
+        notice_el = dlg_vm.locator("#address-search-notice")
+        R.ok(
+            f"SHOP-3-04 AC2 [{width}] bấm nút: hộp tìm mở, dòng thông báo VietMap chuẩn hiện ngay trước request đầu tiên",
+            notice_el.is_visible()
+            and notice_el.inner_text().strip() == expected_notice
+            and len(search_calls) == 0
+            and len(place_calls) == 0,
+            (notice_el.inner_text() if notice_el.count() else "", len(search_calls)),
+        )
+        combo = dlg_vm.locator("input[role=combobox]")
+        combo.fill("1")
+        page_vm.wait_for_timeout(350)
+        R.ok(f"SHOP-3-04 AC2 [{width}] gõ 1 ký tự (<2) chưa gửi request tìm", len(search_calls) == 0, search_calls)
+
+        combo.fill("12")
+        dlg_vm.locator("[role=option]").first.wait_for(state="visible", timeout=5000)
+        R.ok(
+            f"SHOP-3-04 [{width}] gõ ≥2 ký tự: POST thân JSON (không đưa chữ gõ lên query string)",
+            len(search_calls) == 1
+            and search_calls[0][0] == "POST"
+            and "?" not in search_calls[0][1]
+            and search_calls[0][2] == {"scheme": "current", "text": "12"},
+            search_calls,
+        )
+        page_vm.keyboard.press("Escape")
+        page_vm.locator("dialog[open]").wait_for(state="detached", timeout=3000)
+        page_vm.wait_for_timeout(100)
+        focused_after_esc = page_vm.evaluate("document.activeElement?.getAttribute('aria-label') || ''")
+        R.ok(
+            f"SHOP-3-04 AC6 [{width}] bấm Esc: hộp đóng, tiêu điểm về nút 'Tìm địa chỉ giao hàng', chữ cũ trong ô số nhà giữ nguyên",
+            page_vm.locator("dialog[open]").count() == 0
+            and focused_after_esc == "Tìm địa chỉ giao hàng"
+            and page_vm.input_value("#f-addr") == "88 Đường Giữ Nguyên",
+            (focused_after_esc, page_vm.input_value("#f-addr")),
+        )
+
+        # AC3b: chọn gợi ý không khớp danh mục (suggestion: null)
+        find_btn.click()
+        dlg_vm.locator("input[role=combobox]").wait_for(state="visible")
+        dlg_vm.locator("input[role=combobox]").fill("12")
+        dlg_vm.locator("[role=option]").nth(1).click()
+        page_vm.wait_for_function("() => { const b = document.querySelector('dialog[open] footer button'); return !!b && !b.disabled; }")
+        dlg_vm.get_by_role("button", name="Dùng địa chỉ này").click()
+        page_vm.wait_for_timeout(450)
+        main_after_null = page_vm.inner_text("main")
+        R.ok(
+            f"SHOP-3-04 AC3b [{width}] gợi ý không khớp danh mục: điền số nhà, nhắc tự chọn tỉnh/phường, không có nút 'Dùng phường này'",
+            page_vm.input_value("#f-addr") == "12 Đường Mẫu Khu Mới"
+            and "Bạn chọn tỉnh và phường/xã ở trên" in main_after_null
+            and page_vm.get_by_role("button", name="Dùng phường này").count() == 0
+            and "Chọn tỉnh/thành phố" in page_vm.locator("#f-addr-province").inner_text(),
+            main_after_null[:300],
+        )
+        # Sửa tay ô số nhà -> banner mất
+        page_vm.fill("#f-addr", "12 Đường Mẫu Khu Mới, hẻm 1")
+        R.ok(
+            f"SHOP-3-04 [{width}] sửa tay ô số nhà → banner VietMap tự tắt",
+            "Đã điền số nhà từ VietMap" not in page_vm.inner_text("main"),
+        )
+
+        # AC3: chọn gợi ý khớp danh mục (current 68/22945) + bấm "Dùng phường này" + đặt đơn không lộ toạ độ/ref
+        find_btn.click()
+        dlg_vm.locator("input[role=combobox]").wait_for(state="visible")
+        dlg_vm.locator("input[role=combobox]").fill("12 Tran")
+        dlg_vm.locator("[role=option]").first.click()
+        page_vm.wait_for_function("() => { const b = document.querySelector('dialog[open] footer button'); return !!b && !b.disabled; }")
+        dlg_vm.get_by_role("button", name="Dùng địa chỉ này").click()
+        page_vm.wait_for_timeout(450)
+        main_before_apply = page_vm.inner_text("main")
+        use_ward_btn = page_vm.get_by_role("button", name="Dùng phường này")
+        R.ok(
+            f"SHOP-3-04 AC3 [{width}] sau 'Dùng địa chỉ này': điền số nhà, hiện 'Phường gợi ý: Phường Phan Thiết' + nút 'Dùng phường này', tỉnh/phường chưa tự đổi",
+            page_vm.input_value("#f-addr") == "12 Đường Trần Hưng Đạo"
+            and "Phường gợi ý: Phường Phan Thiết" in main_before_apply
+            and use_ward_btn.count() == 1
+            and "Chọn tỉnh/thành phố" in page_vm.locator("#f-addr-province").inner_text()
+            and page_vm.locator("#f-addr-ward").is_disabled(),
+            main_before_apply[:300],
+        )
+        use_ward_btn.click()
+        page_vm.wait_for_function("() => document.querySelector('#f-addr-ward')?.innerText.includes('Phường Phan Thiết')", timeout=5000)
+        R.ok(
+            f"SHOP-3-04 AC3 [{width}] bấm 'Dùng phường này': chọn đúng Tỉnh Lâm Đồng + Phường Phan Thiết, banner báo 'Phường đã khớp.'",
+            "Tỉnh Lâm Đồng" in page_vm.locator("#f-addr-province").inner_text()
+            and "Phường Phan Thiết" in page_vm.locator("#f-addr-ward").inner_text()
+            and "Phường đã khớp." in page_vm.inner_text("main")
+            and page_vm.get_by_role("button", name="Dùng phường này").count() == 0,
+        )
+        page_vm.fill("#f-name", FAKE_NAME)
+        page_vm.fill("#f-phone", f"09000008{width % 100:02d}")
+        if page_vm.locator("#f-consent").count():
+            page_vm.locator("#f-consent").check()
+        page_vm.get_by_role("button", name="Đặt hàng").click()
+        page_vm.wait_for_timeout(1500)
+        sent_order = order_payloads[-1] if order_payloads else {}
+        sent_keys = {k for _, k in keys_of(sent_order)}
+        R.ok(
+            f"SHOP-3-04 AC3 [{width}] request tạo đơn chỉ gửi delivery_address_parts chuẩn, không có lat/lng/place_id/ref/refid",
+            sent_order.get("delivery_address_parts")
+            == {
+                "scheme": "current",
+                "province_code": "68",
+                "district_code": None,
+                "ward_code": "22945",
+                "street": "12 Đường Trần Hưng Đạo",
+            }
+            and not (sent_keys & forbidden_order_keys)
+            and "delivery_address" not in sent_order,
+            (sent_order, sent_keys & forbidden_order_keys),
+        )
+
+        # AC3c: kiểu "Địa chỉ cũ" (legacy) gửi scheme="legacy" và điền đủ tỉnh → quận/huyện → phường/xã
+        page_vm.goto(SHOP + "/shop/orders/")
+        page_vm.wait_for_load_state("networkidle")
+        page_vm.evaluate(set_cart_js, cart_one)
+        goto(page_vm, "/shop/checkout/", 800)
+        page_vm.get_by_label("Địa chỉ cũ (trước sắp xếp)").check()
+        page_vm.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+        dlg_vm.locator("input[role=combobox]").wait_for(state="visible")
+        dlg_vm.locator("input[role=combobox]").fill("12")
+        dlg_vm.locator("[role=option]").first.click()
+        page_vm.wait_for_function("() => { const b = document.querySelector('dialog[open] footer button'); return !!b && !b.disabled; }")
+        dlg_vm.get_by_role("button", name="Dùng địa chỉ này").click()
+        page_vm.wait_for_timeout(450)
+        page_vm.get_by_role("button", name="Dùng phường này").click()
+        page_vm.wait_for_function("() => document.querySelector('#f-addr-ward')?.innerText.includes('Phường Mũi Né')", timeout=5000)
+        R.ok(
+            f"SHOP-3-04 AC3c [{width}] kiểu Địa chỉ cũ: gửi scheme='legacy' và 'Dùng phường này' điền Tỉnh Bình Thuận → Thành phố Phan Thiết → Phường Mũi Né",
+            search_calls[-1][2].get("scheme") == "legacy"
+            and place_calls[-1][2].get("scheme") == "legacy"
+            and "Tỉnh Bình Thuận" in page_vm.locator("#f-addr-province").inner_text()
+            and "Thành phố Phan Thiết" in page_vm.locator("#f-addr-district").inner_text()
+            and "Phường Mũi Né" in page_vm.locator("#f-addr-ward").inner_text(),
+        )
+        ext_hits_vm = [u for _, u, _ in watch_vm.requests if any(dom in u for dom in forbidden_domains)]
+        R.ok(
+            f"SHOP-3-04 AC1 [{width}] log mạng suốt luồng tìm địa chỉ: 0 request tới maps.vietmap.vn, unpkg.com, googleapis.com",
+            not ext_hits_vm and not watch_vm.console_errors(),
+            (ext_hits_vm, watch_vm.console_errors()[:2]),
+        )
+        ctx_vm.close()
+
+        # AC5b (429 trong hộp) và AC5 (503 hai lần → lần 3 mở thẳng C5)
+        ctx_err = browser.new_context(viewport={"width": width, "height": 844 if width < 600 else 800})
+        err_mode = {"status": 429, "calls": 0}
+        ctx_err.route(
+            re.compile(r".*/api/public/site-info/?$"),
+            lambda route: fulfill_cors(route, 200, {**base_site_info, "address_search_enabled": True}),
+        )
+
+        def handle_err_search(route):
+            if route.request.method == "OPTIONS":
+                route.fulfill(status=204, headers=cors_post, body="")
+                return
+            err_mode["calls"] += 1
+            if err_mode["status"] == 429:
+                fulfill_cors(route, 429, {"code": "throttled", "detail": "Request was throttled."})
+            else:
+                fulfill_cors(
+                    route,
+                    503,
+                    {
+                        "code": "ADDRESS_SEARCH_UNAVAILABLE",
+                        "detail": "Chưa tìm được địa chỉ lúc này. Bạn gõ địa chỉ trực tiếp nhé.",
+                    },
+                )
+
+        ctx_err.route("**/api/shop/address-search/", handle_err_search)
+        page_err = ctx_err.new_page()
+        page_err.goto(SHOP + "/shop/orders/")
+        page_err.wait_for_load_state("networkidle")
+        page_err.evaluate(set_cart_js, cart_one)
+        goto(page_err, "/shop/checkout/", 800)
+        page_err.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+        page_err.locator("dialog[open] input[role=combobox]").fill("12")
+        page_err.wait_for_timeout(500)
+        dlg_429_text = page_err.locator("dialog[open]").inner_text()
+        R.ok(
+            f"SHOP-3-04 AC5b [{width}] 429 của Cá Về: hiện 'Thao tác quá nhanh, thử lại sau vài giây' ngay trong hộp, không đóng hộp, không mở C5",
+            page_err.locator("dialog[open]").count() == 1
+            and "Thao tác quá nhanh, thử lại sau vài giây" in dlg_429_text
+            and page_err.locator("dialog[open] input[role=combobox]").count() == 1,
+            dlg_429_text[:250],
+        )
+        page_err.keyboard.press("Escape")
+        page_err.locator("dialog[open]").wait_for(state="detached", timeout=3000)
+        page_err.wait_for_timeout(100)
+
+        # Chuyển sang 503: lỗi lần 1 -> đóng hộp tìm, mở C5; bấm Nhập tay đưa tiêu điểm về #f-addr
+        err_mode["status"] = 503
+        page_err.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+        page_err.locator("dialog[open] input[role=combobox]").fill("12")
+        page_err.wait_for_timeout(900)
+        R.ok(
+            f"SHOP-3-04 AC5 [{width}] 503 lần 1: hộp tìm đóng trước rồi mở C5 (đúng 1 dialog mở, không chồng modal)",
+            page_err.locator("dialog[open]").count() == 1
+            and page_err.locator("dialog[open] input[role=combobox]").count() == 0
+            and "Chưa tìm được địa chỉ" in page_err.locator("dialog[open]").inner_text()
+            and "Nhập tay" in page_err.locator("dialog[open]").inner_text(),
+        )
+        page_err.locator("dialog[open]").get_by_role("button", name="Nhập tay").click()
+        page_err.wait_for_timeout(450)
+        R.ok(
+            f"SHOP-3-04 AC5 [{width}] đóng C5 đưa tiêu điểm về ô số nhà (#f-addr)",
+            page_err.evaluate("document.activeElement?.id || ''") == "f-addr",
+        )
+
+        # Lỗi lần 2 trong phiên -> lần bấm thứ 3 mở thẳng C5
+        page_err.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+        page_err.locator("dialog[open] input[role=combobox]").fill("12")
+        page_err.wait_for_timeout(900)
+        page_err.locator("dialog[open]").get_by_role("button", name="Nhập tay").click()
+        page_err.wait_for_timeout(450)
+        calls_before_third = err_mode["calls"]
+        page_err.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+        page_err.wait_for_timeout(400)
+        R.ok(
+            f"SHOP-3-04 AC5 [{width}] sau 2 lần lỗi 503 trong phiên: lần bấm thứ 3 mở thẳng C5, không mở lại hộp tìm",
+            page_err.locator("dialog[open]").count() == 1
+            and page_err.locator("dialog[open] input[role=combobox]").count() == 0
+            and err_mode["calls"] == calls_before_third,
+            (err_mode["calls"], calls_before_third),
+        )
+        ctx_err.close()
     browser.close()
 
 # ============================================================ G7, G8 (grep)
@@ -797,4 +1193,8 @@ R.ok("G8 component tra đơn cũ (đúng tên, có ranh giới từ) không còn
      not [l for l in strict if not l.startswith("./README.md")], strict[:3])
 R.ok("G8 (ghi nhận) grep rộng chỉ còn khớp tên kiểu contract hiện hành (…Result/…Input) và dòng lịch sử trong README",
      all(re.search(old_lookup + r"(Result|Input)", l) or l.startswith("./README.md") for l in broad), broad[:3])
+geo_patterns = ["navigator." + "geolocation", "Vị trí " + "của tôi", "maps." + "googleapis", "GOOGLE_" + "MAPS", "maps." + "vietmap.vn", "unpkg" + ".com"]
+geo_hits = {pat: grep(pat, ["components", "app", "features", "lib"]) for pat in geo_patterns}
+R.ok("SHOP-3-04 AC4 không có Geolocation, 'Vị trí của tôi', Google Maps hay CDN bản đồ ngoài trong mã nguồn FE",
+     not any(geo_hits.values()), {k: v[:3] for k, v in geo_hits.items() if v})
 R.finish()

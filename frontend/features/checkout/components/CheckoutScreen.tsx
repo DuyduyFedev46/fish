@@ -13,7 +13,7 @@ import { ApiError, USE_MOCK, checkVoucher, createOrder, getCatalog, startCheckou
 import { formatPriceVnd } from "@/lib/format";
 import { parseQtyRule, qtyToApiString, formatQty } from "@/lib/quantity";
 import { contactTarget } from "@/components/shopLinks";
-import type { CreateOrderPayload, OutOfStockLine } from "@/lib/types";
+import type { AddressUnitSuggestion, CreateOrderPayload, OutOfStockLine } from "@/lib/types";
 import { getPrivacyPolicy, getSiteInfo } from "@/features/site/api";
 import type { PrivacyPolicyResponse, SiteInfoResponse } from "@/features/site/types";
 import { pickHotline } from "@/lib/phone";
@@ -37,7 +37,7 @@ import { cartFingerprint, clearRequestId, getRequestId, renewRequestId } from ".
 import { saveLookupToken } from "../lookupToken";
 import { goToMockGateway, redirectToGateway } from "../gateway";
 import { orderUrl } from "../afterCreate";
-import { shouldOpenFallbackDirectly } from "../googleMaps";
+import { isAddressSearchEnabled, shouldOpenFallbackDirectly } from "../addressSearch";
 import {
   INITIAL_SELECTION,
   STREET_MAX,
@@ -54,7 +54,7 @@ import {
   type FormField,
 } from "../formRules";
 import AddressField from "./AddressField";
-import AddressMapPicker from "./AddressMapPicker";
+import AddressSearchSheet, { type AddressSearchConfirmResult } from "./AddressSearchSheet";
 import PaymentChoice from "./PaymentChoice";
 import SoldOutSheet, { type SoldOutLine } from "./SoldOutSheet";
 import s from "./CheckoutScreen.module.css";
@@ -136,6 +136,8 @@ function CheckoutForm() {
   const [mapOpen, setMapOpen] = useState(false);
   const [mapFailedOpen, setMapFailedOpen] = useState(false);
   const [filledFromMap, setFilledFromMap] = useState(false);
+  const [wardSuggestion, setWardSuggestion] = useState<AddressUnitSuggestion | null>(null);
+  const addressSearchEnabled = isAddressSearchEnabled(siteInfo);
 
   const [soldOut, setSoldOut] = useState<SoldOutLine[] | null>(null);
   const [networkOpen, setNetworkOpen] = useState(false);
@@ -424,26 +426,40 @@ function CheckoutForm() {
     void send();
   }
 
-  // ---- Bản đồ (3-04) ----
+  // ---- Tìm địa chỉ VietMap qua máy chủ Cá Về (SHOP-3-04, 02b §1.9b) ----
   function openMap() {
-    // Thiếu key (hoặc đã lỗi hai lần): mở thẳng C5, không tạo thẻ script, không request tới Google.
+    if (!addressSearchEnabled) return;
+    // Đã lỗi 503/mạng hai lần trong phiên: mở thẳng C5, không mở lại hộp tìm (02b §1.9b.5, AC5).
     if (shouldOpenFallbackDirectly()) setMapFailedOpen(true);
     else setMapOpen(true);
   }
 
   function onMapFailed() {
-    // Đóng hộp thoại bản đồ trước rồi mới mở C5 (không chồng hai modal).
+    // Đóng hộp tìm trước rồi mới mở C5 (không chồng hai modal).
     setMapOpen(false);
     window.setTimeout(() => setMapFailedOpen(true), 320);
   }
 
-  function onMapConfirm(addr: string) {
-    setStreet(addr.slice(0, STREET_MAX)); // bản đồ chỉ điền ô số nhà; khách vẫn chọn các cấp bằng danh mục
+  function onMapConfirm(result: AddressSearchConfirmResult) {
+    setStreet(result.street.slice(0, STREET_MAX)); // chỉ điền ô số nhà; tỉnh/phường chỉ đổi khi khách bấm "Dùng phường này" (Q-5, AC3)
     setFilledFromMap(true);
+    setWardSuggestion(result.suggestion);
     setFieldError("street", undefined);
     setMapOpen(false);
-    // Hộp thoại trả tiêu điểm về nút Bản đồ khi đóng xong; ta vào ô địa chỉ sau đó (con trỏ cuối chuỗi).
+    // Hộp tìm trả tiêu điểm về nút khi đóng xong; ta đưa vào cuối ô số nhà sau đó.
     window.setTimeout(focusAddressEnd, 320);
+  }
+
+  function applyWardSuggestion() {
+    if (!wardSuggestion) return;
+    // Đúng thứ tự xoá cấp con trong formRules: selectScheme → selectProvince → [selectDistrict] → selectWard (02b §1.9b.4, AC3c).
+    let next = selectScheme(selection, wardSuggestion.scheme);
+    next = selectProvince(next, wardSuggestion.province_code);
+    if (wardSuggestion.scheme === "legacy") {
+      next = selectDistrict(next, wardSuggestion.district_code ?? "");
+    }
+    next = selectWard(next, wardSuggestion.ward_code);
+    changeSelection(next);
   }
 
   function closeMapFailed() {
@@ -581,7 +597,10 @@ function CheckoutForm() {
               <section className={s.section}>
                 <AddressField
                   selection={selection}
-                  onScheme={(v) => changeSelection(selectScheme(selection, v))}
+                  onScheme={(v) => {
+                    if (v !== selection.scheme) setWardSuggestion(null);
+                    changeSelection(selectScheme(selection, v));
+                  }}
                   onProvince={(v) => changeSelection(selectProvince(selection, v))}
                   onDistrict={(v) => changeSelection(selectDistrict(selection, v))}
                   onWard={(v) => changeSelection(selectWard(selection, v))}
@@ -589,11 +608,15 @@ function CheckoutForm() {
                   onStreet={(v) => {
                     setStreet(v);
                     setFilledFromMap(false);
+                    setWardSuggestion(null);
                     recheck("street", { name, phone, street: v, selection });
                   }}
                   onStreetBlur={() => checkOnBlur("street")}
                   errors={errors}
                   filledFromMap={filledFromMap}
+                  wardSuggestion={wardSuggestion}
+                  onApplyWardSuggestion={applyWardSuggestion}
+                  addressSearchEnabled={addressSearchEnabled}
                   readOnly={submitting}
                   onOpenMap={openMap}
                 />
@@ -652,16 +675,22 @@ function CheckoutForm() {
         </div>
       </div>
 
-      <AddressMapPicker open={mapOpen} onClose={() => setMapOpen(false)} onConfirm={onMapConfirm} onLoadFailed={onMapFailed} />
+      <AddressSearchSheet
+        open={mapOpen}
+        scheme={selection.scheme}
+        onClose={() => setMapOpen(false)}
+        onConfirm={onMapConfirm}
+        onSearchFailed={onMapFailed}
+      />
 
-      {/* C5: bản đồ không mở được. Một nút; mọi cách đóng đưa tiêu điểm vào ô địa chỉ. */}
+      {/* C5: chưa tìm được địa chỉ (02b §1.9b, phương án A không có bản đồ). Một nút; mọi cách đóng đưa tiêu điểm vào ô số nhà. */}
       <Dialog
         open={mapFailedOpen}
         onClose={closeMapFailed}
-        title="Chưa mở được bản đồ"
-        description="Bạn gõ địa chỉ vào ô, vẫn đặt hàng bình thường."
+        title="Chưa tìm được địa chỉ"
+        description="Bạn gõ địa chỉ trực tiếp vào ô số nhà, vẫn đặt hàng bình thường."
         kind="alert"
-        icon={{ name: "map", tone: "warn" }}
+        icon={{ name: "map-pin", tone: "warn" }}
         closeLabel="Đóng, nhập địa chỉ bằng tay"
         actions={
           <Button size="lg" fullWidth data-autofocus onClick={closeMapFailed}>

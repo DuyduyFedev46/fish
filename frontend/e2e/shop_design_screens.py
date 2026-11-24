@@ -7,7 +7,7 @@ render file `screens/*.dc.html` cùng khổ, ghép ảnh cạnh nhau (trái = th
 `shots/lo7/screens/<mã>-<khổ>-sbs.png`, và tự kiểm: không cuộn ngang, không lỗi JS, cụm chữ của thiết kế (bỏ ô [..] và số)
 có mặt trên trang. Kết luận PASS/FAIL về bố cục/câu chữ/trạng thái do người xem ảnh ghi (QA), không do kịch bản tự chấm.
 
-Màn không dựng được: C1b/C1c (bản đồ cần khoá Google Maps), D5/DesktopUnderpaid (chuyển thiếu tiền, "không code V1"),
+Màn không dựng được: D5/DesktopUnderpaid (chuyển thiếu tiền, "không code V1"),
 E6 và 2 bảng HeaderFooter (đặc tả, không phải màn).  Kết quả ghi ở `result-design_screens.json` và `screens/manifest.json`.
 """
 import datetime as dt
@@ -84,6 +84,7 @@ manage_shell(
 run_expiry_job()   # FX['expired'] -> AUTO_CANCELLED
 
 CATALOG = api("GET", "/api/shop/catalog/")[1]["items"]
+SITE_INFO = api("GET", "/api/public/site-info/")[1]
 POST_SLUG = None
 st, ents = api("GET", "/api/public/content/entries/?kind=post")
 if st == 200:
@@ -134,6 +135,81 @@ def fill_form(page, phone=FAKE_PHONE):
 def to_checkout(page, lines):
     set_cart(page, lines)
     goto(page, "/shop/checkout/", 900)
+
+
+CORS_JSON = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    "Content-Type": "application/json; charset=utf-8",
+}
+
+
+def fulfill_json(route, status, payload):
+    if route.request.method == "OPTIONS":
+        route.fulfill(status=204, headers=CORS_JSON, body="")
+        return
+    route.fulfill(status=status, headers=CORS_JSON, body=json.dumps(payload, ensure_ascii=False))
+
+
+def stub_vietmap(page, *, fail=False):
+    """Giả lập site-info có `address_search_enabled: true` và hai endpoint tìm địa chỉ của Cá Về (02b §1.9b.7)."""
+    page.route(
+        re.compile(r".*/api/public/site-info/?$"),
+        lambda r: fulfill_json(r, 200, {**SITE_INFO, "address_search_enabled": True}),
+    )
+    if fail:
+        page.route(
+            "**/api/shop/address-search/",
+            lambda r: fulfill_json(
+                r,
+                503,
+                {
+                    "code": "ADDRESS_SEARCH_UNAVAILABLE",
+                    "detail": "Chưa tìm được địa chỉ lúc này. Bạn gõ địa chỉ trực tiếp nhé.",
+                },
+            ),
+        )
+        return
+    page.route(
+        "**/api/shop/address-search/",
+        lambda r: fulfill_json(
+            r,
+            200,
+            {
+                "results": [
+                    {
+                        "ref": "auto:mock-matched",
+                        "title": "12 Đường Trần Hưng Đạo",
+                        "subtitle": "Phường Phan Thiết, Tỉnh Lâm Đồng",
+                    },
+                    {
+                        "ref": "auto:mock-unmatched",
+                        "title": "12 Đường Mẫu Khu Mới",
+                        "subtitle": "Phường Ngoài Danh Mục, Tỉnh Giả",
+                    },
+                ]
+            },
+        ),
+    )
+    page.route(
+        "**/api/shop/address-place/",
+        lambda r: fulfill_json(
+            r,
+            200,
+            {
+                "street": "12 Đường Trần Hưng Đạo",
+                "display": "12 Đường Trần Hưng Đạo, Phường Phan Thiết, Tỉnh Lâm Đồng",
+                "suggestion": {
+                    "scheme": "current",
+                    "province_code": "68",
+                    "district_code": None,
+                    "ward_code": "22945",
+                    "ward_name": "Phường Phan Thiết",
+                },
+            },
+        ),
+    )
 
 
 STD_CART = lambda: [cart_line("CA-THU", 1.5), cart_line("COMBO-BEP-NHA", 1), cart_line("MUC-ONG", 1)]
@@ -245,14 +321,33 @@ def _(c):
 @screen("C1", "Happy · Thông tin nhận hàng", "Checkout", M, "viewport")
 def _(c): to_checkout(c.page, STD_CART()); return c.page
 
-@screen("C1b", "[Popup] Chọn vị trí trên Google Maps", "C1b-MapPicker", M, "viewport", "needs-maps-key")
+@screen("C1b", "[Popup] Tìm địa chỉ VietMap", "C1b-MapPicker", M, "viewport")
 def _(c):
+    stub_vietmap(c.page)
     to_checkout(c.page, STD_CART())
-    c.page.get_by_role("button", name=re.compile("Tìm và chọn địa chỉ")).click(); c.page.wait_for_timeout(1200)
+    c.page.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+    box = c.page.locator("dialog[open] input[role=combobox]")
+    box.wait_for(state="visible")
+    box.fill("12")
+    c.page.locator("dialog[open] [role=option]").first.wait_for(state="visible")
+    c.page.wait_for_timeout(300)
     return c.page
 
-@screen("C1c", "Happy · Địa chỉ tự điền từ bản đồ", "C1c-AddressFilled", M, "viewport", "needs-maps-key")
-def _(c): return None
+@screen("C1c", "Happy · Địa chỉ tự điền từ VietMap", "C1c-AddressFilled", M, "viewport")
+def _(c):
+    stub_vietmap(c.page)
+    to_checkout(c.page, STD_CART())
+    c.page.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+    box = c.page.locator("dialog[open] input[role=combobox]")
+    box.wait_for(state="visible")
+    box.fill("12")
+    c.page.locator("dialog[open] [role=option]").first.click()
+    confirm = c.page.get_by_role("button", name="Dùng địa chỉ này")
+    confirm.wait_for(state="visible")
+    c.page.wait_for_function("() => { const b = document.querySelector('dialog[open] footer button'); return !!b && !b.disabled; }")
+    confirm.click()
+    c.page.wait_for_timeout(500)
+    return c.page
 
 @screen("C2", "Lỗi · Nhập thiếu / sai", "C2-Invalid", M, "viewport")
 def _(c):
@@ -278,10 +373,16 @@ def _(c):
     c.page.route("**/api/shop/orders/", lambda r: r.abort("internetdisconnected"))
     c.page.get_by_role("button", name="Đặt hàng").click(); c.page.wait_for_timeout(1500); return c.page
 
-@screen("C5", "[Popup] Không lấy được vị trí / bản đồ lỗi", "C5-LocationDenied", M, "viewport", "needs-maps-key")
+@screen("C5", "[Popup] Không tìm được địa chỉ / VietMap lỗi", "C5-LocationDenied", M, "viewport")
 def _(c):
+    stub_vietmap(c.page, fail=True)
     to_checkout(c.page, STD_CART())
-    c.page.get_by_role("button", name=re.compile("Tìm và chọn địa chỉ")).click(); c.page.wait_for_timeout(1200); return c.page
+    c.page.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+    box = c.page.locator("dialog[open] input[role=combobox]")
+    box.wait_for(state="visible")
+    box.fill("12")
+    c.page.wait_for_timeout(1100)
+    return c.page
 
 @screen("C6", "[Popup] Mã hết hiệu lực lúc đặt", "B8-VoucherInvalidAtOrder", M, "viewport")
 def _(c):
@@ -422,10 +523,17 @@ def _(c):
 @screen("DP2", "Máy tính · [Popup] Hết giờ giữ hàng", "DesktopModalExpired", D, "viewport")
 def _(c): return hold_runs_out(c)
 
-@screen("DP3", "Máy tính · [Popup] Chọn vị trí Google Maps", "DesktopMapPicker", D, "viewport", "needs-maps-key")
+@screen("DP3", "Máy tính · [Popup] Tìm địa chỉ VietMap", "DesktopMapPicker", D, "viewport")
 def _(c):
+    stub_vietmap(c.page)
     to_checkout(c.page, STD_CART())
-    c.page.get_by_role("button", name=re.compile("Tìm và chọn địa chỉ")).click(); c.page.wait_for_timeout(1200); return c.page
+    c.page.get_by_role("button", name="Tìm địa chỉ giao hàng").click()
+    box = c.page.locator("dialog[open] input[role=combobox]")
+    box.wait_for(state="visible")
+    box.fill("12")
+    c.page.locator("dialog[open] [role=option]").first.click()
+    c.page.wait_for_timeout(500)
+    return c.page
 
 @screen("DP4", "Máy tính · [Popup] Gợi ý khi gõ tìm", "DesktopSearchSuggest", D, "viewport")
 def _(c):
@@ -651,9 +759,9 @@ def main():
             if wanted and sid not in wanted:
                 continue
             row = {"id": sid, "label": label, "design": design, "width": width, "note": note}
-            if note in ("not-coded-v1", "spec-not-screen") or (note == "needs-maps-key" and sid in ("C1c",)):
-                why = {"not-coded-v1": "D5/Underpaid: chuyển thiếu tiền 'không code V1' (decisions)", "spec-not-screen": "E6 là bảng đặc tả, không phải màn",
-                       "needs-maps-key": "cần khoá Google Maps"}[note]
+            if note in ("not-coded-v1", "spec-not-screen"):
+                why = {"not-coded-v1": "D5/Underpaid: chuyển thiếu tiền 'không code V1' (decisions)",
+                       "spec-not-screen": "E6 là bảng đặc tả, không phải màn"}[note]
                 R.skip(f"{sid} {label}", why)
                 row["status"] = "skip"; row["why"] = why
                 MANIFEST.append(row)
@@ -662,8 +770,6 @@ def main():
             c = Ctx(browser, width)
             try:
                 page = fn(c)
-                if note == "needs-maps-key":
-                    pass
                 full = mode == "full"
                 png = OUT / f"{sid}-{width}.png"
                 page.screenshot(path=str(png), full_page=full)

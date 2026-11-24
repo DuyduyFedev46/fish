@@ -92,6 +92,42 @@ export type DeliveryAddressParts = {
   street: string;
 };
 
+// ---- Tìm địa chỉ VietMap qua máy chủ Cá Về (02b §1.9b.3, SHOP-3-04). Không có toạ độ hay mã nội bộ VietMap. ----
+
+export type AddressSearchInput = {
+  scheme: AddressScheme;
+  text: string;
+};
+
+export type AddressSearchItem = {
+  ref: string;
+  title: string;
+  subtitle: string;
+};
+
+export type AddressSearchResponse = {
+  results: AddressSearchItem[];
+};
+
+export type AddressUnitSuggestion = {
+  scheme: AddressScheme;
+  province_code: string;
+  district_code: string | null;
+  ward_code: string;
+  ward_name: string;
+};
+
+export type AddressPlaceInput = {
+  scheme: AddressScheme;
+  ref: string;
+};
+
+export type AddressPlaceResponse = {
+  street: string;
+  display: string;
+  suggestion: AddressUnitSuggestion | null;
+};
+
 export type CreateOrderPayload = {
   /** UUID sinh một lần khi mở form, giữ qua các lần "Thử lại" để không tạo đơn trùng (BR-BH-27). */
   client_request_id: string;

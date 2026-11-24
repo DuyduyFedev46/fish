@@ -1,14 +1,16 @@
 .body {
   display: flex;
   flex-direction: column;
+  width: 100%;
   height: 100%;
   min-height: 0;
 }
 
 .searchWrap {
-  position: relative;
   flex: none;
-  padding: var(--space-3) var(--space-4) var(--space-2);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
 }
 
 .search {
@@ -42,6 +44,10 @@
   outline: none;
 }
 
+.input::placeholder {
+  color: var(--ink-3);
+}
+
 .input::-webkit-search-cancel-button {
   display: none;
 }
@@ -56,49 +62,63 @@
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--ink-3);
+  color: var(--ink-2);
   cursor: pointer;
 }
 
 .notice {
   margin: var(--space-2) 0 0;
   color: var(--ink-2);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.45;
 }
 
-.list {
-  position: absolute;
-  top: calc(var(--space-3) + var(--h-input) + var(--space-1));
-  left: var(--space-4);
-  right: var(--space-4);
-  z-index: var(--z-popover);
-  max-height: 260px;
-  margin: 0;
-  padding: var(--space-1) 0;
+.resultsArea {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
   overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.bannerWrap {
+  flex: none;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
   list-style: none;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: var(--shadow-pop);
-}
-
-.list[hidden] {
-  display: none;
+  overflow: hidden;
 }
 
 .option {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  min-height: 48px;
+  min-height: 52px;
   padding: 10px var(--space-3);
-  color: var(--ink-3);
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
   cursor: pointer;
+  transition: background-color var(--dur-color) ease-out;
+}
+
+.option:last-child {
+  border-bottom: 0;
 }
 
 .optionActive {
+  background: var(--surface-2);
+}
+
+.optionSelected {
   background: var(--accent-soft);
 }
 
@@ -106,11 +126,27 @@
   .option:hover {
     background: var(--surface-2);
   }
+  .optionSelected:hover {
+    background: var(--accent-soft);
+  }
+}
+
+.optionIcon {
+  display: inline-flex;
+  flex: none;
+  margin-top: 2px;
+  color: var(--ink-3);
+}
+
+.optionSelected .optionIcon {
+  color: var(--accent-text);
 }
 
 .optionText {
   display: flex;
+  flex: 1;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -118,63 +154,55 @@
   color: var(--ink);
   font-size: 14px;
   font-weight: 600;
+  line-height: 1.35;
 }
 
 .optionSub {
   color: var(--ink-2);
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 400;
+  line-height: 1.4;
 }
 
-.mapArea {
-  position: relative;
-  flex: 1;
-  min-height: 220px;
-  background: var(--surface-3);
-}
-
-.map {
-  position: absolute;
-  inset: 0;
-}
-
-.loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface-3);
+.optionCheck {
+  display: inline-flex;
+  flex: none;
+  margin-top: 2px;
   color: var(--accent-text);
 }
 
-.pin {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+.state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  color: var(--accent);
-  transform: translate(-50%, -100%);
-  pointer-events: none;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-3);
+  color: var(--ink-2);
+  font-size: 14px;
+  text-align: center;
 }
 
-.pinLabel {
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  background: var(--ink);
-  color: var(--on-accent);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
+.stateTitle {
+  margin: 0;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stateSub {
+  max-width: 44ch;
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .footer {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  width: 100%;
 }
 
 .chosen {
@@ -188,15 +216,38 @@
   line-height: 1.45;
 }
 
-.chosen svg {
+.chosen > svg {
   flex: none;
-  margin-top: 1px;
+  margin-top: 2px;
   color: var(--accent-text);
+}
+
+.chosenText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.chosenMain {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chosenSub {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 400;
 }
 
 .chosenEmpty {
   color: var(--ink-2);
   font-weight: 400;
+}
+
+.chosenEmpty > svg {
+  color: var(--ink-3);
 }
 
 .actions {
@@ -210,6 +261,14 @@
 }
 
 @media (min-width: 768px) {
+  .searchWrap {
+    padding: var(--space-5) var(--space-6) var(--space-3);
+  }
+
+  .resultsArea {
+    padding: var(--space-4) var(--space-6);
+  }
+
   .manual {
     display: block;
   }

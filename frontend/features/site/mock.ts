@@ -33,6 +33,7 @@ export const MOCK_SELLER_INFO: SiteInfoResponse = {
     hotline: "1900 xxxx",
   },
   policies: { return_report_hours: null, min_qty_kg: "0.5", qty_step_kg: "0.5", hold_minutes: 30 },
+  address_search_enabled: true,
 };
 
 // Khớp 6 trang chính sách do lệnh `load_shop_content` nạp (06-marketing B4, thứ tự footer 1→6).

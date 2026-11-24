@@ -4,7 +4,11 @@
 
 import {
   ApiError,
+  type AddressPlaceInput,
+  type AddressPlaceResponse,
   type AddressScheme,
+  type AddressSearchInput,
+  type AddressSearchResponse,
   type AdministrativeLevel,
   type AdministrativeUnitList,
   type CatalogItemDetail,
@@ -212,6 +216,36 @@ export async function checkVoucher(input: VoucherCheckInput): Promise<VoucherChe
     return m.mockCheckVoucher(input);
   }
   return apiFetch<VoucherCheckResult>("/api/shop/vouchers/check/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Tìm gợi ý địa chỉ qua máy chủ Cá Về (02b §1.9b.3, SHOP-3-04). Dùng POST thân JSON để chữ khách gõ không rơi vào log URL.
+ * Không log `input`. 503 (`ADDRESS_SEARCH_UNAVAILABLE`) và 429 để nguyên `ApiError` cho hộp tìm xử lý.
+ */
+export async function searchAddress(input: AddressSearchInput): Promise<AddressSearchResponse> {
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
+    const m = await import("./mock");
+    return m.mockSearchAddress(input);
+  }
+  return apiFetch<AddressSearchResponse>("/api/shop/address-search/", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Lấy chi tiết một gợi ý địa chỉ và gợi ý mã phường khớp danh mục Cá Về (02b §1.9b.3, SHOP-3-04).
+ * Phản hồi không có toạ độ hay mã nội bộ VietMap. Không log `input`.
+ */
+export async function getAddressPlace(input: AddressPlaceInput): Promise<AddressPlaceResponse> {
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
+    const m = await import("./mock");
+    return m.mockGetAddressPlace(input);
+  }
+  return apiFetch<AddressPlaceResponse>("/api/shop/address-place/", {
     method: "POST",
     body: JSON.stringify(input),
   });
