@@ -83,4 +83,5 @@ def site_info() -> dict[str, Any]:
         "confirm_call_notice": bool(getattr(settings, "SHOP_CONFIRM_CALL_NOTICE", False)),
         "confirm_call_hours": str(getattr(settings, "SHOP_CONFIRM_CALL_HOURS", "7:00–20:00")),
         "policies": policies,
+        "address_search_enabled": bool(_clean_str(getattr(settings, "VIETMAP_API_KEY", ""))),
     }

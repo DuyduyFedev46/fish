@@ -31,7 +31,8 @@ class S1Base(TestCase):
         pl = PriceList.objects.create(name="Bán lẻ", is_default=True)
         ItemPrice.objects.create(
             price_list=pl, item=self.item, rate=Decimal("100000"),
-            valid_from=self.today - datetime.timedelta(days=60),
+            # Tránh bom thời gian: test C1 chốt ngày 24/09/2026 nên valid_from phải cố định đủ sớm.
+            valid_from=datetime.date(2026, 1, 1),
         )
         self.sup = Supplier.objects.create(name="Đầu mối A")
         self.wh = Warehouse.objects.create(name="Kho chính")

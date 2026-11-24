@@ -86,6 +86,12 @@ class ShopVoucherCheckThrottle(SettingsRateThrottle):
     scope = "shop_voucher_check"
 
 
+class ShopAddressSearchThrottle(SettingsRateThrottle):
+    """Tìm địa chỉ qua máy chủ bằng VietMap: 60/phút/IP (SHOP-3-04, 02b §1.9b.3)."""
+
+    scope = "shop_address_search"
+
+
 class ShopOrderCreateThrottle(SettingsRateThrottle):
     scope = "shop_order_create"
 
