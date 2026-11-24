@@ -1,9 +1,12 @@
 "use client";
 
-// Khối địa chỉ giao hàng có cấu trúc (STA-02, BR-BH-29): kiểu địa chỉ → tỉnh → [quận/huyện, chỉ kiểu cũ] → phường/xã → số nhà
-// (ô chữ có nút "Bản đồ"). Màn cha giữ state; đổi cấp cha xoá cấp con ở `formRules` (selectScheme/selectProvince/selectDistrict).
+// Khối địa chỉ giao hàng có cấu trúc (STA-02, SHOP-3-04, 02b §1.9b.4, BR-BH-29):
+// kiểu địa chỉ → tỉnh → [quận/huyện, chỉ kiểu cũ] → phường/xã → số nhà (ô chữ có nút "Tìm địa chỉ" khi cờ bật).
+// Màn cha giữ state; đổi cấp cha xoá cấp con ở `formRules` (selectScheme/selectProvince/selectDistrict/selectWard).
 
+import type { AddressUnitSuggestion } from "@/lib/types";
 import Banner from "@/components/ui/Banner";
+import Button from "@/components/ui/Button";
 import Icon from "@/components/ui/Icon";
 import TextField from "@/components/ui/TextField";
 import type { AddressSelection, AddressScheme, FormErrors } from "../formRules";
@@ -21,9 +24,15 @@ export interface AddressFieldProps {
   onStreet: (value: string) => void;
   onStreetBlur?: () => void;
   errors: FormErrors;
-  /** Vừa điền số nhà từ bản đồ (C1c): viền xanh và dòng báo; mất khi khách sửa tay. */
+  /** Vừa điền số nhà từ hộp tìm VietMap (C1c): viền xanh và banner gợi ý phường; mất khi khách sửa tay. */
   filledFromMap?: boolean;
-  /** Form đang gửi: các ô chỉ đọc, nút Bản đồ tắt. */
+  /** Gợi ý phường từ máy chủ (khớp đúng 1 dòng danh mục Cá Về); `null` khi không khớp. */
+  wardSuggestion?: AddressUnitSuggestion | null;
+  /** Khách bấm "Dùng phường này" trên banner gợi ý. */
+  onApplyWardSuggestion?: () => void;
+  /** `site-info.address_search_enabled === true`: hiện nút "Tìm địa chỉ"; tắt/vắng/lỗi thì ẩn nút (Q-5). */
+  addressSearchEnabled?: boolean;
+  /** Form đang gửi: các ô chỉ đọc, nút Tìm địa chỉ tắt. */
   readOnly?: boolean;
   onOpenMap: () => void;
 }
@@ -36,6 +45,13 @@ const SCHEME_OPTIONS: { value: AddressScheme; label: string }[] = [
   { value: "legacy", label: "Địa chỉ cũ (trước sắp xếp)" },
 ];
 
+function suggestionMatches(selection: AddressSelection, suggestion: AddressUnitSuggestion): boolean {
+  if (selection.scheme !== suggestion.scheme) return false;
+  if (selection.provinceCode !== suggestion.province_code) return false;
+  if (suggestion.scheme === "legacy" && selection.districtCode !== (suggestion.district_code ?? "")) return false;
+  return selection.wardCode === suggestion.ward_code;
+}
+
 export default function AddressField({
   selection,
   onScheme,
@@ -47,11 +63,15 @@ export default function AddressField({
   onStreetBlur,
   errors,
   filledFromMap = false,
+  wardSuggestion = null,
+  onApplyWardSuggestion,
+  addressSearchEnabled = false,
   readOnly = false,
   onOpenMap,
 }: AddressFieldProps) {
   const legacy = selection.scheme === "legacy";
   const wardParent = legacy ? selection.districtCode : selection.provinceCode;
+  const matchedAlready = wardSuggestion ? suggestionMatches(selection, wardSuggestion) : false;
 
   return (
     <div className={s.wrap}>
@@ -119,7 +139,24 @@ export default function AddressField({
       />
       {filledFromMap ? (
         <Banner tone="success" live="polite" icon="check">
-          Đã điền số nhà từ bản đồ. Bạn vẫn cần chọn tỉnh, phường/xã ở trên.
+          {wardSuggestion ? (
+            matchedAlready ? (
+              "Đã điền số nhà từ VietMap. Phường đã khớp."
+            ) : (
+              <div className={s.suggestionBanner}>
+                <span>
+                  Đã điền số nhà từ VietMap. Phường gợi ý: <strong>{wardSuggestion.ward_name}</strong>.
+                </span>
+                {onApplyWardSuggestion ? (
+                  <Button variant="secondary" size="md" disabled={readOnly} onClick={onApplyWardSuggestion}>
+                    Dùng phường này
+                  </Button>
+                ) : null}
+              </div>
+            )
+          ) : (
+            "Đã điền số nhà từ VietMap. Bạn chọn tỉnh và phường/xã ở trên nhé."
+          )}
         </Banner>
       ) : null}
       <TextField
@@ -140,16 +177,18 @@ export default function AddressField({
         tone={filledFromMap ? "good" : "default"}
         describedBy={ADDRESS_AREA_NOTE_ID}
         endSlot={
-          <button
-            type="button"
-            className={s.mapButton}
-            aria-label="Tìm và chọn địa chỉ trên bản đồ"
-            disabled={readOnly}
-            onClick={onOpenMap}
-          >
-            <Icon name="map-pin" size={20} />
-            <span>Bản đồ</span>
-          </button>
+          addressSearchEnabled ? (
+            <button
+              type="button"
+              className={s.mapButton}
+              aria-label="Tìm địa chỉ giao hàng"
+              disabled={readOnly}
+              onClick={onOpenMap}
+            >
+              <Icon name="map-pin" size={20} />
+              <span>Tìm địa chỉ</span>
+            </button>
+          ) : undefined
         }
       />
       <p id={ADDRESS_AREA_NOTE_ID} className={s.area}>

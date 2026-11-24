@@ -49,6 +49,8 @@ export interface SiteInfoResponse {
   confirmation_policy?: ConfirmationPolicyConfig | null;
   // 02b §3.6: vắng = backend chưa có (lô 5) -> FE dùng mặc định của mình hoặc ẩn câu có số.
   policies?: ShopPolicies | null;
+  // 02b §1.9b.5: true khi máy chủ đã cấu hình VIETMAP_API_KEY; false/vắng -> ẩn nút tìm địa chỉ.
+  address_search_enabled?: boolean;
 }
 
 export interface FooterLinkItem {
