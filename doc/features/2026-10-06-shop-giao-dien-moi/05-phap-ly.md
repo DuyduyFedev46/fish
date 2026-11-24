@@ -217,6 +217,75 @@ xử lý dữ liệu hoặc điều khoản dịch vụ có phần dữ liệu �
 - Tra DNS/whois `maps.vietmap.vn` → `42.117.1.18`, `FPT-STATICIP`, country `VN` (chạy `dig`, `whois` ngày 25/11)
 - Luật BVDLCN 91/2025: [Đ.2](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-2) (k7, k8, k10) · [Đ.20](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-20) (k1 a–c) · [Đ.37](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-37) (k1, k2 a–b). Bản sao bên thứ ba, chưa đối chiếu công báo.
 
+#### §1.2c-A Câu chốt cho phương án A (25/11)
+> `legal-vn` · 2026-11-25 · căn cứ 02b §1.9b.2, §1.9b.3, §1.9b.7 (phương án A: **trình duyệt → máy chủ Cá Về → VietMap**, chỉ gửi chữ gõ và mã gợi ý,
+> VietMap không thấy IP hay trình duyệt của khách, **không bản đồ, không ghim**, không lưu, không log chữ gõ). Story đang **tạm theo A** (chờ Duy ở 🔴 Q-VM-1).
+> Theo A thì mục này **thay** mục 3 và mục 4 của §1.2c. Nếu Duy chọn B thì dùng lại nguyên mục 3, 4 của §1.2c. Tài liệu nội bộ, không phải tư vấn pháp lý.
+
+**1. Câu thông báo trong hộp tìm** (hằng `MAP_NOTICE_TEXT`, `AddressSearchSheet`) · FE · **Bắt buộc** · thay câu §1.2c mục 3 và câu nháp 02b §1.9b.7
+> Gợi ý địa chỉ do VietMap cung cấp. Chữ bạn gõ được máy chủ Cá Về chuyển tới VietMap để tìm địa chỉ, không kèm họ tên hay số điện thoại. Không muốn dùng, bạn đóng lại và gõ địa chỉ trực tiếp.
+
+- Đã bỏ "vị trí bạn ghim" và chữ "Bản đồ", vì A không có bản đồ, không có ghim.
+- So với câu nháp 02b: giữ ý "qua máy chủ Cá Về", thêm "không kèm họ tên hay số điện thoại" để khách biết phạm vi. Không ghi "không lưu" ở đây cho câu ngắn,
+  vì trang chính sách đã ghi.
+- Vị trí và thời điểm như AC2: hiện ngay khi hộp mở, **trước** request tìm đầu tiên, nằm sát ô tìm, không ẩn sau nút "Xem thêm".
+
+**2. Gạch đầu dòng thay nguyên văn mục 3 trang `quyen-rieng-tu`** (`pages.json`, mục "## 3. Bên nhận hoặc xử lý dữ liệu cùng Cá Về") · `mkt-brand` lô VM-CMS
+Thay **nguyên dòng** bắt đầu bằng `- **Google (Google Maps Platform, máy chủ ở nước ngoài):**` bằng dòng dưới (giữ escape `\"` khi chép vào JSON):
+
+```markdown
+- **VietMap ([tên pháp nhân ghi trên hợp đồng hoặc hoá đơn VietMap], dịch vụ tìm địa chỉ tại Việt Nam):** chỉ khi bạn bấm "Tìm địa chỉ" lúc đặt hàng. Chữ bạn gõ vào ô tìm và gợi ý bạn chọn được máy chủ Cá Về (xem mục 4) chuyển tới VietMap để lấy gợi ý địa chỉ. VietMap không nhận địa chỉ IP, thông tin trình duyệt, họ tên hay số điện thoại của bạn. Cá Về không lưu chữ bạn gõ để tìm và không ghi chữ đó vào nhật ký hệ thống; địa chỉ bạn chọn chỉ được lưu khi bạn đặt hàng, như địa chỉ gõ tay. VietMap xử lý theo chính sách riêng của VietMap ([maps.vietmap.vn/console/privacy-policy](https://maps.vietmap.vn/console/privacy-policy)). Bạn có thể không dùng và gõ địa chỉ trực tiếp.
+```
+
+- Ô `[tên pháp nhân…]`: Lộc điền trước production; staging để nguyên ngoặc vuông. **Không** chép tên "Công ty Cổ phần Ứng dụng Bản đồ Việt" từ câu nháp 02b,
+  vì §1.2c mục 1 cho thấy các nguồn lệch nhau (chưa xác minh).
+- Nhãn trong ngoặc kép phải **trùng chữ trên nút** (mục 4 dưới). Duy giữ nhãn "Bản đồ" thì đổi `"Tìm địa chỉ"` thành `"Bản đồ"`.
+- "(xem mục 4)" trỏ sang mục "Lưu trữ ở nước ngoài" vì máy chủ Cá Về đặt tại Singapore (`asia-southeast1`, `doc/ops/moi-truong.md` dòng 31). Mục 4 **giữ nguyên**.
+- Câu tuỳ chọn "Dữ liệu này được xử lý trên máy chủ đặt tại Việt Nam." của §1.2c **không dùng** nữa, vì theo A chữ gõ có đi qua máy chủ Singapore.
+- Câu "VietMap không nhận địa chỉ IP, thông tin trình duyệt…" chỉ đúng khi BE gọi VietMap **không chuyển tiếp** header của khách (`X-Forwarded-For`,
+  `User-Agent`, `Referer`, cookie). 02b §1.9b.3 chỉ đặt header `Accept`, khớp. Đề xuất QA/techlead thêm một ca test: request gửi VietMap không có các header đó
+  và không có IP khách trong tham số. Thiếu ca này thì câu chính sách chưa có chứng cứ.
+
+**3. Đánh giá lại theo A**
+
+- **Cá Về là bên chuyển giao dữ liệu cho VietMap.** Ở thiết kế cũ (trình duyệt gọi thẳng), còn có thể hiểu là khách tự gửi qua công cụ Cá Về nhúng. Theo A,
+  chính máy chủ Cá Về gửi chữ gõ tới VietMap, nên đây rõ ràng là **chuyển giao dữ liệu cá nhân** của bên kiểm soát cho bên xử lý, thuộc **Đ.17 k1 điểm d** Luật 91/2025
+  (bên kiểm soát chuyển cho bên xử lý hoặc bên thứ ba để xử lý theo quy định). Điều kiện đi kèm vẫn là **Đ.37 k1, k2 a–b**: phải có thoả thuận hoặc hợp đồng
+  xử lý dữ liệu ghi trách nhiệm các bên. Kết luận về hợp đồng **không đổi**, nhưng nay chắc chắn hơn là cần, không còn cách hiểu nào để bỏ qua ⚠.
+- **Chữ gõ có phải dữ liệu cá nhân không.** Chữ gõ thường là số nhà, tên đường; không kèm tên, SĐT, IP thì VietMap khó gắn với một người. Nhưng Cá Về có thể gắn
+  chữ đó với phiên đặt hàng, nên **vẫn coi là dữ liệu cá nhân** (cách hiểu thận trọng) và vẫn thông báo như mục 1, 2.
+- **Ít dữ liệu hơn.** VietMap không còn nhận IP, trình duyệt, vị trí ghim. Rủi ro VietMap dùng dữ liệu cho mục đích riêng (nghiên cứu, tiếp thị theo chính sách chung)
+  **giảm hẳn**, vì chữ gõ không gắn được với người dùng. Vẫn giữ ⚠ bên thứ ba như §1.2c mục 2.
+- **Chuyển ra nước ngoài (Đ.20).** VietMap vẫn là bên trong nước, không thêm gì vào hồ sơ. Điểm mới: chữ gõ đi **từ trình duyệt tới máy chủ Cá Về ở Singapore**
+  rồi mới tới VietMap. Đây là luồng dữ liệu đơn hàng đã có trong hồ sơ đánh giá tác động cho máy chủ Singapore, nên **không cần hồ sơ mới**. Chỉ cần thêm một dòng
+  vào danh mục dữ liệu của hồ sơ đó: "chữ khách gõ để tìm địa chỉ, xử lý tạm, không lưu".
+- **Điều kiện (ii) của §1.2c** (không nạp thư viện bản đồ từ CDN nước ngoài) **hết áp dụng**: A không nạp script bản đồ nào. AC1 kiểm việc này (0 request tới `unpkg.com`, `maps.vietmap.vn`).
+- **Dữ liệu nhạy cảm, Đ.38:** không đổi. Không ghim, không `navigator.geolocation`, nên không có vị trí từ dịch vụ định vị. Quyền miễn của Đ.38 giữ nguyên.
+- **Kết luận theo A:** **ĐẠT cho staging** (mục 1, 2 dùng được ngay) · **CHƯA ĐẠT cho production**, cùng điều kiện như §1.2c: tên pháp nhân VietMap và thoả thuận
+  xử lý dữ liệu hoặc điều khoản dịch vụ có phần dữ liệu ⚠. Điều kiện xác nhận nơi lưu log của VietMap giảm từ "chặn" xuống "nên có", vì VietMap không nhận gì nhận diện được khách.
+
+**Việc của Lộc theo A** (thay bảng §1.2c mục 5; IT chỉ soạn khung)
+
+| Việc | Ai | Chặn |
+|---|---|---|
+| Lấy tên pháp nhân, mã số thuế, địa chỉ VietMap từ hợp đồng, hoá đơn hoặc trang tài khoản key; điền ô `[tên pháp nhân…]` | **Lộc** | go-live production |
+| Đọc điều khoản dịch vụ Maps API; không có phần dữ liệu cá nhân thì gửi `maps.info@vietmap.vn` xin thoả thuận xử lý dữ liệu (Đ.17 k1 d, Đ.37 k2). Hỏi kèm: log truy vấn lưu ở đâu, bao lâu; có dùng chữ tìm cho tiếp thị hay huấn luyện không | **Lộc** (IT soạn email nếu cần) | go-live production ⚠ |
+| Hồ sơ đánh giá tác động chuyển dữ liệu ra nước ngoài (Singapore): thêm dòng "chữ khách gõ để tìm địa chỉ, xử lý tạm, không lưu" | Lộc + luật sư | go-live ⚠ |
+| Hằng `MAP_NOTICE_TEXT` theo mục 1 | fe-dev | lô VM-FE |
+| Chép dòng mục 2 vào `pages.json` | `mkt-brand` | lô VM-CMS (staging) |
+| Ca test BE: request gửi VietMap không có header, IP của khách | be-dev + QA | lô VM-BE |
+
+**4. Nhãn nút "Tìm địa chỉ"**
+
+- **Không có vấn đề pháp lý**, và **tốt hơn** "Bản đồ": A không hiện bản đồ, nên "Bản đồ" dễ khiến khách nghĩ sẽ thấy bản đồ hoặc bị lấy vị trí. Nhãn đúng với
+  chức năng là cách thông tin minh bạch, hợp tinh thần Luật BVQLNTD 2023 về thông tin trung thực cho người tiêu dùng (không phải nghĩa vụ riêng cho nhãn nút).
+- Ba chỗ phải **cùng một chữ**: nhãn nút, câu chính sách mục 2 ("khi bạn bấm \"Tìm địa chỉ\""), và tên hộp tìm. `aria-label` "Tìm địa chỉ giao hàng" ổn.
+- Giữ icon `map-pin` được. **Không** dùng chữ "Định vị", "Vị trí của tôi", "Lấy vị trí": các chữ này gợi ý lấy vị trí thiết bị, là dữ liệu nhạy cảm theo NĐ 356.
+- Placeholder ô tìm cũng là "Tìm địa chỉ" (`AddressMapPicker.tsx:294` hiện nay): trùng chữ với nút nhưng không sao.
+
+**Nguồn bổ sung (tra 2026-11-25):** Luật BVDLCN 91/2025 [Đ.17](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-17)
+(k1 điểm d, k2). Bản sao bên thứ ba, chưa đối chiếu công báo.
+
 ### 1.3 Việc của ai
 
 | Việc | Ai | Chặn |
