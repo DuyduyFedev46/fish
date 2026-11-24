@@ -483,14 +483,18 @@ class LoadShopContentPolicyTextTests(LoadShopContentBase):
         self.assertIn("[mã số thuế]", self.page_text("thong-tin-nguoi-ban"))
 
     def test_privacy_policy_names_vietmap_instead_of_google_maps(self):
-        """SHOP-3-04 (05-phap-ly §1.2c, decisions 2026-11-24, bất biến 9): trang quyen-rieng-tu nêu VietMap kèm ô chờ tên pháp nhân và link chính sách VietMap; không còn Google Maps Platform, giữ Google Cloud ở mục hạ tầng."""
+        """SHOP-3-04 (05-phap-ly §1.2c-A, decisions 2026-11-24, bất biến 9): trang quyen-rieng-tu nêu VietMap theo phương án A (tìm địa chỉ qua máy chủ Cá Về, không gửi IP/trình duyệt/họ tên/SĐT, có ô chờ tên pháp nhân và link chính sách VietMap); không còn Google Maps Platform, giữ Google Cloud ở mục hạ tầng."""
         self.run_cmd()
         privacy = self.page_text("quyen-rieng-tu")
         self.assertIn("VietMap", privacy)
         self.assertIn("[tên pháp nhân ghi trên hợp đồng hoặc hoá đơn VietMap]", privacy)
+        self.assertIn("dịch vụ tìm địa chỉ tại Việt Nam", privacy)
+        self.assertIn("máy chủ Cá Về (xem mục 4) chuyển tới VietMap", privacy)
+        self.assertIn("VietMap không nhận địa chỉ IP", privacy)
         self.assertIn("https://maps.vietmap.vn/console/privacy-policy", privacy)
         self.assertNotIn("Google Maps Platform", privacy)
         self.assertNotIn("policies.google.com/privacy", privacy)
+        self.assertNotIn("vị trí bạn ghim", privacy)
         self.assertIn("Google Cloud và Supabase", privacy)
 
     def test_shop_5_06_every_loaded_entry_passes_cms_scan(self):
