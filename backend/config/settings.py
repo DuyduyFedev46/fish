@@ -258,6 +258,7 @@ _DEFAULT_THROTTLE_RATES = {
     "shop_checkout": _rate("THROTTLE_SHOP_CHECKOUT", "30/hour"),
     "shop_lookup_token": _rate("THROTTLE_SHOP_LOOKUP_TOKEN", "60/min"),
     "shop_voucher_check": _rate("THROTTLE_SHOP_VOUCHER_CHECK", "20/min"),
+    "shop_address_search": _rate("THROTTLE_SHOP_ADDRESS_SEARCH", "60/min"),
     "login_ip": _rate("THROTTLE_LOGIN_IP", "10/min"),
     # B6/L-3: khoá theo cặp (username, IP) nên người ngoài không khoá được Chủ từ IP khác.
     "login_user": _rate("THROTTLE_LOGIN_USER", "10/hour"),
@@ -438,6 +439,10 @@ SELLER_WEBSITE_NOTICE_IMAGE = os.getenv("SELLER_WEBSITE_NOTICE_IMAGE", "")
 # Cờ thông báo xác nhận cuộc gọi (mặc định TẮT tới khi CSKH vận hành - G2)
 SHOP_CONFIRM_CALL_NOTICE = _bool("SHOP_CONFIRM_CALL_NOTICE", "0")
 SHOP_CONFIRM_CALL_HOURS = os.getenv("SHOP_CONFIRM_CALL_HOURS", "7:00–20:00")
+
+# Tìm địa chỉ qua máy chủ bằng VietMap (SHOP-3-04, 02b §1.9b.3): key rỗng = tắt nút trên Shop.
+VIETMAP_API_KEY = os.environ.get("VIETMAP_API_KEY", "").strip()
+VIETMAP_TIMEOUT_SECONDS = int(os.environ.get("VIETMAP_TIMEOUT_SECONDS", "4"))
 
 # --- FISH-66 (doc/features/2026-11-14-hang-ban-excel-dong-lanh/02b §6.2): tải/nhập file Excel mặt hàng ---
 ITEM_IMPORT_MAX_ROWS = int(os.getenv("ITEM_IMPORT_MAX_ROWS", "1000"))

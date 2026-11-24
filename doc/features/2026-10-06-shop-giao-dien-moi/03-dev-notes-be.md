@@ -151,3 +151,48 @@ $ python3 scripts/check_naming.py   # backend sạch; còn lỗi ở frontend/ (
 ### Sửa sau QA lô 7
 - L11: bỏ khoá `gateway: "SEPAY"` khỏi JSON `POST /api/shop/orders/<mã>/checkout/` (`apps/sales/payments/checkout.py`). Frontend không đọc khoá này (grep chỉ thấy tên file `gateway.ts`). Các khoá còn lại (`checkout_url`, `fields`, `merchant`...) giữ nguyên. Test `test_qa_l11_...`.
 - L12: throttle `public_content` nâng 120/min thành 600/min mỗi IP (`config/settings.py`, đổi được bằng env `THROTTLE_PUBLIC_CONTENT`), vì mỗi trang gọi khoảng 3 lần và mạng dùng chung dễ dính 429. Test `test_qa_l12_...`; test throttle cũ vẫn xanh.
+
+## Lô VM-BE · SHOP-3-04 (BR-BH-29, STA-02, bất biến 9; 02b §1.9b — phương án A)
+
+### File đã thêm / sửa
+- Mới `backend/apps/common/address_search/{__init__,vietmap,matching,shop_api}.py`, `README.md`, `tests/{__init__,test_address_search}.py` (18 ca kiểm thử, mock hoàn toàn `urllib.request.urlopen`).
+- `backend/config/settings.py`: thêm `VIETMAP_API_KEY` (mặc định `""` = tắt), `VIETMAP_TIMEOUT_SECONDS` (mặc định `4`), throttle `shop_address_search` (`THROTTLE_SHOP_ADDRESS_SEARCH`, mặc định `"60/min"`).
+- `backend/apps/common/throttling.py`: thêm `ShopAddressSearchThrottle` (`scope = "shop_address_search"` theo IP).
+- `backend/config/api_urls.py`: thêm `POST /api/shop/address-search/` và `POST /api/shop/address-place/`.
+- `backend/apps/content/site/services.py` + `backend/apps/content/site/tests/{test_site_info,test_site_info_shop}.py`: thêm cờ gốc `"address_search_enabled": bool(...)` vào `/api/public/site-info/`, không lộ giá trị `VIETMAP_API_KEY`.
+- `backend/apps/ai/policy/rules.py`: thêm `"text"` vào `SCRUB_PII_KEYS` (toàn bộ 666 test `apps.ai + apps.common + apps.content.site` và 4183 test toàn suite đều xanh).
+- Commit riêng theo phép của điều phối: `backend/apps/inventory/batches/tests/test_s1_expiry.py` đổi `valid_from` thành `datetime.date(2026, 1, 1)` cố định (tránh bom thời gian nổ ngày 25/11/2026 ở ca `test_s1_c1` chốt cứng ngày 24/09/2026).
+
+### Endpoint thực tế & JSON mẫu
+- `POST /api/shop/address-search/` (`AllowAny`, chỉ `POST`, `Cache-Control: no-store`, throttle `shop_address_search` 60/phút/IP):
+  - Request: `{"scheme": "current"|"legacy", "text": "12 tran hung dao"}` (`text` gộp khoảng trắng dài 2–120 ký tự; sai -> `400 {"code": "VALIDATION", "detail": "Thông tin tìm địa chỉ chưa hợp lệ.", "fields": {"scheme"?: "...", "text"?: "..."}}`).
+  - Gọi `https://maps.vietmap.vn/api/autocomplete/v4` qua `urllib.request.urlopen` + `urllib.parse.urlencode` với `apikey`, `text`, `display_type=1|2`, `focus=10.9289,108.1021`, header cố định `Accept: application/json` (không chuyển tiếp IP hay bất kỳ header trình duyệt nào của khách).
+  - 200: `{"results": [{"ref": "auto:Xyz...", "title": "12 Trần Hưng Đạo", "subtitle": "Phường Phan Thiết, Tỉnh Lâm Đồng"}]}` (tối đa 6 mục; rỗng -> `{"results": []}`).
+- `POST /api/shop/address-place/` (`AllowAny`, chỉ `POST`, `Cache-Control: no-store`, throttle `shop_address_search` 60/phút/IP):
+  - Request: `{"scheme": "current"|"legacy", "ref": "auto:Xyz..."}` (`ref` khớp `\A(auto|geocode):[A-Za-z0-9_\-+/=.:]{1,500}\Z`, chặn xuống dòng và URL lạ -> `400 VALIDATION fields.ref`).
+  - Gọi `https://maps.vietmap.vn/api/place/v4` với `apikey`, `refid=ref`; bỏ `lat`, `lng`, `ward_id`, `city_id`, `district_id`, `ref`.
+  - 200: `{"street": "12 Đường Trần Hưng Đạo", "display": "12 Đường Trần Hưng Đạo, Phường Phan Thiết, Tỉnh Lâm Đồng", "suggestion": {"scheme": "current", "province_code": "68", "district_code": null, "ward_code": "22945", "ward_name": "Phường Phan Thiết"}}` (`suggestion: null` khi không khớp hoặc trùng tên sau `fold_text`, vd hai xã Lộc Thành / Lộc Thạnh ở tỉnh Đồng Nai).
+- Lỗi upstream (`HTTPError` 401/423/429/5xx, `TimeoutError`, `URLError`, JSON hỏng) hoặc máy chủ chưa có `VIETMAP_API_KEY`: `503 {"code": "ADDRESS_SEARCH_UNAVAILABLE", "detail": "Chưa tìm được địa chỉ lúc này. Bạn gõ địa chỉ trực tiếp nhé."}` (chưa có key thì không gọi `urlopen`). Log chỉ ghi `vietmap upstream failed status=%s api=%s`, không có `text`, `ref`, URL hay key.
+
+### Lệch thiết kế / giả định
+- **Lệch thiết kế:** không có.
+- **Giả định nhỏ:** (1) Kiểm tra định dạng đầu vào (`scheme`, `text`, `ref` -> 400 `VALIDATION`) chạy trước kiểm tra `VIETMAP_API_KEY` (503) để caller gửi tham số sai vẫn nhận 400 nhất quán ngay cả khi môi trường chưa đặt key; cả hai đều không gọi `urlopen`. (2) Gắn `NoStoreMixin` (`Cache-Control: no-store`) cho cả hai view để proxy/trình duyệt dùng chung không lưu phản hồi địa chỉ.
+
+### Điều còn nợ
+- Chờ Duy xác nhận 🔴 `Q-VM-1` (chọn phương án A) ở gate trước khi lên thật và đặt secret `VIETMAP_API_KEY` cho backend staging/production (02b §1.9b.11).
+
+### Kiểm chứng (chạy tuần tự, lượt này)
+```
+$ cd backend && DJANGO_SECRET_KEY=test DJANGO_DEBUG=1 .venv/bin/python manage.py collectstatic --noinput >/dev/null
+(exit 0)
+
+$ cd backend && DJANGO_SECRET_KEY=test .venv/bin/python manage.py test --parallel 1
+Ran 4183 tests in 311.775s
+OK (skipped=19)
+
+$ cd backend && DJANGO_SECRET_KEY=test .venv/bin/python manage.py makemigrations --check --dry-run
+No changes detected
+
+$ python3 scripts/check_naming.py
+check_naming: OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.
+```

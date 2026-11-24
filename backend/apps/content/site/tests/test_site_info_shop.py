@@ -130,13 +130,28 @@ class SiteInfoShopTests(TestCase):
         self.assertEqual(
             set(data.keys()),
             {"seller", "seller_complete", "privacy_consent_required", "confirm_call_notice",
-             "confirm_call_hours", "confirmation_policy", "policies"},
+             "confirm_call_hours", "confirmation_policy", "policies", "address_search_enabled"},
         )
         self.assertEqual(
             set(data["seller"].keys()),
             {"name", "business_type", "registration_no", "tax_code", "address", "phone", "email"} | NEW_SELLER_KEYS,
         )
         self.assertEqual(set(data["policies"].keys()), {"return_report_hours", "min_qty_kg", "qty_step_kg", "hold_minutes"})
+
+    def test_shop_3_04_ac7_address_search_enabled_follows_vietmap_key_without_leaking_secret(self):
+        """SHOP-3-04 AC7 (02b §1.9b.3, §1.9b.5): cờ bật theo VIETMAP_API_KEY, không rò giá trị key."""
+        for empty_key in ("", "   "):
+            with self.subTest(key=empty_key), override_settings(VIETMAP_API_KEY=empty_key):
+                self.assertIs(self.get()["address_search_enabled"], False)
+
+        fake_secret = "vietmap-secret-gia-khong-lo-999"
+        with override_settings(VIETMAP_API_KEY=fake_secret):
+            resp = self.client.get(self.url)
+            self.assertEqual(resp.status_code, 200)
+            self.assertIs(resp.json()["address_search_enabled"], True)
+            raw_text = resp.content.decode("utf-8")
+            self.assertNotIn(fake_secret, raw_text)
+            self.assertNotIn("VIETMAP_API_KEY", raw_text)
 
     @override_settings(**OLD_SELLER_VALUES)
     def test_shop_5_01_ac4_no_customer_data(self):

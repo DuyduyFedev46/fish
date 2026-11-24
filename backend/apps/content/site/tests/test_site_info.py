@@ -109,6 +109,7 @@ class SiteInfoApiTests(TestCase):
             "confirm_call_hours",
             "confirmation_policy",
             "policies",  # SHOP-5-01 (02b §3.6)
+            "address_search_enabled",  # SHOP-3-04 (02b §1.9b.3)
         }
         self.assertEqual(set(data.keys()), expected_root_keys)
 

@@ -119,6 +119,7 @@ SCRUB_PII_KEYS = frozenset({
     "default_address",  # địa chỉ giao mặc định của khách (B2)
     "cancel_note",  # ghi chú huỷ đơn (TL-D3-L4): có thể chứa tên/địa chỉ khách
     "decision_note",  # lý do bỏ qua xác nhận/gia hạn/huỷ xác nhận
+    "text",  # SHOP-3-04 (02b §1.9b.7): chữ gõ tìm địa chỉ
 })
 
 # Lọc đầu ra: Chữ tự do (H10 — tránh Prompt Injection)
