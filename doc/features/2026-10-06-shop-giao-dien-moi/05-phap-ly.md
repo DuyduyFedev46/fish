@@ -225,7 +225,7 @@ xử lý dữ liệu hoặc điều khoản dịch vụ có phần dữ liệu �
 | Dòng thông báo (b) trong MapPicker | FE | lô 3 |
 | Quyết định giữ hay bỏ "Vị trí của tôi" | **Duy** | lô 3 |
 | Nội dung (c) vào CMS, điền các ô [ ] | Duy/Lộc nhập, `legal-vn` soát | go-live |
-| Hồ sơ đánh giá tác động chuyển dữ liệu ra nước ngoài (Singapore + Google Maps), nộp trong 60 ngày từ lần chuyển đầu (Đ.20 k2) | Duy + luật sư | go-live ⚠ |
+| Hồ sơ đánh giá tác động chuyển dữ liệu ra nước ngoài (Singapore; bản đồ VietMap trong nước, xem §1.2c), nộp trong 60 ngày từ lần chuyển đầu (Đ.20 k2) | Duy + luật sư | go-live ⚠ |
 
 ---
 
@@ -498,7 +498,7 @@ chuyển dữ liệu ra nước ngoài, và xác định nghĩa vụ hoá đơn.
 - [ ] Duy chốt chủ thể pháp lý (DN/hộ KD), MST, tên miền riêng.
 - [ ] Thông báo website qua Cổng DVC quốc gia, nhận biểu tượng và link, Lộc dán vào ERP.
 - [ ] Nhập nội dung đã điền số vào 6 trang chính sách trên CMS; `legal-vn` soát bản cuối.
-- [ ] Hồ sơ đánh giá tác động chuyển dữ liệu ra nước ngoài (Singapore + Google Maps), nộp trong 60 ngày từ lần chuyển đầu, hoặc luật sư xác nhận được miễn ⚠.
+- [ ] Hồ sơ đánh giá tác động chuyển dữ liệu ra nước ngoài (Singapore; bản đồ VietMap trong nước, xem §1.2c), nộp trong 60 ngày từ lần chuyển đầu, hoặc luật sư xác nhận được miễn ⚠.
 - [ ] Kế toán xác nhận nghĩa vụ hoá đơn theo NĐ 254/2026 và NĐ 68/2026; nếu phải lập theo từng đơn thì có quy trình hoặc lô ERP trước khi bán.
 - [ ] Luật sư xác nhận các ô ⚠: phạm vi miễn của Đ.38, thời hạn trả lời yêu cầu của chủ thể dữ liệu, bản gốc NĐ 239/2026 về mức giảm, khung phạt mới.
 
