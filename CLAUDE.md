@@ -16,7 +16,9 @@ flowchart TD
 
 - Phiên chính chạy `claude-opus-5-5` trong Orca và là **điều phối viên duy nhất** (Duy chốt 24/11). Giao mọi vai bằng
   `orca orchestration worker-start` theo `doc/ops/orca-worker.md`: `techlead`, `ba-analyst`, `po-owner`, `legal-vn` dùng
-  `--agent claude --model claude-opus-5-5`, các vai còn lại `--agent antigravity --model gemini-4-carbon-high`.
+  `--agent claude --model claude-opus-5-5`; `qa-tester`, `shop-ui-qa` dùng `--agent claude --model claude-sonnet-5-5`;
+  QA tổng trước khi lên thật dùng vai `qa-tester` với `claude-opus-5-5`; các vai còn lại
+  `--agent antigravity --model gemini-4-carbon-high`.
 - **Nếu prompt của bạn có Task ID và Dispatch ID thì bạn là worker, không phải điều phối viên**: bỏ qua dòng trên, làm
   đúng Luật worker ở `doc/ops/orca-worker.md` mục 2 và file vai trong spec. Không chạy skill `feature`, không giao việc.
   Điểm Duy duyệt là `orca orchestration gate-create`, không hỏi trong chat trừ khi Duy đang nói chuyện trực tiếp.

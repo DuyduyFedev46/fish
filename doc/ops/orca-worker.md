@@ -16,11 +16,19 @@ flowchart TD
 Duy chốt ngày 24/11/2026, làm giống dự án LiveTranscribe:
 
 - **Điều phối duy nhất** là Claude Code chạy model `claude-opus-5-5` trong Orca.
-- **Mọi vai** trong bảng ở `AGENTS.md` chạy dưới dạng **worker Orca**, chia hai nhóm (Duy chốt 24/11):
+- **Mọi vai** trong bảng ở `AGENTS.md` chạy dưới dạng **worker Orca**, chia ba nhóm (Duy chốt 24/11, "không muốn chất
+  lượng bị giảm"):
   - **Vai quan trọng → worker Claude Opus** (`--agent claude --model claude-opus-5-5`): `techlead`, `ba-analyst`, `po-owner`, `legal-vn`.
     Sai ở đây là sai nghiệp vụ, giá vốn hoặc pháp lý, sửa về sau rất tốn.
+  - **QA từng lô → worker Claude Sonnet** (`--agent claude --model claude-sonnet-5-5`): `qa-tester`, `shop-ui-qa`.
+    Giữ đúng như trước khi có Orca: QA không hạ chất lượng.
   - **Các vai còn lại → worker Gemini** (`--agent antigravity --model gemini-4-carbon-high`): `product-manager`,
-    `ux-designer`, `mkt-brand`, `be-dev`, `fe-dev`, `qa-tester`, `shop-ui-dev`, `shop-ui-qa`, `image-scout`.
+    `ux-designer`, `mkt-brand`, `be-dev`, `fe-dev`, `shop-ui-dev`, `image-scout`.
+- **QA tổng** (Duy chốt 24/11): sau khi lên staging, trước gate lên thật, giao worker `qa-tester` chạy
+  **Claude Opus** (`--agent claude --model claude-opus-5-5`) kiểm hồi quy toàn bộ: e2e `general_rules` + `full_flow` chạy
+  với staging, quét rò giá vốn và dữ liệu khách trên API công khai bằng token từng Group, đi lại luồng mua và luồng ERP
+  chính trên staging (ảnh 360 + 1280), đối chiếu mọi AC của đợt. Ghi `04-qa-report-tong.md`, kết luận APPROVED/REJECTED.
+  REJECTED thì không mở gate lên thật.
 - Gemini **không làm điều phối** nữa. Bỏ `.agents/agents/`, `.gemini/commands/` và chế độ "ngang quyền".
 - Opus **tự review diff** ở các chỗ nhạy cảm: giá vốn, dữ liệu cá nhân, phân quyền, migration, thanh toán, webhook.
   Việc này không giao cho worker.
@@ -47,6 +55,8 @@ ORCA orchestration gate-create --task <task PO> --question "Duyệt phân tích 
 
 # giao worker; mỗi việc một worktree mới tách từ origin/main
 #   vai techlead, ba-analyst, po-owner, legal-vn: --agent claude --model claude-opus-5-5
+#   vai qa-tester, shop-ui-qa (QA từng lô):      --agent claude --model claude-sonnet-5-5
+#   QA tổng trước khi lên thật (vai qa-tester):  --agent claude --model claude-opus-5-5
 #   các vai còn lại:                             --agent antigravity --model gemini-4-carbon-high
 ORCA orchestration worker-start --environment local --task <task_id> --agent <agent> --model <model> \
   --worktree new-top-level --repo id:19653c71-270c-4299-8146-e6ff05e5e8c9 --base-branch origin/main --name claude-<slug>-<vai>
@@ -92,7 +102,7 @@ LUẬT WORKER CÁ VỀ (bắt buộc)
    Chỉ dùng dữ liệu giả.
 7. Git: chỉ commit trên nhánh của worktree mình, theo pathspec (`git add <file>`, `git commit -m "<mã story>: …" -- <file>`),
    message tiếng Việt, dòng cuối `Co-Authored-By: Gemini 4 Carbon <noreply@google.com>` (worker Opus ghi
-   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
+   `Co-Authored-By: Claude <tên model> <noreply@anthropic.com>`).
    Không push, không merge, không rebase, không `git add -A`. Không deploy, không gcloud, không đụng DB staging/production.
 8. Không kill tiến trình nào bạn không tự bật. Cổng 8000/3000/3100 bận thì báo, không tự giải phóng.
 9. Báo xong đúng một lần theo cách Orca ghi ở đầu prompt (worker_done), kèm danh sách file đã sửa. Body gồm:
@@ -142,7 +152,9 @@ Placement: this machine (local), the user named it.
 | Chọn luồng, nhận việc ở bảng việc, tạo Run/Task/gate | Opus |
 | BA, PO (viết story và nghiệm thu), Tech Lead viết 02b, Pháp lý | worker Claude Opus theo vai |
 | PM, UX, Marketing | worker Gemini theo vai |
-| BE, FE, UI review (đánh bóng), QA, Shop UI, image-scout | worker Gemini theo vai |
+| BE, FE, UI review (đánh bóng), Shop UI dev, image-scout | worker Gemini theo vai |
+| QA từng lô (`qa-tester`, `shop-ui-qa`) | worker Claude Sonnet 5.5 |
+| QA tổng trước khi lên thật | worker Claude Opus 5.5, vai `qa-tester` |
 | Tự chạy lại kiểm chứng, review diff chỗ nhạy cảm (bước 3c) | Opus |
 | Commit gộp, gộp `main`, push, deploy staging, cập nhật bảng việc và sheet | Opus |
 | Duyệt phân tích, story, lên staging (khi cần), lên thật | Duy, qua gate Orca |

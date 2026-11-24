@@ -33,7 +33,8 @@ File này là **luật chung duy nhất**. Claude đọc qua `CLAUDE.md` (`@AGEN
 ## Điều phối bằng Orca (Duy chốt 2026-11-24, thay chế độ "ngang quyền" 15/11)
 
 **Một bộ não:** Claude Code chạy `claude-opus-5-5` trong Orca là điều phối viên duy nhất. Mọi vai trong đội chạy dưới dạng
-**worker Orca**: `techlead`, `ba-analyst`, `po-owner`, `legal-vn` là worker Claude `claude-opus-5-5`; các vai còn lại là worker `antigravity` (`agy`)
+**worker Orca**: `techlead`, `ba-analyst`, `po-owner`, `legal-vn` là worker Claude `claude-opus-5-5`; `qa-tester`, `shop-ui-qa` là
+worker Claude `claude-sonnet-5-5` (như trước); QA tổng trước khi lên thật là worker Opus; các vai còn lại là worker `antigravity` (`agy`)
 `gemini-4-carbon-high`. Gemini không làm điều phối nữa. Lệnh Orca, luật worker
 và mẫu spec ở `doc/ops/orca-worker.md`.
 
@@ -85,7 +86,7 @@ thích/tra cứu, hoặc việc vận hành không đổi code (xem log, seed d�
 | QA | `qa-tester` | e2e-playwright, tdd-workflow | `04-qa-report.md` |
 | Shop UI dev / QA / ảnh | `shop-ui-dev`, `shop-ui-qa`, `image-scout` | caveve-ui, nextjs-shop-patterns, e2e-playwright | việc GUI-xx theo lệnh `/lam-shop-ui` |
 
-**Model:** điều phối, review chỗ nhạy cảm và 4 vai `techlead`, `ba-analyst`, `po-owner`, `legal-vn` dùng `claude-opus-5-5`; các vai còn lại là
+**Model:** điều phối, review chỗ nhạy cảm và 4 vai `techlead`, `ba-analyst`, `po-owner`, `legal-vn` dùng `claude-opus-5-5`; QA từng lô dùng `claude-sonnet-5-5`, QA tổng dùng `claude-opus-5-5`; các vai còn lại là
 worker `agy` `gemini-4-carbon-high` (giao theo `doc/ops/orca-worker.md`). Dòng `model:` trong frontmatter vai chỉ dùng cho đường dự
 phòng (công cụ Agent của Claude khi Orca hỏng hoặc chạy trên cloud).
 
@@ -98,6 +99,8 @@ phòng (công cụ Agent của Claude khi Orca hỏng hoặc chạy trên cloud)
 6. REJECTED → giao lại dev, quay về bước 3 (tối đa 2 vòng). APPROVED → commit tiếng Việt có mã lô/story **theo pathspec**
    (không `git add -A`), gộp `main`, chạy lại test tuần tự, `git push origin main`, đánh ☑ ở 02c và bảng việc.
 7. QA đạt + gộp main → tự deploy **staging** (UAT) cho Duy test. **Production chỉ khi Duy duyệt.**
+8. Trước gate lên thật: **QA tổng** bằng worker Opus (vai `qa-tester`) kiểm hồi quy toàn bộ trên staging
+   (`doc/ops/orca-worker.md`). QA tổng chưa APPROVED thì không xin Duy lên thật.
 
 Worker không giao việc cho worker khác: mọi lượt giao việc đi qua điều phối viên. Worker chỉ commit trên nhánh worktree
 của mình theo pathspec; không push, không merge, không deploy, không đụng DB thật.

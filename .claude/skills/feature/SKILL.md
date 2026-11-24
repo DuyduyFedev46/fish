@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → Review → QA → Deploy) bằng worker Orca (Opus cho techlead/ba-analyst/po-owner/legal-vn, Gemini 4 Carbon cho các vai khác) theo vai product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
+description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → Review → QA → Deploy) bằng worker Orca (Opus cho techlead/ba-analyst/po-owner/legal-vn và QA tổng, Sonnet cho QA từng lô, Gemini 4 Carbon cho các vai khác) theo vai product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
 argument-hint: "<yêu cầu bằng lời thường>"
 ---
 
@@ -29,7 +29,9 @@ flowchart TD
   GIT --> RV["Soát pháp lý, PO nghiệm thu"]
   RV --> D3{"Điểm dừng 3: Duy cho deploy?"}
   D3 -- "có" --> STG["Deploy staging"]
-  STG --> D4{"Duy duyệt staging?"}
+  STG --> QT{"QA tổng bằng Opus đạt?"}
+  QT -- "chưa" --> DEV
+  QT -- "đạt" --> D4{"Duy duyệt lên thật?"}
   D4 -- "có" --> PRD["Deploy production"]
 ```
 
@@ -66,7 +68,7 @@ Quy tắc khi phân vân:
 
 Bạn (phiên chính, Claude Opus 5.5 trong Orca) là **điều phối viên duy nhất**. Mỗi chỗ dưới đây ghi "giao `<vai>`"
 nghĩa là tạo Task và chạy `orca orchestration worker-start` (vai `techlead`, `ba-analyst`, `po-owner`, `legal-vn`: `--agent claude --model claude-opus-5-5`;
-vai khác: `--agent antigravity --model gemini-4-carbon-high`) với spec theo
+`qa-tester`, `shop-ui-qa`: `--agent claude --model claude-sonnet-5-5`; vai khác: `--agent antigravity --model gemini-4-carbon-high`) với spec theo
 mẫu `doc/ops/orca-worker.md` (dán Luật worker, trỏ tới `.claude/agents/<vai>.md`). Mỗi "ĐIỂM DỪNG" là một gate Orca
 (`gate-create`) chặn Task phía sau. Orca hỏng hoặc phiên chạy trên cloud: dùng công cụ Agent làm dự phòng. Worker không
 giao việc cho nhau, nên mọi lượt giao việc đều đi qua bạn. Bạn không tự viết code nghiệp vụ — bạn giao việc, kiểm
@@ -167,6 +169,12 @@ Trước khi push, kiểm `git status` không có `.env`, DB hay bí mật nào.
 (Cloud SQL đã xoá). Luôn lên **staging trước**, Duy duyệt rồi mới lên production. URL, lệnh
 build, cách chạy migrate cho từng môi trường: `doc/ops/moi-truong.md`. Build frontend truyền
 `NEXT_PUBLIC_*` trực tiếp. Có migration → chạy migrate trên DB của đúng môi trường đang deploy.
+
+**6b. QA tổng (trước gate lên thật).** QA tổng (Duy chốt 24/11): sau khi lên staging, trước gate lên thật, giao worker `qa-tester` chạy
+**Claude Opus** (`--agent claude --model claude-opus-5-5`) kiểm hồi quy toàn bộ: e2e `general_rules` + `full_flow` chạy
+với staging, quét rò giá vốn và dữ liệu khách trên API công khai bằng token từng Group, đi lại luồng mua và luồng ERP
+chính trên staging (ảnh 360 + 1280), đối chiếu mọi AC của đợt. Ghi `04-qa-report-tong.md`, kết luận APPROVED/REJECTED.
+REJECTED thì không mở gate lên thật. Lỗi → giao lại đúng dev, sửa, lên lại staging, QA tổng chạy lại.
 
 ## Luồng nhanh
 Cho bug nhỏ / chỉnh sửa rõ ràng, 1 story:
