@@ -141,6 +141,82 @@ cách xem, sửa, xoá hoặc hạn chế xử lý, và cách tiếp nhận khi�
   yêu cầu nêu "đối tượng có thể tiếp cận", nên **đề xuất ghi tên SePay ở trang chính sách** (chỉ ở đây). Nếu Duy không muốn thì ghi "đơn vị đối soát thanh toán
   tại Việt Nam". Cách này rủi ro hơn, vì khó chứng minh khách đã được thông báo đủ.
 
+### 1.2c VietMap thay Google (25/11)
+> `legal-vn` · tra cứu 2026-11-25 · căn cứ `doc/decisions.md` mục 2026-11-24 (Duy chốt VietMap). Mục này **thay** phần Google ở 1.1, 1.2(b), 1.2(c) và 1.3;
+> các vế khác của 1.1 (bỏ nút "Vị trí của tôi", không lưu toạ độ, thông báo trước khi nạp script) giữ nguyên. Tài liệu nội bộ, không phải tư vấn pháp lý.
+
+**1. VietMap là ai (kiểm chứng web 25/11)**
+
+| Thông tin | Kết quả | Nguồn |
+|---|---|---|
+| Tên pháp nhân | **Chưa xác minh, các nguồn lệch nhau.** Trang tuyển dụng ghi "Công ty Cổ phần Ứng dụng Bản đồ Việt (VIETMAP Co., JSC)", thành lập 2006. Chính sách quyền riêng tư của VietMap ghi "Vietmap Co., Ltd" và "các công ty con, công ty liên kết". | itviec, topdev, chính sách VietMap |
+| Mã số thuế | **Chưa xác minh** (không thấy trên nguồn công khai đã đọc) | — |
+| Trụ sở | **Chưa xác minh, các nguồn lệch nhau.** Chính sách VietMap: 197 Trần Phú, phường Chợ Quán, TP.HCM. TopDev: 03 Trần Nhân Tôn, Phường 9, Quận 5, TP.HCM (có thể là địa chỉ cũ trước khi sáp nhập phường). | chính sách VietMap, topdev |
+| Máy chủ | Chính sách **không nêu** nơi đặt máy chủ. Mục "International transfers" nói dữ liệu "may be transferred" sang nước khác khi có đồng ý hoặc biện pháp bảo vệ theo luật. Tra DNS ngày 25/11: `maps.vietmap.vn` trỏ về IP `42.117.1.18`, whois ghi `FPT-STATICIP`, country `VN`. Tức là **điểm nhận request API đặt ở Việt Nam**; nơi lưu log và bản sao lưu thì **chưa xác minh**. | `dig` + `whois` 25/11 |
+| Chính sách quyền riêng tư | https://maps.vietmap.vn/console/privacy-policy · không ghi ngày cập nhật · liên hệ `support@map.zone`, hotline 1800.555.546. Đây là bản chung của nhóm (nói nhiều về tài xế, camera xe, telematics), **không có phần riêng cho Maps API** (log truy vấn, chữ tìm kiếm, thời hạn lưu log). Mục đích có ghi "Research and development" và "Marketing And Promotions". | trang chính sách |
+| Liên hệ API | `maps.info@vietmap.vn` (trang tài liệu API) | maps.vietmap.vn/docs |
+
+**2. Đánh giá theo Luật BVDLCN 91/2025 và NĐ 356/2025**
+
+- **Vai của VietMap.** Cá Về quyết định mục đích (tìm địa chỉ giao hàng) và phương tiện (chọn VietMap, nhúng vào bước đặt hàng), nên Cá Về là **bên kiểm soát**
+  (Đ.2 k7). Trong việc tìm địa chỉ, VietMap xử lý dữ liệu theo yêu cầu của Cá Về qua hợp đồng dịch vụ API, tức là **bên xử lý** (Đ.2 k8).
+  Nhưng chính sách chung của VietMap cho phép dùng dữ liệu cho nghiên cứu phát triển và tiếp thị. Nếu VietMap dùng chữ khách gõ cho mục đích riêng thì với phần đó
+  VietMap là **bên thứ ba** (Đ.2 k10) ⚠. **Đề xuất:** chính sách của Cá Về ghi VietMap là bên **cùng xử lý**, kèm link chính sách của VietMap (giống cách đã làm với Google),
+  để phủ cả hai cách hiểu.
+- **Hợp đồng xử lý dữ liệu.** Đ.37 k2 điểm a, b: bên xử lý chỉ được nhận dữ liệu sau khi có "thoả thuận, hợp đồng về xử lý dữ liệu cá nhân" với bên kiểm soát;
+  Đ.37 k1 yêu cầu bên kiểm soát nêu rõ trách nhiệm các bên trong thoả thuận đó. Điều khoản dịch vụ chấp nhận khi đăng ký key **có thể** là thoả thuận này,
+  nếu có điều khoản về dữ liệu ⚠ (chưa đọc được điều khoản dịch vụ API của VietMap). Với Google trước đây cũng ở tình trạng tương tự. → Việc của Lộc, mục 5.
+- **Chuyển dữ liệu ra nước ngoài (Đ.20 k1).** Đ.20 k1 tính là chuyển xuyên biên giới khi chuyển tới hệ thống lưu trữ ngoài lãnh thổ (a), cho tổ chức ở nước ngoài (b),
+  hoặc dùng nền tảng ngoài lãnh thổ để xử lý (c). VietMap là doanh nghiệp Việt Nam và điểm nhận API đặt ở Việt Nam, nên **nhiều khả năng không phải chuyển ra
+  nước ngoài**. Hệ quả tốt: **bỏ phần bản đồ khỏi hồ sơ đánh giá tác động chuyển dữ liệu ra nước ngoài**; hồ sơ đó vẫn phải làm cho máy chủ Singapore
+  (checklist go-live dòng "Singapore + Google Maps" đọc lại là "Singapore"). Điều kiện kèm theo ⚠: (i) VietMap xác nhận bằng văn bản là lưu log trong nước, vì chính sách
+  chung có câu "may be transferred"; (ii) FE **tự host** thư viện bản đồ JS/CSS hoặc nạp từ máy chủ VietMap, không nạp từ CDN nước ngoài (unpkg, jsdelivr), nếu không thì IP
+  khách vẫn đi ra nước ngoài lúc mở bản đồ. Điểm (ii) Tech Lead chốt ở 02b §1.9.
+- **Dữ liệu nhạy cảm.** Vị trí khách **tự kéo ghim** không phải "vị trí xác định qua dịch vụ định vị" theo NĐ 356 (chưa xác minh bản gốc, như 1.1). Giữ luật bỏ nút
+  "Vị trí của tôi" và không gọi `navigator.geolocation` (SHOP-3-04 AC4) thì Cá Về vẫn không xử lý dữ liệu nhạy cảm, quyền miễn ở Đ.38 không mất.
+- **Đồng ý.** Như 1.1: khách mở bản đồ trước khi tick ô đồng ý, nên dòng thông báo trong popup vẫn **bắt buộc** (cách hiểu thận trọng) và phải hiện trước khi script nạp
+  (SHOP-3-04 AC2). Đổi chính sách thì phiên bản chính sách mới tự buộc khách đồng ý lại (`policy_version_id`), đúng ý đồ.
+- **Ô đồng ý 1.2(a)** không đổi: câu "Dữ liệu được lưu trên máy chủ đặt ở nước ngoài" vẫn đúng vì máy chủ đơn hàng ở Singapore.
+
+**3. Câu thông báo mới trong popup bản đồ** (thay câu Google ở SHOP-3-04 AC2 và 1.2(b)) · C1b `MapPicker`, `DesktopMapPicker` · FE · **Bắt buộc**
+> Bản đồ do VietMap cung cấp. Chữ bạn gõ và vị trí bạn ghim sẽ được gửi tới VietMap để tìm địa chỉ. Không muốn dùng, bạn đóng lại và gõ địa chỉ trực tiếp.
+
+Vị trí, thời điểm hiện như 1.2(b). AC1 của SHOP-3-04 đổi tên miền kiểm thành tên miền VietMap (PO sửa story, không thuộc mục này).
+
+**4. Đoạn thay thế nguyên văn trong Chính sách quyền riêng tư** (`pages.json`, trang `quyen-rieng-tu`, mục "## 3. Bên nhận hoặc xử lý dữ liệu cùng Cá Về").
+`mkt-brand` thay **nguyên dòng** bắt đầu bằng `- **Google (Google Maps Platform, máy chủ ở nước ngoài):**` bằng dòng dưới đây (giữ escape `\"` khi chép vào JSON):
+
+```markdown
+- **VietMap ([tên pháp nhân ghi trên hợp đồng hoặc hoá đơn VietMap], doanh nghiệp bản đồ tại Việt Nam):** chỉ khi bạn bấm "Bản đồ" để tìm địa chỉ. VietMap nhận chữ bạn gõ, vị trí bạn ghim, địa chỉ IP và thông tin trình duyệt để tìm và hiển thị địa chỉ. Cá Về không gửi họ tên hay số điện thoại cho VietMap. VietMap xử lý theo chính sách riêng của VietMap ([maps.vietmap.vn/console/privacy-policy](https://maps.vietmap.vn/console/privacy-policy)). Bạn có thể không dùng bản đồ và gõ địa chỉ trực tiếp.
+```
+
+- Ô `[tên pháp nhân…]` Lộc điền trước khi đăng production. Trên staging để nguyên ngoặc vuông được.
+- Câu tuỳ chọn, **chỉ thêm khi VietMap đã xác nhận bằng văn bản** là lưu dữ liệu trong nước (mục 5): chèn sau "…để tìm và hiển thị địa chỉ." câu
+  "Dữ liệu này được xử lý trên máy chủ đặt tại Việt Nam." Chưa có xác nhận thì **không** ghi, để tránh khẳng định sai.
+- Mục "## 4. Lưu trữ ở nước ngoài" của trang **giữ nguyên** (chỉ nói máy chủ Singapore, không nhắc bản đồ).
+- `seo_description` và các mục khác không phải sửa.
+
+**5. Việc của Lộc** (pháp lý, tài khoản là việc của Lộc; IT chỉ soạn khung)
+
+| Việc | Ai | Chặn |
+|---|---|---|
+| Lấy **tên pháp nhân, mã số thuế, địa chỉ** VietMap từ hợp đồng, hoá đơn hoặc trang tài khoản đã đăng ký key; điền vào ô `[tên pháp nhân…]` | **Lộc** | go-live production |
+| Đọc điều khoản dịch vụ Maps API lúc đăng ký: có điều khoản về bảo vệ dữ liệu cá nhân không. Không có thì gửi email `maps.info@vietmap.vn` xin thoả thuận xử lý dữ liệu (Đ.37 k2), hỏi kèm: (1) log truy vấn lưu ở đâu, bao lâu; (2) có dùng chữ khách tìm cho tiếp thị hay huấn luyện không; (3) có chuyển ra nước ngoài không | **Lộc** (IT soạn sẵn email nếu Lộc cần) | go-live production ⚠ |
+| Hồ sơ đánh giá tác động chuyển dữ liệu ra nước ngoài: chỉ còn máy chủ Singapore; thêm lại bản đồ nếu VietMap trả lời là có chuyển ra nước ngoài | Lộc + luật sư | go-live ⚠ |
+| Câu popup mục 3 vào MapPicker; sửa AC2 (và tên miền ở AC1) SHOP-3-04 | FE + PO | lô SHOP-3-04 |
+| Chép đoạn mục 4 vào `pages.json` | `mkt-brand` | lô SHOP-3-04 (staging) |
+| Chốt nơi nạp thư viện bản đồ (tự host hoặc máy chủ VietMap, không CDN nước ngoài) | Tech Lead, 02b §1.9 | lô SHOP-3-04 |
+
+**Kết luận §1.2c: ĐẠT cho staging** (câu popup và đoạn chính sách dùng được ngay) · **CHƯA ĐẠT cho production** tới khi Lộc điền tên pháp nhân và có thoả thuận
+xử lý dữ liệu hoặc điều khoản dịch vụ có phần dữ liệu ⚠.
+
+**Nguồn (tra 2026-11-25)**
+- Chính sách quyền riêng tư VietMap: https://maps.vietmap.vn/console/privacy-policy
+- Tài liệu Maps API VietMap: https://maps.vietmap.vn/docs/map-api/overview/
+- Hồ sơ công ty: [itviec](https://itviec.com/companies/vietmap) · [topdev](https://topdev.vn/nha-tuyen-dung/vietmap-85924)
+- Tra DNS/whois `maps.vietmap.vn` → `42.117.1.18`, `FPT-STATICIP`, country `VN` (chạy `dig`, `whois` ngày 25/11)
+- Luật BVDLCN 91/2025: [Đ.2](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-2) (k7, k8, k10) · [Đ.20](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-20) (k1 a–c) · [Đ.37](https://hethongphapluat.com/luat-bao-ve-du-lieu-ca-nhan-2025/dieu-37) (k1, k2 a–b). Bản sao bên thứ ba, chưa đối chiếu công báo.
+
 ### 1.3 Việc của ai
 
 | Việc | Ai | Chặn |
