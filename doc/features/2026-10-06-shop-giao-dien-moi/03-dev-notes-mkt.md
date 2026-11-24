@@ -478,3 +478,25 @@ $ python3 scripts/check_naming.py -> OK, không phát sinh mới
   Lấy từ catalog đã nạp sẵn (không thêm request) một **món lẻ**: ưu tiên "Còn hàng", không có thì "Sắp hết". Không có món nào hoặc catalog lỗi thì ẩn thẻ.
   Điện thoại: thẻ nằm dưới hai nút (rộng tối đa 280 px). Máy tính (≥ 768 px): chữ bên trái, thẻ 260 px bên phải. Chỉ dùng token.
 - Kiểm: `cd frontend && npx tsc --noEmit` cho tsc=0 · grep hex `app/about` = 0 · `check_naming` OK. Chưa chụp 360/1280 (QA chụp sau khi fe-dev build).
+
+## SHOP-3-04 VietMap — nội dung
+
+> `mkt-brand` · 25/11/2026 · nhánh `DuyduyFedev46/claude-vietmap-mkt` · Căn cứ: `05-phap-ly.md` §1.2c và §1.2c-A (phương án A, 25/11), `doc/decisions.md` mục 2026-11-24.
+
+### File đổi
+- `backend/apps/content/management/shop_content/pages.json`: tại trang `quyen-rieng-tu` (mục `## 3. Bên nhận hoặc xử lý dữ liệu cùng Cá Về`, dòng 183), thay nguyên văn dòng Google Maps Platform bằng câu chốt phương án A tại `05-phap-ly.md` §1.2c-A mục 2 (`VietMap ([tên pháp nhân ghi trên hợp đồng hoặc hoá đơn VietMap], dịch vụ tìm địa chỉ tại Việt Nam)` — bấm `"Tìm địa chỉ"`, chữ gõ đi qua máy chủ Cá Về sang VietMap, VietMap không nhận IP/trình duyệt/họ tên/SĐT, Cá Về không lưu/ghi nhật ký chữ gõ, kèm link `https://maps.vietmap.vn/console/privacy-policy`). Giữ nguyên dòng hạ tầng `Google Cloud và Supabase` (dòng 185) và mục `## 4. Lưu trữ ở nước ngoài` (máy chủ Singapore, dòng 188).
+- Rà soát các trang và bài còn lại trong `shop_content/{pages,posts,categories}.json`: không có chỗ nào khác nhắc bản đồ hay Google Maps (`cach-mua-hang`, `lien-he`, `gioi-thieu`, `doi-tra`, `giao-hang`, `thanh-toan`, `dieu-khoan`, `khieu-nai`, `thong-tin-nguoi-ban`, `home-banner`, `home-commitments` và 5 bài Góc bếp đều không nhắc).
+- `backend/apps/content/tests/test_load_shop_content.py`: thêm và cập nhật `LoadShopContentPolicyTextTests.test_privacy_policy_names_vietmap_instead_of_google_maps` theo §1.2c-A (kiểm trang `quyen-rieng-tu` sau khi nạp có `VietMap`, ô chờ tên pháp nhân, `dịch vụ tìm địa chỉ tại Việt Nam`, `máy chủ Cá Về (xem mục 4) chuyển tới VietMap`, `VietMap không nhận địa chỉ IP`, link chính sách VietMap; không còn `Google Maps Platform`, `policies.google.com/privacy`, `vị trí bạn ghim`; vẫn giữ `Google Cloud và Supabase`).
+
+### Lưu ý vận hành / chờ chốt tiếp
+- DB staging nếu đã có người sửa tay trang `quyen-rieng-tu`: chạy `load_shop_content --author <Chủ> --publish` sẽ in `bỏ qua: đã sửa`, cần thêm `--overwrite` hoặc sửa tay ở màn Nội dung ERP để phát sinh phiên bản chính sách mới (`policy_version_id` mới buộc khách đồng ý lại theo BR-BH-17).
+- Trước go-live production theo §1.2c-A mục 3: Lộc điền tên pháp nhân VietMap vào ô `[tên pháp nhân ghi trên hợp đồng hoặc hoá đơn VietMap]`, rà điều khoản xử lý dữ liệu với VietMap (Đ.17 k1 d, Đ.37 k2), và bổ sung dòng "chữ khách gõ để tìm địa chỉ, xử lý tạm, không lưu" vào hồ sơ đánh giá tác động cho máy chủ Singapore. Nếu Duy chọn phương án B ở Q-VM-1 thì đổi lại về câu ở §1.2c mục 4; nếu Duy đổi nhãn nút `"Tìm địa chỉ"` sang `"Bản đồ"` thì đồng bộ chữ trong ngoặc kép ở dòng này.
+
+### Kiểm chứng (25/11, cập nhật §1.2c-A)
+- TDD RED trước khi cập nhật `pages.json` sang §1.2c-A: `manage.py test apps.content.tests.test_load_shop_content.LoadShopContentPolicyTextTests.test_privacy_policy_names_vietmap_instead_of_google_maps --parallel 1` → `FAILED (failures=1)` (`AssertionError: 'dịch vụ tìm địa chỉ tại Việt Nam' not found`).
+- Cổng kiểm chứng sau khi đổi sang §1.2c-A:
+  - `python3 -c "import json;json.load(open('backend/apps/content/management/shop_content/pages.json'))"` → exit 0
+  - `cd backend && DJANGO_SECRET_KEY=test DJANGO_DEBUG=1 .venv/bin/python manage.py collectstatic --noinput >/dev/null` → exit 0
+  - `cd backend && DJANGO_SECRET_KEY=test .venv/bin/python manage.py test apps.content --parallel 1` → `Ran 220 tests … OK`
+  - `python3 scripts/check_naming.py` → `OK - 6437 vi phạm cũ trong 173 file, không phát sinh mới.`
+
