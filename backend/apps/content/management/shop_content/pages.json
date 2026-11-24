@@ -180,7 +180,7 @@
         "Cá Về dùng các dữ liệu này để giao hàng, gọi xác nhận đơn, xác nhận thanh toán và hỗ trợ bạn sau khi mua. [Câu chữ cuối do legal-vn soát.]",
         "## 3. Bên nhận hoặc xử lý dữ liệu cùng Cá Về",
         "- **Nhân viên Cá Về:** chỉ người soạn hàng, giao hàng và chăm sóc đơn của bạn.",
-        "- **Google (Google Maps Platform, máy chủ ở nước ngoài):** chỉ khi bạn bấm \"Bản đồ\" để tìm địa chỉ. Google nhận chữ bạn gõ, vị trí bạn ghim, địa chỉ IP và thông tin trình duyệt. Cá Về không gửi họ tên hay số điện thoại cho Google. Google xử lý theo chính sách riêng của Google ([policies.google.com/privacy](https://policies.google.com/privacy)). Bạn có thể không dùng bản đồ và gõ địa chỉ trực tiếp.",
+        "- **VietMap ([tên pháp nhân ghi trên hợp đồng hoặc hoá đơn VietMap], doanh nghiệp bản đồ tại Việt Nam):** chỉ khi bạn bấm \"Bản đồ\" để tìm địa chỉ. VietMap nhận chữ bạn gõ, vị trí bạn ghim, địa chỉ IP và thông tin trình duyệt để tìm và hiển thị địa chỉ. Cá Về không gửi họ tên hay số điện thoại cho VietMap. VietMap xử lý theo chính sách riêng của VietMap ([maps.vietmap.vn/console/privacy-policy](https://maps.vietmap.vn/console/privacy-policy)). Bạn có thể không dùng bản đồ và gõ địa chỉ trực tiếp.",
         "- **SePay (đơn vị đối soát thanh toán) và ngân hàng:** nhận mã đơn và số tiền để xác nhận bạn đã chuyển khoản.",
         "- **Đơn vị cung cấp hạ tầng:** Google Cloud và Supabase, nơi đặt máy chủ lưu dữ liệu.",
         "- **Cơ quan nhà nước có thẩm quyền** khi pháp luật yêu cầu.",

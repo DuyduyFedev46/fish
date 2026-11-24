@@ -482,6 +482,17 @@ class LoadShopContentPolicyTextTests(LoadShopContentBase):
         self.assertIn("[Thời gian giao dự kiến", self.page_text("giao-hang"))
         self.assertIn("[mã số thuế]", self.page_text("thong-tin-nguoi-ban"))
 
+    def test_privacy_policy_names_vietmap_instead_of_google_maps(self):
+        """SHOP-3-04 (05-phap-ly §1.2c, decisions 2026-11-24, bất biến 9): trang quyen-rieng-tu nêu VietMap kèm ô chờ tên pháp nhân và link chính sách VietMap; không còn Google Maps Platform, giữ Google Cloud ở mục hạ tầng."""
+        self.run_cmd()
+        privacy = self.page_text("quyen-rieng-tu")
+        self.assertIn("VietMap", privacy)
+        self.assertIn("[tên pháp nhân ghi trên hợp đồng hoặc hoá đơn VietMap]", privacy)
+        self.assertIn("https://maps.vietmap.vn/console/privacy-policy", privacy)
+        self.assertNotIn("Google Maps Platform", privacy)
+        self.assertNotIn("policies.google.com/privacy", privacy)
+        self.assertIn("Google Cloud và Supabase", privacy)
+
     def test_shop_5_06_every_loaded_entry_passes_cms_scan(self):
         """Mọi trang, bài nạp sẵn không có cụm khẳng định cấm theo máy quét CMS (02b §3.7.5)."""
         from apps.content.body.scan import scan_entry_warnings
