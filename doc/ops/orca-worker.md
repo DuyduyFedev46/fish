@@ -47,6 +47,10 @@ ORCA orchestration worker-start --environment local --task <task_id> --agent ant
   --worktree new-top-level --repo id:19653c71-270c-4299-8146-e6ff05e5e8c9 --base-branch origin/main --name claude-<slug>-<vai>
 ```
 
+- Orca đặt tên nhánh worker là `DuyduyFedev46/<--name>` (đã chạy thử 24/11), worktree ở `~/orca/workspaces/loc/<--name>`.
+  Gộp nhánh đó vào nhánh lô, xong thì dọn: `ORCA orchestration worker-release --dispatch <id>` rồi
+  `ORCA worktree rm --worktree path:<worktree> --delete-branch`.
+- `--model gemini-4-carbon-high` được Orca hiểu là model `gemini-4-carbon`, mức `high`.
 - Việc chỉ viết tài liệu (PM, BA, PO, UX, Tech Lead viết 02b, Pháp lý, Marketing chỉ soạn chữ): có thể cho chung một
   worktree tài liệu `claude-<slug>-doc`. Dùng `--worktree <selector của worktree đó>`, không tạo mới mỗi lượt.
 - Việc code: BE và FE song song thì **mỗi bên một worktree**. Không bao giờ cho hai worker sửa cùng một file.
